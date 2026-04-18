@@ -11,15 +11,18 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/tailscale/hujson"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // OpenVSXFiles represents the nested files object from OpenVSX
 type OpenVSXFiles struct {
 	Download string `json:"download"`
+	Icon     string `json:"icon"`
 }
 
 // OpenVSXExtension represents the essential data from the search API
@@ -32,6 +35,7 @@ type OpenVSXExtension struct {
 	Version     string       `json:"version"`
 	URL         string       `json:"url"` // usually the page, not the download
 	Files       OpenVSXFiles `json:"files"`
+	DownloadCount int        `json:"downloadCount"`
 	DownloadURL string       `json:"downloadUrl"` // We build this or use from API
 }
 
@@ -40,10 +44,23 @@ type OpenVSXSearchResponse struct {
 	Results []OpenVSXExtension `json:"extensions"`
 }
 
+type openVSXLatestResponse struct {
+	Categories    []string     `json:"categories"`
+	Tags          []string     `json:"tags"`
+	DownloadCount int          `json:"downloadCount"`
+	Files         OpenVSXFiles `json:"files"`
+}
+
 // CustomTheme is the result sent back to frontend
 type CustomTheme struct {
 	ID     string            `json:"id"`
 	Colors map[string]string `json:"colors"`
+}
+
+type manifestThemeEntry struct {
+	Label   string `json:"label"`
+	Path    string `json:"path"`
+	UITheme string `json:"uiTheme"` // e.g. vs-dark
 }
 
 // Allowed color keys - we only parse these to avoid injection
@@ -62,18 +79,87 @@ var allowedColors = map[string]bool{
 	"editorGutter.background": true,
 	"editorGroup.border": true,
 	"editorLineNumber.activeForeground": true,
+	"editorLineNumber.foreground": true,
 	"editorError.foreground": true,
 	"problemsErrorIcon.foreground": true,
 	"textLink.foreground": true,
+	"symbolIcon.functionForeground": true,
+	"symbolIcon.variableForeground": true,
 }
 
 // Strict regex for valid colors (hex, rgb, rgba)
 var validColorRegex = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[0-9.]+\s*)?\))$`)
 
+func isThemeByMetadata(data openVSXLatestResponse) bool {
+	for _, category := range data.Categories {
+		if strings.EqualFold(strings.TrimSpace(category), "Themes") {
+			return true
+		}
+	}
+
+	for _, tag := range data.Tags {
+		normalized := strings.ToLower(strings.TrimSpace(tag))
+		if normalized == "theme" || normalized == "color-theme" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func fetchLatestMetadata(client *http.Client, namespace string, name string) (openVSXLatestResponse, error) {
+	endpoint := fmt.Sprintf("https://open-vsx.org/api/%s/%s/latest", url.PathEscape(namespace), url.PathEscape(name))
+	resp, err := client.Get(endpoint)
+	if err != nil {
+		return openVSXLatestResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return openVSXLatestResponse{}, fmt.Errorf("metadata status: %d", resp.StatusCode)
+	}
+
+	var data openVSXLatestResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return openVSXLatestResponse{}, err
+	}
+
+	return data, nil
+}
+
+func normalizeThemePath(rawPath string) string {
+	return filepath.ToSlash(filepath.Clean(strings.TrimPrefix(rawPath, "./")))
+}
+
+func isJSONThemePath(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasSuffix(lower, ".json") || strings.HasSuffix(lower, ".jsonc")
+}
+
+func selectInstallableThemePath(themes []manifestThemeEntry) (string, error) {
+	if len(themes) == 0 {
+		return "", errors.New("no themes contributed by this extension")
+	}
+
+	for _, t := range themes {
+		clean := normalizeThemePath(t.Path)
+		if isJSONThemePath(clean) {
+			return clean, nil
+		}
+	}
+
+	return "", errors.New("theme format not supported: extension has no JSON/JSONC theme file")
+}
+
 // SearchThemes calls Open VSX API
 func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
-	// e.g. https://open-vsx.org/api/-/search?query=dracula&extensionFilter=theme
-	reqURL := fmt.Sprintf("https://open-vsx.org/api/-/search?query=%s&extensionFilter=theme", url.QueryEscape(query))
+	searchQuery := strings.TrimSpace(query)
+	if searchQuery == "" {
+		searchQuery = "theme"
+	}
+
+	// Keep result set bounded; we re-verify each extension as a true theme for safety.
+	reqURL := fmt.Sprintf("https://open-vsx.org/api/-/search?query=%s&size=30", url.QueryEscape(searchQuery))
 	
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(reqURL)
@@ -91,19 +177,41 @@ func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
 		return nil, fmt.Errorf("failed to parse JSON response: %v", err)
 	}
 	
-	// API puts download url inside files.download
+	filtered := make([]OpenVSXExtension, 0, len(data.Results))
 	for i := range data.Results {
-		if data.Results[i].Files.Download != "" {
-			data.Results[i].DownloadURL = data.Results[i].Files.Download
-		} else if data.Results[i].DownloadURL == "" {
-			ns := data.Results[i].Namespace
-			n := data.Results[i].Name
-			v := data.Results[i].Version
-			data.Results[i].DownloadURL = fmt.Sprintf("https://open-vsx.org/api/%s/%s/%s/file/%s-%s-%s.vsix", ns, n, v, ns, n, v)
+		ext := data.Results[i]
+		meta, err := fetchLatestMetadata(client, ext.Namespace, ext.Name)
+		if err != nil {
+			continue
 		}
+		if !isThemeByMetadata(meta) {
+			continue
+		}
+
+		if ext.Files.Download != "" {
+			ext.DownloadURL = ext.Files.Download
+		} else if ext.DownloadURL == "" {
+			ns := ext.Namespace
+			n := ext.Name
+			v := ext.Version
+			ext.DownloadURL = fmt.Sprintf("https://open-vsx.org/api/%s/%s/%s/file/%s-%s-%s.vsix", ns, n, v, ns, n, v)
+		}
+
+		if ext.Files.Icon == "" {
+			ext.Files.Icon = meta.Files.Icon
+		}
+		if ext.DownloadCount == 0 {
+			ext.DownloadCount = meta.DownloadCount
+		}
+
+		filtered = append(filtered, ext)
 	}
-	
-	return data.Results, nil
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].DownloadCount > filtered[j].DownloadCount
+	})
+
+	return filtered, nil
 }
 
 // InstallTheme downloads the VSIX, unzips in memory, and parses styles
@@ -152,25 +260,17 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 	// Parse package.json
 	var manifest struct {
 		Contributes struct {
-			Themes []struct {
-				Label string `json:"label"`
-				Path  string `json:"path"`
-				UITheme string `json:"uiTheme"` // e.g. vs-dark
-			} `json:"themes"`
+			Themes []manifestThemeEntry `json:"themes"`
 		} `json:"contributes"`
 	}
 	if err := json.Unmarshal(packageJSON, &manifest); err != nil {
 		return nil, fmt.Errorf("failed to parse package.json: %v", err)
 	}
-	
-	if len(manifest.Contributes.Themes) == 0 {
-		return nil, errors.New("no themes contributed by this extension")
+
+	cleanThemePath, err := selectInstallableThemePath(manifest.Contributes.Themes)
+	if err != nil {
+		return nil, err
 	}
-	
-	// Select first theme for simplicity, or we could pass UITheme mapping
-	themePath := manifest.Contributes.Themes[0].Path
-	// Usually path is "./themes/dracula.json". Let's clean it.
-	cleanThemePath := filepath.ToSlash(filepath.Clean(strings.TrimPrefix(themePath, "./")))
 	targetFile := "extension/" + cleanThemePath
 	
 	var themeJSON []byte
@@ -190,21 +290,26 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 		return nil, fmt.Errorf("theme file %s not found in archive", targetFile)
 	}
 	
-	// 2. Parse theme JSON. Note that VS Code themes are often JSON with Comments.
-	// We'll run a naive strip comments.
+	// 2. Parse theme JSON. VS Code themes often use JSONC (comments/trailing commas).
 	themeJSONStr := string(themeJSON)
-	reComments := regexp.MustCompile(`(?m)^\s*//.*$`)
-	themeJSONStr = reComments.ReplaceAllString(themeJSONStr, "")
-	// Also block comments like /* ... */
-	reBlockComments := regexp.MustCompile(`(?s)/\*.*?\*/`)
-	themeJSONStr = reBlockComments.ReplaceAllString(themeJSONStr, "")
+	themeJSONStr = strings.TrimSpace(strings.TrimPrefix(themeJSONStr, "\ufeff"))
+	if strings.HasPrefix(themeJSONStr, "<") {
+		return nil, errors.New("theme incompatible: expected JSON/JSONC theme file, but found XML/plist")
+	}
+
+	jsoncAST, err := hujson.Parse([]byte(themeJSONStr))
+	if err != nil {
+		return nil, fmt.Errorf("theme incompatible: unable to parse %s as JSON/JSONC", cleanThemePath)
+	}
+	jsoncAST.Standardize()
+	standardJSON := jsoncAST.Pack()
 	
 	var themeData struct {
 		Type string `json:"type"` // dark or light
 		Colors map[string]string `json:"colors"`
 	}
-	if err := json.Unmarshal([]byte(themeJSONStr), &themeData); err != nil {
-		return nil, fmt.Errorf("failed to parse theme json: %v", err)
+	if err := json.Unmarshal(standardJSON, &themeData); err != nil {
+		return nil, fmt.Errorf("theme incompatible: unable to read colors from %s", cleanThemePath)
 	}
 	
 	// 3. Filter strictly

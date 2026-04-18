@@ -2,7 +2,10 @@ module calc
 
 go 1.23.0
 
-require github.com/wailsapp/wails/v2 v2.12.0
+require (
+	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
+	github.com/wailsapp/wails/v2 v2.12.0
+)
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect

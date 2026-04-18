@@ -16,6 +16,7 @@ export namespace main {
 	}
 	export class OpenVSXFiles {
 	    download: string;
+	    icon: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new OpenVSXFiles(source);
@@ -24,6 +25,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.download = source["download"];
+	        this.icon = source["icon"];
 	    }
 	}
 	export class OpenVSXExtension {
@@ -35,6 +37,7 @@ export namespace main {
 	    version: string;
 	    url: string;
 	    files: OpenVSXFiles;
+	    downloadCount: number;
 	    downloadUrl: string;
 	
 	    static createFrom(source: any = {}) {
@@ -51,6 +54,7 @@ export namespace main {
 	        this.version = source["version"];
 	        this.url = source["url"];
 	        this.files = this.convertValues(source["files"], OpenVSXFiles);
+	        this.downloadCount = source["downloadCount"];
 	        this.downloadUrl = source["downloadUrl"];
 	    }
 	

@@ -66,6 +66,10 @@ func applicationMenu(app *App) *menu.Menu {
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
+	var appMenu *menu.Menu
+	if goruntime.GOOS == "darwin" {
+		appMenu = applicationMenu(app)
+	}
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -75,7 +79,7 @@ func main() {
 		MinWidth:  480,
 		MinHeight: 320,
 		Frameless: false,
-		Menu:      applicationMenu(app),
+		Menu:      appMenu,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

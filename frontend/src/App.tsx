@@ -1,8 +1,15 @@
 import {KeyboardEvent, useEffect, useMemo, useRef, useState} from 'react';
 import {
+    BrowserOpenURL,
+    Environment,
     EventsOn,
+    Quit,
     ScreenGetAll,
+    WindowReload,
     WindowCenter,
+    WindowSetDarkTheme,
+    WindowSetLightTheme,
+    WindowSetSystemDefaultTheme,
     WindowGetPosition,
     WindowGetSize,
     WindowSetPosition,
@@ -11,9 +18,10 @@ import {
 import './App.css';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
 import {evaluateExpression, ParseError, type DecimalDelimiter} from './calculator';
-import {useTheme} from './useTheme';
+import {useTheme, type ThemeState} from './useTheme';
+import { getPrimaryShortcutAction } from './editorShortcuts';
 
-import { ThemeStore } from './ThemeStore';
+import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
 const OPERATOR_KEY_RE = /^[+\-*/]$/;
 const ERROR_SUFFIX = ' = error';
@@ -36,8 +44,11 @@ const WORKSHEET_CONTENT_STORAGE_KEY = 'calc.editor.content';
 const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
 const LINE_VARIABLES_STORAGE_KEY = 'calc.editor.lineVariables';
 const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
+const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
+
+type SavedThemeEntry = AcceptedThemeEntry;
 
 type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
 type PrecisionMode = 'auto' | number;
@@ -94,6 +105,62 @@ function formatNumber(
     }
 
     return decimalDelimiter === ',' ? str.replace('.', ',') : str;
+}
+
+function parseHexColor(hexColor: string): [number, number, number] | null {
+    const hex = hexColor.trim();
+    if (!hex.startsWith('#')) {
+        return null;
+    }
+
+    const value = hex.slice(1);
+    if (value.length === 3 || value.length === 4) {
+        const r = parseInt(value[0] + value[0], 16);
+        const g = parseInt(value[1] + value[1], 16);
+        const b = parseInt(value[2] + value[2], 16);
+        return Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b) ? null : [r, g, b];
+    }
+
+    if (value.length === 6 || value.length === 8) {
+        const r = parseInt(value.slice(0, 2), 16);
+        const g = parseInt(value.slice(2, 4), 16);
+        const b = parseInt(value.slice(4, 6), 16);
+        return Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b) ? null : [r, g, b];
+    }
+
+    return null;
+}
+
+function parseRgbColor(rgbColor: string): [number, number, number] | null {
+    const match = rgbColor.trim().match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!match) {
+        return null;
+    }
+
+    const r = Number(match[1]);
+    const g = Number(match[2]);
+    const b = Number(match[3]);
+    if (![r, g, b].every((v) => Number.isFinite(v) && v >= 0 && v <= 255)) {
+        return null;
+    }
+
+    return [r, g, b];
+}
+
+function inferCustomThemeMode(customColors?: Record<string, string>): 'light' | 'dark' {
+    const bg = customColors?.['editor.background'] || customColors?.['sideBar.background'];
+    if (!bg) {
+        return 'dark';
+    }
+
+    const rgb = parseHexColor(bg) || parseRgbColor(bg);
+    if (!rgb) {
+        return 'dark';
+    }
+
+    const [r, g, b] = rgb;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.58 ? 'light' : 'dark';
 }
 
 function App() {
@@ -172,7 +239,40 @@ function App() {
         return {};
     });
     const [pendingRecalc, setPendingRecalc] = useState<{ variable: string; dependents: number[]; newValue: number } | null>(null);
+    const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
+    const previewRestoreThemeRef = useRef<ThemeState | null>(null);
+    const [savedThemes, setSavedThemes] = useState<SavedThemeEntry[]>(() => {
+        const raw = localStorage.getItem(ACCEPTED_THEMES_STORAGE_KEY);
+        if (!raw) {
+            return [];
+        }
+
+        try {
+            const parsed: unknown = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed.filter((item): item is SavedThemeEntry => {
+                if (!item || typeof item !== 'object') {
+                    return false;
+                }
+
+                const maybe = item as SavedThemeEntry;
+                return (
+                    typeof maybe.id === 'string' &&
+                    typeof maybe.name === 'string' &&
+                    !!maybe.colors &&
+                    typeof maybe.colors === 'object'
+                );
+            });
+        } catch {
+            return [];
+        }
+    });
+    const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const burgerMenuRef = useRef<HTMLDivElement | null>(null);
     const editorRef = useRef<HTMLTextAreaElement | null>(null);
     const gutterRef = useRef<HTMLDivElement | null>(null);
     const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -194,6 +294,8 @@ function App() {
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [caretPos, setCaretPos] = useState(0);
+    const [runtimePlatform, setRuntimePlatform] = useState('');
+    const [showBurgerMenu, setShowBurgerMenu] = useState(false);
 
     const systemDecimalDelimiter = getSystemDecimalDelimiter();
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
@@ -269,6 +371,86 @@ function App() {
     }, [variableValues]);
 
     useEffect(() => {
+        localStorage.setItem(ACCEPTED_THEMES_STORAGE_KEY, JSON.stringify(savedThemes));
+    }, [savedThemes]);
+
+    useEffect(() => {
+        let cancelled = false;
+        Environment()
+            .then((env) => {
+                if (!cancelled) {
+                    setRuntimePlatform(env.platform || '');
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setRuntimePlatform('');
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (runtimePlatform !== 'windows') {
+            return;
+        }
+
+        if (theme.type === 'system') {
+            WindowSetSystemDefaultTheme();
+            return;
+        }
+
+        if (theme.type === 'light') {
+            WindowSetLightTheme();
+            return;
+        }
+
+        if (theme.type === 'dark') {
+            WindowSetDarkTheme();
+            return;
+        }
+
+        const customMode = inferCustomThemeMode(theme.customColors);
+        if (customMode === 'light') {
+            WindowSetLightTheme();
+        } else {
+            WindowSetDarkTheme();
+        }
+    }, [runtimePlatform, theme]);
+
+    useEffect(() => {
+        if (!showBurgerMenu) {
+            return;
+        }
+
+        const onMouseDown = (event: MouseEvent) => {
+            if (!burgerMenuRef.current) {
+                return;
+            }
+            if (!burgerMenuRef.current.contains(event.target as Node)) {
+                setShowBurgerMenu(false);
+            }
+        };
+
+        const onEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setShowBurgerMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('keydown', onEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, [showBurgerMenu]);
+
+    useEffect(() => {
         if (!editorRef.current) return;
         const cs = getComputedStyle(editorRef.current);
         const lh = parseFloat(cs.lineHeight);
@@ -282,6 +464,27 @@ function App() {
         setFontScale((current) => {
             const next = current + direction * FONT_SCALE_STEP;
             return Number(Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, next)).toFixed(2));
+        });
+    };
+
+    const clearWorksheet = () => {
+        setContent('');
+        setLastResult(null);
+        setStatusText('Ready');
+        setIsStatusError(false);
+        setDevError('');
+        setMarkedLines(new Set());
+        localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
+        localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
+
+        requestAnimationFrame(() => {
+            if (!editorRef.current) {
+                return;
+            }
+
+            editorRef.current.focus();
+            editorRef.current.selectionStart = 0;
+            editorRef.current.selectionEnd = 0;
         });
     };
 
@@ -437,28 +640,11 @@ function App() {
     // --- Menu / keyboard event subscriptions ---
 
     useEffect(() => {
-        const clearWorksheet = () => {
-            setContent('');
-            setLastResult(null);
-            setStatusText('Ready');
-            setIsStatusError(false);
-            setDevError('');
-            setMarkedLines(new Set());
-            localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
-            localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
-
-            requestAnimationFrame(() => {
-                if (!editorRef.current) {
-                    return;
-                }
-
-                editorRef.current.focus();
-                editorRef.current.selectionStart = 0;
-                editorRef.current.selectionEnd = 0;
-            });
-        };
-
-        const unsubThemeStore = EventsOn('theme-store:open', () => setShowThemeStore(true));
+        const unsubThemeStore = EventsOn('theme-store:open', () => {
+            setShowSettings(true);
+            setShowThemeStore(true);
+            void expandWindowForThemeStore();
+        });
         const unsubNew = EventsOn('menu:file:new', clearWorksheet);
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
@@ -631,20 +817,38 @@ function App() {
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        const isPrimaryModifier = event.ctrlKey || event.metaKey;
-        if (isPrimaryModifier && !event.altKey && (event.key === 'm' || event.key === 'M')) {
-            event.preventDefault();
-            toggleMarkLine();
-            return;
-        }
-
         if (event.key === 'Enter') {
             event.preventDefault();
             evaluateCurrentLine();
             return;
         }
 
-        if (isPrimaryModifier && !event.altKey && event.key.length === 1 && /[a-zA-Z]/.test(event.key)) {
+        const shortcutAction = getPrimaryShortcutAction(event);
+        if (shortcutAction === 'toggle-mark-line') {
+            event.preventDefault();
+            toggleMarkLine();
+            return;
+        }
+
+        if (shortcutAction === 'increase-font-size') {
+            event.preventDefault();
+            changeFontScale(1);
+            return;
+        }
+
+        if (shortcutAction === 'decrease-font-size') {
+            event.preventDefault();
+            changeFontScale(-1);
+            return;
+        }
+
+        if (shortcutAction === 'reset-font-size') {
+            event.preventDefault();
+            resetFontSize();
+            return;
+        }
+
+        if (shortcutAction === 'assign-variable') {
             event.preventDefault();
             const editor = editorRef.current;
             if (!editor) return;
@@ -750,18 +954,26 @@ function App() {
         return contentLines.map((line, i) => {
             const suffix = i < contentLines.length - 1 ? '\n' : '';
             const lineClassName = lineErrors.has(i) ? 'line-error' : undefined;
+            const isVariableLine = i in lineVariables;
+            const isMarkedLine = markedLines.has(i);
 
-            if (!markedLines.has(i)) {
+            if (!isMarkedLine && !isVariableLine) {
                 return <span key={i} className={lineClassName}>{line + suffix}</span>;
             }
+
             const eqIdx = line.indexOf(' = ');
             if (eqIdx === -1) {
                 return <span key={i} className={lineClassName}>{line + suffix}</span>;
             }
+
+            const resultClass = isVariableLine
+                ? 'marked-result marked-result--var'
+                : 'marked-result';
+
             return (
                 <span key={i} className={lineClassName}>
                     {line.slice(0, eqIdx)}
-                    <span className="marked-result">{line.slice(eqIdx)}</span>
+                    <span className={resultClass}>{line.slice(eqIdx)}</span>
                     {suffix}
                 </span>
             );
@@ -785,6 +997,95 @@ function App() {
     const EDITOR_PADDING = 20;
     const activeLineErrorTop = 18 + activeLineIndex * lineHeightPx - editorScrollTop + lineHeightPx * 0.9;
     const activeLineErrorLeft = Math.max(EDITOR_PADDING, EDITOR_PADDING + measureLineWidth(activeLineText) + 8 - editorScrollLeft);
+
+    const startThemePreview = (candidate: SavedThemeEntry) => {
+        if (!previewRestoreThemeRef.current) {
+            previewRestoreThemeRef.current = theme;
+        }
+
+        setTheme({
+            type: 'custom',
+            customColors: candidate.colors,
+            customId: candidate.id,
+        });
+        setPendingThemePreview(candidate);
+    };
+
+    const cancelThemePreview = () => {
+        if (previewRestoreThemeRef.current) {
+            setTheme(previewRestoreThemeRef.current);
+            previewRestoreThemeRef.current = null;
+        }
+        setPendingThemePreview(null);
+    };
+
+    const acceptThemePreview = (candidate: SavedThemeEntry) => {
+        setSavedThemes((prev) => {
+            const withoutDup = prev.filter((entry) => entry.id !== candidate.id);
+            return [candidate, ...withoutDup];
+        });
+
+        setTheme({
+            type: 'custom',
+            customColors: candidate.colors,
+            customId: candidate.id,
+        });
+
+        previewRestoreThemeRef.current = null;
+        setPendingThemePreview(null);
+    };
+
+    const deleteSavedTheme = (themeId: string) => {
+        setSavedThemes((prev) => prev.filter((entry) => entry.id !== themeId));
+    };
+
+    const expandWindowForThemeStore = async () => {
+        try {
+            const current = await WindowGetSize();
+            if (!themeStoreOriginalSizeRef.current) {
+                themeStoreOriginalSizeRef.current = { w: current.w, h: current.h };
+            }
+
+            const targetWidth = Math.min(1800, Math.max(1360, current.w + 260));
+            if (targetWidth !== current.w) {
+                WindowSetSize(targetWidth, current.h);
+            }
+        } catch {
+            // Keep UI functional even if window APIs fail.
+        }
+    };
+
+    const restoreWindowAfterThemeStore = async () => {
+        const original = themeStoreOriginalSizeRef.current;
+        if (!original) {
+            return;
+        }
+
+        themeStoreOriginalSizeRef.current = null;
+        try {
+            WindowSetSize(original.w, original.h);
+        } catch {
+            // Ignore restore failures.
+        }
+    };
+
+    const openThemeStoreInSidebar = () => {
+        setShowThemeStore(true);
+        void expandWindowForThemeStore();
+    };
+
+    const closeThemeStoreInSidebar = () => {
+        if (pendingThemePreview) {
+            cancelThemePreview();
+        }
+        setShowThemeStore(false);
+        void restoreWindowAfterThemeStore();
+    };
+
+    const runBurgerAction = (action: () => void) => {
+        setShowBurgerMenu(false);
+        action();
+    };
 
     return (
         <div id="app" className="window">
@@ -891,11 +1192,60 @@ function App() {
                 >
                     {precision === 'auto' ? 'prec: auto' : `prec: ${precision}`}
                 </span>
+                <div className="status-menu-wrap" ref={burgerMenuRef}>
+                    <button
+                        type="button"
+                        className="settings-btn status-menu-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowBurgerMenu((prev) => !prev)}
+                        aria-label="Menu"
+                        title="Menu"
+                    >
+                        ☰
+                    </button>
+                    {showBurgerMenu && (
+                        <div className="status-menu-popover" role="menu" aria-label="App menu">
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(clearWorksheet)}>New worksheet</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => WindowReload())}>Reload app</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(1))}>Increase font size</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(-1))}>Decrease font size</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetFontSize)}>Reset font size</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetWindowLayout)}>Reset window layout</button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => {
+                                    setShowSettings(true);
+                                    openThemeStoreInSidebar();
+                                })}
+                            >
+                                Open Theme Store
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://wails.io/docs'))}
+                            >
+                                Wails docs
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item status-menu-item--danger"
+                                onClick={() => runBurgerAction(() => Quit())}
+                            >
+                                Quit
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <button
                     type="button"
                     className="settings-btn"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setShowSettings(true)}
+                    onClick={() => {
+                        setShowSettings(true);
+                        setShowThemeStore(false);
+                    }}
                     aria-label="Settings"
                     title="Settings"
                 >
@@ -955,7 +1305,7 @@ function App() {
             )}
 
             <div
-                className={`settings-panel${showSettings ? ' settings-panel--open' : ''}`}
+                className={`settings-panel${showSettings ? ' settings-panel--open' : ''}${showThemeStore ? ' settings-panel--theme-store' : ''}`}
                 role="dialog"
                 aria-label="Settings"
                 aria-hidden={!showSettings}
@@ -964,14 +1314,30 @@ function App() {
                         <button
                             type="button"
                             className="settings-back"
-                            onClick={() => setShowSettings(false)}
+                            onClick={() => {
+                                if (showThemeStore) {
+                                    closeThemeStoreInSidebar();
+                                    return;
+                                }
+                                setShowSettings(false);
+                            }}
                             aria-label="Back"
                         >
-                            &#8592;
+                            &#8594;
                         </button>
-                        <span className="settings-title">Settings</span>
+                        <span className="settings-title">{showThemeStore ? 'Theme Store' : 'Settings'}</span>
                     </div>
 
+                    {showThemeStore ? (
+                        <div className="settings-body settings-body--theme-store">
+                            <ThemeStore
+                                onPreviewTheme={startThemePreview}
+                                onAcceptTheme={acceptThemePreview}
+                                onCancelThemePreview={cancelThemePreview}
+                                currentPreviewThemeId={pendingThemePreview?.id ?? null}
+                            />
+                        </div>
+                    ) : (
                     <div className="settings-body">
 
                         {/* ── Appearance ── */}
@@ -999,13 +1365,48 @@ function App() {
                             </div>
                             <div className="settings-options" style={{ marginTop: '12px' }}>
                                 <button 
-                                    className="settings-btn"
-                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '13px', background: 'var(--statusBar-background)', border: '1px solid var(--statusBar-border)' }}
-                                    onClick={() => setShowThemeStore(true)}
+                                    className="settings-action-btn settings-open-theme-store-btn"
+                                    onClick={openThemeStoreInSidebar}
                                 >
                                     Browse Theme Store
                                 </button>
                             </div>
+                            {savedThemes.length > 0 && (
+                                <div className="saved-theme-section">
+                                    <div className="saved-theme-title">Saved themes</div>
+                                    <div className="saved-theme-list">
+                                        {savedThemes.map((entry) => {
+                                            const isActive = theme.type === 'custom' && theme.customId === entry.id;
+                                            return (
+                                                <div key={entry.id} className="saved-theme-chip-row">
+                                                    <button
+                                                        type="button"
+                                                        className={`saved-theme-chip${isActive ? ' saved-theme-chip--active' : ''}`}
+                                                        onClick={() => setTheme({
+                                                            type: 'custom',
+                                                            customColors: entry.colors,
+                                                            customId: entry.id,
+                                                        })}
+                                                        title={entry.publisher ? `${entry.name} by ${entry.publisher}` : entry.name}
+                                                    >
+                                                        {entry.iconUrl && <img src={entry.iconUrl} alt="" aria-hidden="true" />}
+                                                        <span>{entry.name}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="saved-theme-delete-btn"
+                                                        onClick={() => deleteSavedTheme(entry.id)}
+                                                        aria-label={`Delete saved theme ${entry.name}`}
+                                                        title={`Delete ${entry.name}`}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Editor ── */}
@@ -1176,21 +1577,8 @@ function App() {
                         </div>
 
                     </div>
+                    )}
                 </div>
-            {showThemeStore && (
-                <ThemeStore
-                    onClose={() => setShowThemeStore(false)}
-                    onApplyTheme={(themeConfig) => {
-                        setTheme({
-                            type: 'custom',
-                            customColors: themeConfig.colors,
-                            customId: themeConfig.id,
-                        });
-                        setShowThemeStore(false);
-                        setShowSettings(false);
-                    }}
-                />
-            )}
         </div>
     );
 }
