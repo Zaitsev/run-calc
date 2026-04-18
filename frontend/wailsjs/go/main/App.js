@@ -5,3 +5,15 @@
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
+
+export function InstallTheme(arg1, arg2) {
+  return window['go']['main']['App']['InstallTheme'](arg1, arg2);
+}
+
+export function OpenThemeStore() {
+  return window['go']['main']['App']['OpenThemeStore']();
+}
+
+export function SearchThemes(arg1) {
+  return window['go']['main']['App']['SearchThemes'](arg1);
+}

@@ -59,8 +59,8 @@ func (a *App) openDocs() {
 func (a *App) showAbout() {
 	_, _ = wruntime.MessageDialog(a.ctx, wruntime.MessageDialogOptions{
 		Type:    wruntime.InfoDialog,
-		Title:   "About Calc",
-		Message: "Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.",
+		Title:   "About Run-Calc",
+		Message: "Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.",
 	})
 }
 

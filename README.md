@@ -1,4 +1,4 @@
-# Calc
+# Run-Calc
 
 Minimal notepad-style desktop calculator built with Wails + React + TypeScript.
 

@@ -49,7 +49,7 @@ func applicationMenu(app *App) *menu.Menu {
 	})
 
 	helpMenu := appMenu.AddSubmenu("Help")
-	helpMenu.AddText("About Calc", nil, func(_ *menu.CallbackData) {
+	helpMenu.AddText("About Run-Calc", nil, func(_ *menu.CallbackData) {
 		app.showAbout()
 	})
 	helpMenu.AddText("Wails Docs", nil, func(_ *menu.CallbackData) {
@@ -69,7 +69,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "calc",
+		Title:     "Run-Calc",
 		Width:     1100,
 		Height:    760,
 		MinWidth:  480,

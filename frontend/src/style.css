@@ -6,32 +6,34 @@ html {
         radial-gradient(1400px 900px at -20% -30%, rgba(96, 150, 245, 0.26), rgba(96, 150, 245, 0)),
         radial-gradient(1200px 780px at 110% 120%, rgba(56, 200, 175, 0.17), rgba(56, 200, 175, 0)),
         linear-gradient(160deg, #eef2ff 0%, #ecf3f5 42%, #e8efee 100%);
-    --editor-bg: rgba(252, 254, 255, 0.6);
-    --editor-color: #18212d;
-    --status-bg: rgba(255, 255, 255, 0.56);
-    --status-border: rgba(30, 41, 59, 0.11);
-    --status-color: #2d3a4d;
-    --status-error-color: #8f1f36;
-    --settings-bg: rgba(238, 244, 255, 0.99);
-    --settings-section-bg: rgba(255, 255, 255, 0.75);
-    --settings-border: rgba(30, 41, 59, 0.09);
-    --settings-text: #18212d;
-    --settings-subtext: #4d6070;
+    --editor-background: rgba(252, 254, 255, 0.6);
+    --editor-foreground: #18212d;
+    --statusBar-background: rgba(255, 255, 255, 0.56);
+    --statusBar-border: rgba(30, 41, 59, 0.11);
+    --statusBar-foreground: #2d3a4d;
+    --statusBarItem-errorBackground: #8f1f36;
+    --sideBar-background: rgba(238, 244, 255, 0.99);
+    --sideBarSectionHeader-background: rgba(255, 255, 255, 0.75);
+    --sideBar-border: rgba(30, 41, 59, 0.09);
+    --sideBarTitle-foreground: #18212d;
+    --descriptionForeground: #4d6070;
     --radio-accent: #2563eb;
     --btn-hover-bg: rgba(30, 41, 59, 0.07);
     --stepper-track: rgba(0, 0, 0, 0.03);
-    --gutter-bg: rgba(233, 238, 246, 0.8);
-    --gutter-border: rgba(30, 41, 59, 0.09);
-    --gutter-mark-color: #2563eb;
-    --line-error-text-color: #b4233d;
-    --line-error-icon-color: #c0213c;
+    --editorGutter-background: rgba(233, 238, 246, 0.8);
+    --editorGroup-border: rgba(30, 41, 59, 0.09);
+    --editorLineNumber-activeForeground: #2563eb;
+    --editorError-foreground: #b4233d;
+    --problemsErrorIcon-foreground: #c0213c;
     --line-error-gutter-bg: rgba(192, 33, 60, 0.12);
     --line-error-explainer-color: #6b0f22;
     --line-error-explainer-bg: rgba(255, 245, 246, 0.97);
     --line-error-explainer-border: rgba(192, 33, 60, 0.55);
-    --marked-result-color: #1a3d6e;
+    --textLink-foreground: #1a3d6e;
     --truncated-zero-gutter-bg: rgba(194, 120, 6, 0.12);
     --truncated-zero-icon-color: #b45309;
+    --gutter-var-color: #047857;
+    --gutter-var-bg: rgba(5, 150, 105, 0.12);
 
     background-color: var(--html-bg);
     color: var(--body-color);
@@ -44,32 +46,34 @@ html[data-theme="dark"] {
         radial-gradient(1400px 900px at -20% -30%, rgba(40, 90, 200, 0.18), rgba(40, 90, 200, 0)),
         radial-gradient(1200px 780px at 110% 120%, rgba(20, 150, 130, 0.12), rgba(20, 150, 130, 0)),
         linear-gradient(160deg, #1a2540 0%, #161e30 42%, #13202e 100%);
-    --editor-bg: rgba(16, 24, 40, 0.8);
-    --editor-color: #d2dcea;
-    --status-bg: rgba(10, 16, 28, 0.9);
-    --status-border: rgba(255, 255, 255, 0.07);
-    --status-color: #7a96b2;
-    --status-error-color: #f87171;
-    --settings-bg: rgba(13, 19, 32, 0.99);
-    --settings-section-bg: rgba(20, 30, 50, 0.9);
-    --settings-border: rgba(255, 255, 255, 0.07);
-    --settings-text: #d2dcea;
-    --settings-subtext: #7a96b2;
+    --editor-background: rgba(16, 24, 40, 0.8);
+    --editor-foreground: #d2dcea;
+    --statusBar-background: rgba(10, 16, 28, 0.9);
+    --statusBar-border: rgba(255, 255, 255, 0.07);
+    --statusBar-foreground: #7a96b2;
+    --statusBarItem-errorBackground: #f87171;
+    --sideBar-background: rgba(13, 19, 32, 0.99);
+    --sideBarSectionHeader-background: rgba(20, 30, 50, 0.9);
+    --sideBar-border: rgba(255, 255, 255, 0.07);
+    --sideBarTitle-foreground: #d2dcea;
+    --descriptionForeground: #7a96b2;
     --radio-accent: #60a5fa;
     --btn-hover-bg: rgba(255, 255, 255, 0.07);
     --stepper-track: rgba(255, 255, 255, 0.04);
-    --gutter-bg: rgba(8, 14, 26, 0.7);
-    --gutter-border: rgba(255, 255, 255, 0.06);
-    --gutter-mark-color: #60a5fa;
-    --line-error-text-color: #fda4af;
-    --line-error-icon-color: #fb7185;
+    --editorGutter-background: rgba(8, 14, 26, 0.7);
+    --editorGroup-border: rgba(255, 255, 255, 0.06);
+    --editorLineNumber-activeForeground: #60a5fa;
+    --editorError-foreground: #fda4af;
+    --problemsErrorIcon-foreground: #fb7185;
     --line-error-gutter-bg: rgba(251, 113, 133, 0.15);
     --line-error-explainer-color: #fecdd3;
     --line-error-explainer-bg: rgba(30, 10, 15, 0.92);
     --line-error-explainer-border: rgba(251, 113, 133, 0.7);
-    --marked-result-color: #93c5fd;
+    --textLink-foreground: #93c5fd;
     --truncated-zero-gutter-bg: rgba(251, 191, 36, 0.15);
     --truncated-zero-icon-color: #fbbf24;
+    --gutter-var-color: #34d399;
+    --gutter-var-bg: rgba(52, 211, 153, 0.15);
 }
 
 body {

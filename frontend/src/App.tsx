@@ -9,8 +9,11 @@ import {
     WindowSetSize
 } from '../wailsjs/runtime/runtime';
 import './App.css';
+import appLogo from './assets/images/icons/hare-calc-1024.png';
 import {evaluateExpression, ParseError, type DecimalDelimiter} from './calculator';
 import {useTheme} from './useTheme';
+
+import { ThemeStore } from './ThemeStore';
 
 const OPERATOR_KEY_RE = /^[+\-*/]$/;
 const ERROR_SUFFIX = ' = error';
@@ -31,6 +34,8 @@ const PRECISION_STORAGE_KEY = 'calc.editor.precision';
 const SCIENTIFIC_NOTATION_STORAGE_KEY = 'calc.editor.scientificNotation';
 const WORKSHEET_CONTENT_STORAGE_KEY = 'calc.editor.content';
 const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
+const LINE_VARIABLES_STORAGE_KEY = 'calc.editor.lineVariables';
+const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
 
@@ -121,6 +126,7 @@ function App() {
         return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, parsed));
     });
     const [showSettings, setShowSettings] = useState(false);
+    const [showThemeStore, setShowThemeStore] = useState(false);
     const [decimalDelimiterMode, setDecimalDelimiterMode] = useState<DecimalDelimiterMode>(() => {
         const raw = localStorage.getItem(DECIMAL_DELIMITER_STORAGE_KEY);
         if (raw === 'dot' || raw === 'comma' || raw === 'system') {
@@ -139,6 +145,33 @@ function App() {
     const [scientificNotation, setScientificNotation] = useState(() => {
         return localStorage.getItem(SCIENTIFIC_NOTATION_STORAGE_KEY) === 'true';
     });
+    const [lineVariables, setLineVariables] = useState<Record<number, string>>(() => {
+        const raw = localStorage.getItem(LINE_VARIABLES_STORAGE_KEY);
+        if (!raw) return {};
+        try {
+            const obj = JSON.parse(raw);
+            if (typeof obj === 'object' && obj !== null) {
+                return obj;
+            }
+        } catch {
+            // ignore
+        }
+        return {};
+    });
+    const [variableValues, setVariableValues] = useState<Record<string, number>>(() => {
+        const raw = localStorage.getItem(VARIABLE_VALUES_STORAGE_KEY);
+        if (!raw) return {};
+        try {
+            const obj = JSON.parse(raw);
+            if (typeof obj === 'object' && obj !== null) {
+                return obj;
+            }
+        } catch {
+            // ignore
+        }
+        return {};
+    });
+    const [pendingRecalc, setPendingRecalc] = useState<{ variable: string; dependents: number[]; newValue: number } | null>(null);
     const {theme, setTheme} = useTheme();
     const editorRef = useRef<HTMLTextAreaElement | null>(null);
     const gutterRef = useRef<HTMLDivElement | null>(null);
@@ -194,7 +227,7 @@ function App() {
                 const expr = line.slice(0, eqIdx).trimEnd();
                 if (expr.trim().length === 0) return line;
                 try {
-                    const result = evaluateExpression(expr, decimalDelimiter);
+                    const result = evaluateExpression(expr, decimalDelimiter, variableValues);
                     const formatted = formatNumber(result, decimalDelimiter, precision, scientificNotation);
                     const newLine = `${expr} = ${formatted}`;
                     if (newLine !== line) {
@@ -226,6 +259,14 @@ function App() {
 
         localStorage.setItem(LAST_RESULT_STORAGE_KEY, String(lastResult));
     }, [lastResult]);
+
+    useEffect(() => {
+        localStorage.setItem(LINE_VARIABLES_STORAGE_KEY, JSON.stringify(lineVariables));
+    }, [lineVariables]);
+
+    useEffect(() => {
+        localStorage.setItem(VARIABLE_VALUES_STORAGE_KEY, JSON.stringify(variableValues));
+    }, [variableValues]);
 
     useEffect(() => {
         if (!editorRef.current) return;
@@ -417,12 +458,14 @@ function App() {
             });
         };
 
+        const unsubThemeStore = EventsOn('theme-store:open', () => setShowThemeStore(true));
         const unsubNew = EventsOn('menu:file:new', clearWorksheet);
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
         const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
         return () => {
+            unsubThemeStore();
             unsubNew();
             unsubResetWindow();
             unsubIncrease();
@@ -504,6 +547,7 @@ function App() {
         const lineText = content.slice(lineStart, lineEnd);
         const editableLine = getExpressionSource(lineText);
         const trimmed = editableLine.trim();
+        const lineIndex = content.slice(0, lineStart).split('\n').length - 1;
 
         if (trimmed.length === 0) {
             insertAtSelection('\n');
@@ -519,7 +563,7 @@ function App() {
 
         let result: number;
         try {
-            result = evaluateExpression(expression, decimalDelimiter);
+            result = evaluateExpression(expression, decimalDelimiter, variableValues);
         } catch (error) {
             const replacement = `${editableLine} = error`;
             const before = content.slice(0, lineStart);
@@ -555,6 +599,35 @@ function App() {
         setStatusText('Calculated');
         setIsStatusError(false);
         setDevError('');
+
+        // Recalculate dependents if it's a variable assignment
+        if (lineIndex in lineVariables) {
+            const varName = lineVariables[lineIndex];
+            const oldVal = variableValues[varName];
+            
+            if (oldVal !== result) {
+                setVariableValues(prev => ({ ...prev, [varName]: result }));
+                
+                const lines = nextContent.split('\n');
+                const dependentLines: number[] = [];
+                const regex = new RegExp(String.raw`(^|[^a-zA-Z])${varName}([^a-zA-Z]|$)`);
+                
+                for (let i = lineIndex + 1; i < lines.length; i++) {
+                    const exprSource = getExpressionSource(lines[i]);
+                    if (regex.test(exprSource)) {
+                        dependentLines.push(i);
+                    }
+                }
+                
+                if (dependentLines.length > 0) {
+                    setPendingRecalc({
+                        variable: varName,
+                        dependents: dependentLines,
+                        newValue: result
+                    });
+                }
+            }
+        }
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -568,6 +641,37 @@ function App() {
         if (event.key === 'Enter') {
             event.preventDefault();
             evaluateCurrentLine();
+            return;
+        }
+
+        if (isPrimaryModifier && !event.altKey && event.key.length === 1 && /[a-zA-Z]/.test(event.key)) {
+            event.preventDefault();
+            const editor = editorRef.current;
+            if (!editor) return;
+            const lineIndex = content.slice(0, editor.selectionStart).split('\n').length - 1;
+            const letter = event.key.toUpperCase();
+            
+            setLineVariables((prev) => {
+                const next = { ...prev };
+                if (next[lineIndex] === letter) {
+                    delete next[lineIndex]; // toggle off
+                } else {
+                    next[lineIndex] = letter;
+                }
+                return next;
+            });
+            
+            const lineText = content.split('\n')[lineIndex];
+            const eqIdx = lineText.indexOf(' = ');
+            if (eqIdx !== -1) {
+                const afterEq = lineText.slice(eqIdx + 3);
+                if (afterEq !== 'error') {
+                     const parsedRes = Number(afterEq.replace(decimalDelimiter === ',' ? ',' : '.', '.'));
+                     if (Number.isFinite(parsedRes)) {
+                         setVariableValues(prev => ({ ...prev, [letter]: parsedRes }));
+                     }
+                }
+            }
             return;
         }
 
@@ -608,7 +712,7 @@ function App() {
 
             let evalResult: number | null = null;
             try {
-                evalResult = evaluateExpression(expression, decimalDelimiter);
+                evalResult = evaluateExpression(expression, decimalDelimiter, variableValues);
             } catch (error) {
                 // Suppress errors that occur at the very end of the expression: those
                 // indicate the user hasn't finished typing yet (e.g. "4+", "2*(").
@@ -640,7 +744,7 @@ function App() {
         });
 
         return {lines, lineErrors: nextLineErrors, truncatedZeroLines: nextTruncatedZeroLines, truncatedLines: nextTruncatedLines};
-    }, [content, decimalDelimiter, precision, scientificNotation]);
+    }, [content, decimalDelimiter, precision, scientificNotation, variableValues]);
 
     const renderOverlayLines = () => {
         return contentLines.map((line, i) => {
@@ -684,13 +788,16 @@ function App() {
 
     return (
         <div id="app" className="window">
+            <div className="window-logo-bg" aria-hidden="true">
+                <img className="window-logo-bg-image" src={appLogo} alt="" />
+            </div>
             <div className="editor-container">
                 <div className="gutter" ref={gutterRef}>
                     <div className="gutter-lines" style={{paddingTop: 18}}>
                         {contentLines.map((_, i) => (
                             <div
                                 key={i}
-                                className={`gutter-line${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}`}
+                                className={`gutter-line${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${i in lineVariables ? ' gutter-line--var' : ''}`}
                                 style={{height: lineHeightPx}}
                                 onClick={() => {
                                     setMarkedLines((prev) => {
@@ -717,8 +824,11 @@ function App() {
                                 {!lineErrors.has(i) && !truncatedZeroLines.has(i) && truncatedLines.has(i) && (
                                     <span className="gutter-truncated-icon" aria-hidden="true">≈</span>
                                 )}
-                                {markedLines.has(i) && (
+                                {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !(i in lineVariables) && (
                                     <span className="gutter-mark" aria-hidden="true">&#9670;</span>
+                                )}
+                                {i in lineVariables && (
+                                    <span className="gutter-var" aria-hidden="true">{lineVariables[i]}</span>
                                 )}
                             </div>
                         ))}
@@ -793,6 +903,57 @@ function App() {
                 </button>
             </div>
 
+            {pendingRecalc && (
+                <div className="recalc-modal-overlay">
+                    <div className="recalc-modal">
+                        <h3>Variable Changed</h3>
+                        <p>
+                            Variable <strong>{pendingRecalc.variable}</strong> was updated to {formatNumber(pendingRecalc.newValue, decimalDelimiter, precision, scientificNotation)}.
+                            <br/>
+                            Recalculate {pendingRecalc.dependents.length} dependent line(s)?
+                        </p>
+                        <div className="recalc-modal-actions">
+                            <button
+                                className="recalc-btn-yes"
+                                onClick={() => {
+                                    setContent(prevContent => {
+                                        const lines = prevContent.split('\n');
+                                        pendingRecalc.dependents.forEach(idx => {
+                                            const line = lines[idx];
+                                            const expr = getExpressionSource(line);
+                                            try {
+                                                const res = evaluateExpression(expr.trim(), decimalDelimiter, variableValues);
+                                                lines[idx] = `${expr} = ${formatNumber(res, decimalDelimiter, precision, scientificNotation)}`;
+                                            } catch {
+                                                lines[idx] = `${expr} = error`;
+                                            }
+                                        });
+                                        return lines.join('\n');
+                                    });
+                                    setPendingRecalc(null);
+                                    
+                                    // Focus back on editor
+                                    if (editorRef.current) {
+                                        editorRef.current.focus();
+                                    }
+                                }}
+                            >
+                                Yes
+                            </button>
+                            <button 
+                                className="recalc-btn-no"
+                                onClick={() => {
+                                    setPendingRecalc(null);
+                                    if (editorRef.current) editorRef.current.focus();
+                                }}
+                            >
+                                No
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div
                 className={`settings-panel${showSettings ? ' settings-panel--open' : ''}`}
                 role="dialog"
@@ -827,14 +988,23 @@ function App() {
                                             type="radio"
                                             name="theme"
                                             value={t}
-                                            checked={theme === t}
-                                            onChange={() => setTheme(t)}
+                                            checked={theme.type === t}
+                                            onChange={() => setTheme({ type: t as any })}
                                         />
                                         <span>
                                             {t === 'light' ? 'Light' : t === 'dark' ? 'Dark' : 'Use system setting'}
                                         </span>
                                     </label>
                                 ))}
+                            </div>
+                            <div className="settings-options" style={{ marginTop: '12px' }}>
+                                <button 
+                                    className="settings-btn"
+                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '13px', background: 'var(--statusBar-background)', border: '1px solid var(--statusBar-border)' }}
+                                    onClick={() => setShowThemeStore(true)}
+                                >
+                                    Browse Theme Store
+                                </button>
                             </div>
                         </div>
 
@@ -1007,6 +1177,20 @@ function App() {
 
                     </div>
                 </div>
+            {showThemeStore && (
+                <ThemeStore
+                    onClose={() => setShowThemeStore(false)}
+                    onApplyTheme={(themeConfig) => {
+                        setTheme({
+                            type: 'custom',
+                            customColors: themeConfig.colors,
+                            customId: themeConfig.id,
+                        });
+                        setShowThemeStore(false);
+                        setShowSettings(false);
+                    }}
+                />
+            )}
         </div>
     );
 }

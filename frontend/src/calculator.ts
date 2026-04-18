@@ -10,7 +10,7 @@ export class ParseError extends Error {
     }
 }
 
-export function evaluateExpression(input: string, decimalDelimiter: DecimalDelimiter): number {
+export function evaluateExpression(input: string, decimalDelimiter: DecimalDelimiter, variables: Record<string, number> = {}): number {
     let index = 0;
 
     const fail = (message: string, position = index): never => {
@@ -91,6 +91,16 @@ export function evaluateExpression(input: string, decimalDelimiter: DecimalDelim
             }
             index++;
             return value;
+        }
+
+        const chMatch = input[index];
+        if (chMatch !== undefined && /[a-zA-Z]/.test(chMatch)) {
+            const varName = chMatch.toUpperCase();
+            if (!(varName in variables)) {
+                fail(`Undefined variable "${varName}"`);
+            }
+            index++;
+            return variables[varName];
         }
 
         const start = index;
