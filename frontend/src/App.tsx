@@ -12,6 +12,7 @@ import {
     WindowSetSystemDefaultTheme,
     WindowGetPosition,
     WindowGetSize,
+    WindowHide,
     WindowSetPosition,
     WindowSetSize
 } from '../wailsjs/runtime/runtime';
@@ -20,6 +21,7 @@ import appLogo from './assets/images/icons/hare-calc-1024.png';
 import {evaluateExpression, ParseError, type DecimalDelimiter} from './calculator';
 import {useTheme, type ThemeState} from './useTheme';
 import { getPrimaryShortcutAction } from './editorShortcuts';
+import { SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
@@ -44,7 +46,19 @@ const WORKSHEET_CONTENT_STORAGE_KEY = 'calc.editor.content';
 const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
 const LINE_VARIABLES_STORAGE_KEY = 'calc.editor.lineVariables';
 const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
+const VARIABLE_TRIGGER_KEY_STORAGE_KEY = 'calc.editor.variableTriggerKey';
 const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
+const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
+const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
+const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;
+
+const VARIABLE_TRIGGER_KEYS = ['@', '$', '_', ':'] as const;
+// Math / expression characters that must not be used as a trigger key.
+const MATH_CHARS = new Set(['+', '-', '*', '/', '=', '.', ',', '(', ')', '^', '%']);
+type VariableTriggerKey = (typeof VARIABLE_TRIGGER_KEYS)[number];
+function isValidTriggerKey(key: string): key is VariableTriggerKey {
+    return (VARIABLE_TRIGGER_KEYS as readonly string[]).includes(key) && !MATH_CHARS.has(key);
+}
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
 
@@ -52,6 +66,7 @@ type SavedThemeEntry = AcceptedThemeEntry;
 
 type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
 type PrecisionMode = 'auto' | number;
+type HelpPage = 'operations' | 'shortcuts' | 'new';
 
 type StoredWindowState = {
     w: number;
@@ -194,6 +209,13 @@ function App() {
     });
     const [showSettings, setShowSettings] = useState(false);
     const [showThemeStore, setShowThemeStore] = useState(false);
+    const [minimiseToTrayOnClose, setMinimiseToTrayOnClose] = useState(() => {
+        return localStorage.getItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY) !== 'false';
+    });
+    const [restoreShortcutEnabled, setRestoreShortcutEnabled] = useState(() => {
+        return localStorage.getItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY) !== 'false';
+    });
+    const [activeHelpPage, setActiveHelpPage] = useState<HelpPage>('operations');
     const [decimalDelimiterMode, setDecimalDelimiterMode] = useState<DecimalDelimiterMode>(() => {
         const raw = localStorage.getItem(DECIMAL_DELIMITER_STORAGE_KEY);
         if (raw === 'dot' || raw === 'comma' || raw === 'system') {
@@ -276,6 +298,9 @@ function App() {
     const editorRef = useRef<HTMLTextAreaElement | null>(null);
     const gutterRef = useRef<HTMLDivElement | null>(null);
     const overlayRef = useRef<HTMLDivElement | null>(null);
+    const variableInputRef = useRef<HTMLInputElement | null>(null);
+    const cancelVariableInputRef = useRef(false);
+    const lastEscapeKeyAtRef = useRef(0);
     const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(() => {
         const raw = localStorage.getItem(MARKED_LINES_STORAGE_KEY);
         if (!raw) return new Set<number>();
@@ -294,6 +319,12 @@ function App() {
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [caretPos, setCaretPos] = useState(0);
+    const [variableInputLine, setVariableInputLine] = useState<number | null>(null);
+    const [variableInputValue, setVariableInputValue] = useState('');
+    const [variableTriggerKey, setVariableTriggerKey] = useState<VariableTriggerKey>(() => {
+        const raw = localStorage.getItem(VARIABLE_TRIGGER_KEY_STORAGE_KEY);
+        return isValidTriggerKey(raw ?? '') ? (raw as VariableTriggerKey) : '@';
+    });
     const [runtimePlatform, setRuntimePlatform] = useState('');
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
 
@@ -373,6 +404,24 @@ function App() {
     useEffect(() => {
         localStorage.setItem(ACCEPTED_THEMES_STORAGE_KEY, JSON.stringify(savedThemes));
     }, [savedThemes]);
+
+    useEffect(() => {
+        localStorage.setItem(VARIABLE_TRIGGER_KEY_STORAGE_KEY, variableTriggerKey);
+    }, [variableTriggerKey]);
+
+    useEffect(() => {
+        localStorage.setItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY, String(minimiseToTrayOnClose));
+        SetMinimiseToTrayOnClose(minimiseToTrayOnClose).catch(() => {
+            // Keep settings responsive even if backend sync fails.
+        });
+    }, [minimiseToTrayOnClose]);
+
+    useEffect(() => {
+        localStorage.setItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY, String(restoreShortcutEnabled));
+        SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
+            // Keep settings responsive even if backend sync fails.
+        });
+    }, [restoreShortcutEnabled]);
 
     useEffect(() => {
         let cancelled = false;
@@ -458,6 +507,21 @@ function App() {
         setEditorFontSpec(`${cs.fontSize} ${cs.fontFamily}`);
     }, [fontScale]);
 
+    useEffect(() => {
+        if (variableInputLine === null) {
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            if (!variableInputRef.current) {
+                return;
+            }
+
+            variableInputRef.current.focus();
+            variableInputRef.current.select();
+        });
+    }, [variableInputLine]);
+
     // --- Hoisted actions (stable: only use setState callbacks or stable fns) ---
 
     const changeFontScale = (direction: 1 | -1) => {
@@ -474,6 +538,10 @@ function App() {
         setIsStatusError(false);
         setDevError('');
         setMarkedLines(new Set());
+        setLineVariables({});
+        setVariableValues({});
+        setVariableInputLine(null);
+        setVariableInputValue('');
         localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
         localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
 
@@ -722,6 +790,165 @@ function App() {
         setCaretPos(editorRef.current.selectionStart);
     };
 
+    const getLineIndexAtPosition = (text: string, pos: number) => {
+        return text.slice(0, pos).split('\n').length - 1;
+    };
+
+    const countLineBreaks = (text: string) => {
+        let count = 0;
+        for (let i = 0; i < text.length; i++) {
+            if (text[i] === '\n') {
+                count++;
+            }
+        }
+        return count;
+    };
+
+    const getLineEditInfo = (beforeText: string, afterText: string) => {
+        let start = 0;
+        const maxStart = Math.min(beforeText.length, afterText.length);
+        while (start < maxStart && beforeText[start] === afterText[start]) {
+            start++;
+        }
+
+        let beforeEnd = beforeText.length;
+        let afterEnd = afterText.length;
+        while (
+            beforeEnd > start &&
+            afterEnd > start &&
+            beforeText[beforeEnd - 1] === afterText[afterEnd - 1]
+        ) {
+            beforeEnd--;
+            afterEnd--;
+        }
+
+        const beforeChanged = beforeText.slice(start, beforeEnd);
+        const afterChanged = afterText.slice(start, afterEnd);
+        const startLine = countLineBreaks(beforeText.slice(0, start));
+        const beforeBreaks = countLineBreaks(beforeChanged);
+        const afterBreaks = countLineBreaks(afterChanged);
+
+        return {
+            startLine,
+            beforeBreaks,
+            afterBreaks,
+            delta: afterBreaks - beforeBreaks,
+        };
+    };
+
+    const remapLineIndex = (lineIndex: number, edit: {startLine: number; beforeBreaks: number; afterBreaks: number; delta: number}) => {
+        const editEndLineBefore = edit.startLine + edit.beforeBreaks;
+        if (lineIndex < edit.startLine) {
+            return lineIndex;
+        }
+
+        if (lineIndex > editEndLineBefore) {
+            return lineIndex + edit.delta;
+        }
+
+        const relative = lineIndex - edit.startLine;
+        if (relative <= edit.afterBreaks) {
+            return edit.startLine + relative;
+        }
+
+        return null;
+    };
+
+    const remapLineVariablesForEdit = (prevVars: Record<number, string>, beforeText: string, afterText: string) => {
+        const edit = getLineEditInfo(beforeText, afterText);
+        if (edit.delta === 0) {
+            return prevVars;
+        }
+
+        const next: Record<number, string> = {};
+        for (const [rawLine, variableName] of Object.entries(prevVars)) {
+            const lineIndex = Number(rawLine);
+            if (!Number.isInteger(lineIndex) || lineIndex < 0) {
+                continue;
+            }
+
+            const remapped = remapLineIndex(lineIndex, edit);
+            if (remapped !== null) {
+                next[remapped] = variableName;
+            }
+        }
+
+        return next;
+    };
+
+    const remapMarkedLinesForEdit = (prevMarked: ReadonlySet<number>, beforeText: string, afterText: string) => {
+        const edit = getLineEditInfo(beforeText, afterText);
+        if (edit.delta === 0) {
+            return prevMarked;
+        }
+
+        const next = new Set<number>();
+        prevMarked.forEach((lineIndex) => {
+            const remapped = remapLineIndex(lineIndex, edit);
+            if (remapped !== null) {
+                next.add(remapped);
+            }
+        });
+
+        return next;
+    };
+
+    const syncVariableValueFromLine = (lineIndex: number, variableName: string) => {
+        const lineText = content.split('\n')[lineIndex] ?? '';
+        const eqIdx = lineText.indexOf(' = ');
+        if (eqIdx === -1) {
+            return;
+        }
+
+        const afterEq = lineText.slice(eqIdx + 3);
+        if (afterEq === 'error') {
+            return;
+        }
+
+        const parsedRes = Number(afterEq.replace(decimalDelimiter === ',' ? ',' : '.', '.'));
+        if (Number.isFinite(parsedRes)) {
+            setVariableValues((prev) => ({...prev, [variableName]: parsedRes}));
+        }
+    };
+
+    const closeVariableInput = () => {
+        setVariableInputLine(null);
+        setVariableInputValue('');
+        requestAnimationFrame(() => {
+            editorRef.current?.focus();
+        });
+    };
+
+    const commitVariableInput = () => {
+        if (variableInputLine === null) {
+            return;
+        }
+
+        const lineIndex = variableInputLine;
+        const nextVariable = variableInputValue.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+
+        setLineVariables((prev) => {
+            const next = {...prev};
+            if (!nextVariable) {
+                delete next[lineIndex];
+            } else {
+                next[lineIndex] = nextVariable;
+            }
+            return next;
+        });
+
+        if (nextVariable) {
+            syncVariableValueFromLine(lineIndex, nextVariable);
+        }
+
+        closeVariableInput();
+    };
+
+    const cancelVariableInput = () => {
+        cancelVariableInputRef.current = true;
+        closeVariableInput();
+    };
+
     const evaluateCurrentLine = () => {
         const editor = editorRef.current;
         if (!editor) {
@@ -817,6 +1044,30 @@ function App() {
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+            const now = Date.now();
+            const elapsed = now - lastEscapeKeyAtRef.current;
+            lastEscapeKeyAtRef.current = now;
+            if (elapsed <= DOUBLE_ESCAPE_HIDE_WINDOW_MS) {
+                event.preventDefault();
+                WindowHide();
+            }
+            return;
+        }
+
+        if (event.key === variableTriggerKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            const editor = editorRef.current;
+            if (!editor) {
+                return;
+            }
+
+            const lineIndex = getLineIndexAtPosition(content, editor.selectionStart);
+            setVariableInputLine(lineIndex);
+            setVariableInputValue(lineVariables[lineIndex] ?? '');
+            return;
+        }
+
         if (event.key === 'Enter') {
             event.preventDefault();
             evaluateCurrentLine();
@@ -845,37 +1096,6 @@ function App() {
         if (shortcutAction === 'reset-font-size') {
             event.preventDefault();
             resetFontSize();
-            return;
-        }
-
-        if (shortcutAction === 'assign-variable') {
-            event.preventDefault();
-            const editor = editorRef.current;
-            if (!editor) return;
-            const lineIndex = content.slice(0, editor.selectionStart).split('\n').length - 1;
-            const letter = event.key.toUpperCase();
-            
-            setLineVariables((prev) => {
-                const next = { ...prev };
-                if (next[lineIndex] === letter) {
-                    delete next[lineIndex]; // toggle off
-                } else {
-                    next[lineIndex] = letter;
-                }
-                return next;
-            });
-            
-            const lineText = content.split('\n')[lineIndex];
-            const eqIdx = lineText.indexOf(' = ');
-            if (eqIdx !== -1) {
-                const afterEq = lineText.slice(eqIdx + 3);
-                if (afterEq !== 'error') {
-                     const parsedRes = Number(afterEq.replace(decimalDelimiter === ',' ? ',' : '.', '.'));
-                     if (Number.isFinite(parsedRes)) {
-                         setVariableValues(prev => ({ ...prev, [letter]: parsedRes }));
-                     }
-                }
-            }
             return;
         }
 
@@ -1074,6 +1294,12 @@ function App() {
         void expandWindowForThemeStore();
     };
 
+    const openHelpPanel = (page: HelpPage) => {
+        setShowThemeStore(false);
+        setActiveHelpPage(page);
+        setShowSettings(true);
+    };
+
     const closeThemeStoreInSidebar = () => {
         if (pendingThemePreview) {
             cancelThemePreview();
@@ -1101,6 +1327,10 @@ function App() {
                                 className={`gutter-line${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${i in lineVariables ? ' gutter-line--var' : ''}`}
                                 style={{height: lineHeightPx}}
                                 onClick={() => {
+                                    if (i === variableInputLine) {
+                                        return;
+                                    }
+
                                     setMarkedLines((prev) => {
                                         const next = new Set(prev);
                                         if (next.has(i)) next.delete(i); else next.add(i);
@@ -1128,8 +1358,44 @@ function App() {
                                 {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !(i in lineVariables) && (
                                     <span className="gutter-mark" aria-hidden="true">&#9670;</span>
                                 )}
-                                {i in lineVariables && (
+                                {i in lineVariables && i !== variableInputLine && (
                                     <span className="gutter-var" aria-hidden="true">{lineVariables[i]}</span>
+                                )}
+                                {i === variableInputLine && (
+                                    <input
+                                        ref={variableInputRef}
+                                        className="gutter-var-input"
+                                        value={variableInputValue}
+                                        maxLength={1}
+                                        aria-label={`Variable for line ${i + 1}`}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                            const next = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+                                            setVariableInputValue(next);
+                                        }}
+                                        onBlur={() => {
+                                            if (cancelVariableInputRef.current) {
+                                                cancelVariableInputRef.current = false;
+                                                return;
+                                            }
+                                            commitVariableInput();
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                commitVariableInput();
+                                                return;
+                                            }
+
+                                            if (e.key === 'Escape') {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                cancelVariableInput();
+                                            }
+                                        }}
+                                    />
                                 )}
                             </div>
                         ))}
@@ -1142,8 +1408,47 @@ function App() {
                         spellCheck={false}
                         value={content}
                         onChange={(e) => {
-                            setContent(e.target.value);
+                            const nextContent = e.target.value;
+                            setContent(nextContent);
                             setCaretPos(e.target.selectionStart);
+
+                            setLineVariables((prev) => {
+                                const remapped = remapLineVariablesForEdit(prev, content, nextContent);
+                                if (remapped === prev) {
+                                    return prev;
+                                }
+
+                                const activeVariables = new Set(Object.values(remapped));
+                                setVariableValues((prevValues) => {
+                                    const nextValues: Record<string, number> = {};
+                                    let changed = false;
+                                    for (const [name, value] of Object.entries(prevValues)) {
+                                        if (activeVariables.has(name)) {
+                                            nextValues[name] = value;
+                                        } else {
+                                            changed = true;
+                                        }
+                                    }
+                                    return changed ? nextValues : prevValues;
+                                });
+
+                                return remapped;
+                            });
+
+                            setMarkedLines((prev) => remapMarkedLinesForEdit(prev, content, nextContent));
+
+                            setVariableInputLine((prev) => {
+                                if (prev === null) {
+                                    return prev;
+                                }
+
+                                const edit = getLineEditInfo(content, nextContent);
+                                if (edit.delta === 0) {
+                                    return prev;
+                                }
+
+                                return remapLineIndex(prev, edit);
+                            });
                         }}
                         onSelect={updateCaretPosFromEditor}
                         onClick={updateCaretPosFromEditor}
@@ -1221,6 +1526,9 @@ function App() {
                             >
                                 Open Theme Store
                             </button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('operations'))}>Help: Operations</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('shortcuts'))}>Help: Shortcuts</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('new'))}>Help: New</button>
                             <button
                                 type="button"
                                 className="status-menu-item"
@@ -1340,6 +1648,78 @@ function App() {
                     ) : (
                     <div className="settings-body">
 
+                        {/* ── Help ── */}
+                        <p className="settings-section-label">Help</p>
+                        <div className="settings-card">
+                            <div className="settings-card-header">
+                                <div className="settings-card-title">In-app help</div>
+                                <div className="settings-card-desc">Reference pages for operations, shortcuts, and latest changes</div>
+                            </div>
+                            <div className="settings-help-tabs" role="tablist" aria-label="Help pages">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeHelpPage === 'operations'}
+                                    className={`settings-help-tab${activeHelpPage === 'operations' ? ' settings-help-tab--active' : ''}`}
+                                    onClick={() => setActiveHelpPage('operations')}
+                                >
+                                    Operations
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeHelpPage === 'shortcuts'}
+                                    className={`settings-help-tab${activeHelpPage === 'shortcuts' ? ' settings-help-tab--active' : ''}`}
+                                    onClick={() => setActiveHelpPage('shortcuts')}
+                                >
+                                    Shortcuts
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeHelpPage === 'new'}
+                                    className={`settings-help-tab${activeHelpPage === 'new' ? ' settings-help-tab--active' : ''}`}
+                                    onClick={() => setActiveHelpPage('new')}
+                                >
+                                    New
+                                </button>
+                            </div>
+                            <div className="settings-help-content" role="tabpanel">
+                                {activeHelpPage === 'operations' && (
+                                    <ul>
+                                        <li>Type an expression directly in the editor (example: 2+3*4).</li>
+                                        <li>Press Enter to evaluate the current line and append result inline as expression = result.</li>
+                                        <li>Start a new line with +, -, *, or / to continue from the previous result.</li>
+                                        <li>Type @ on a line to assign a one-letter variable in the gutter, then reuse it in expressions.</li>
+                                        <li>Invalid lines are highlighted in red with a gutter ! marker until corrected.</li>
+                                    </ul>
+                                )}
+                                {activeHelpPage === 'shortcuts' && (
+                                    <ul>
+                                        <li>Enter: Evaluate current line.</li>
+                                        <li>Ctrl/Cmd + N: New worksheet.</li>
+                                        <li>Ctrl/Cmd + =: Increase font size.</li>
+                                        <li>Ctrl/Cmd + -: Decrease font size.</li>
+                                        <li>Ctrl/Cmd + 0: Reset font size.</li>
+                                        <li>Ctrl/Cmd + R: Reload app window.</li>
+                                        <li>Ctrl/Cmd + Q: Quit app.</li>
+                                        <li>Press Escape twice quickly: Hide app window.</li>
+                                    </ul>
+                                )}
+                                {activeHelpPage === 'new' && (
+                                    <ul>
+                                        <li>Added a quick double-Escape shortcut to hide the app window while keeping the app running.</li>
+                                        <li>Fixed line-bound variable remapping: deleting or inserting lines now keeps variable letters attached to the correct lines instead of moving onto empty lines.</li>
+                                        <li>Restored Help pages in menus: native Help menu entries and in-app menu shortcuts now open Help pages directly.</li>
+                                        <li>Added worksheet persistence so your content and carry-over result are restored on restart.</li>
+                                        <li>Added on-type line validation with red line state and gutter ! markers.</li>
+                                        <li>Added scientific notation support in expressions such as 1e6 and 2.5E-3.</li>
+                                        <li>Added decimal delimiter mode in Settings with dot, comma, and system options.</li>
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
                         {/* ── Appearance ── */}
                         <p className="settings-section-label">Appearance</p>
                         <div className="settings-card">
@@ -1411,6 +1791,26 @@ function App() {
 
                         {/* ── Editor ── */}
                         <p className="settings-section-label">Editor</p>
+                        <div className="settings-card">
+                            <div className="settings-card-header">
+                                <div className="settings-card-title">Variable trigger key</div>
+                                <div className="settings-card-desc">Key that opens the variable input in the gutter. Cannot be a math symbol.</div>
+                            </div>
+                            <div className="settings-options settings-options--inline">
+                                {VARIABLE_TRIGGER_KEYS.map((k) => (
+                                    <label key={k} className="settings-option settings-option--chip">
+                                        <input
+                                            type="radio"
+                                            name="variable-trigger-key"
+                                            value={k}
+                                            checked={variableTriggerKey === k}
+                                            onChange={() => setVariableTriggerKey(k)}
+                                        />
+                                        <span className="settings-chip-key">{k}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                         <div className="settings-card">
                             <div className="settings-row">
                                 <div className="settings-row-info">
@@ -1573,6 +1973,44 @@ function App() {
                                 >
                                     Reset
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Close button behavior</div>
+                                    <div className="settings-row-desc">Hide to tray on close (default) instead of quitting</div>
+                                </div>
+                                <label className="settings-toggle" aria-label="Toggle close button behavior">
+                                    <input
+                                        type="checkbox"
+                                        checked={minimiseToTrayOnClose}
+                                        onChange={(e) => setMinimiseToTrayOnClose(e.target.checked)}
+                                    />
+                                    <span className="settings-toggle-track" />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Restore shortcut</div>
+                                    <div className="settings-row-desc">
+                                        {runtimePlatform === 'darwin'
+                                            ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
+                                            : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
+                                    </div>
+                                </div>
+                                <label className="settings-toggle" aria-label="Toggle restore shortcut">
+                                    <input
+                                        type="checkbox"
+                                        checked={restoreShortcutEnabled}
+                                        onChange={(e) => setRestoreShortcutEnabled(e.target.checked)}
+                                    />
+                                    <span className="settings-toggle-track" />
+                                </label>
                             </div>
                         </div>
 

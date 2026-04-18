@@ -42,9 +42,9 @@ describe('getPrimaryShortcutAction', () => {
         expect(getPrimaryShortcutAction(event({key: '0', metaKey: true, code: 'Numpad0'}))).toBe('reset-font-size');
     });
 
-    it('keeps variable assignment shortcut for letters', () => {
-        expect(getPrimaryShortcutAction(event({key: 'a', ctrlKey: true}))).toBe('assign-variable');
-        expect(getPrimaryShortcutAction(event({key: 'Z', metaKey: true}))).toBe('assign-variable');
+    it('does not map Ctrl/Cmd + letter to a shortcut', () => {
+        expect(getPrimaryShortcutAction(event({key: 'a', ctrlKey: true}))).toBeNull();
+        expect(getPrimaryShortcutAction(event({key: 'Z', metaKey: true}))).toBeNull();
     });
 
     it('ignores combinations without primary modifier or with Alt', () => {

@@ -9,3 +9,9 @@ export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
 export function OpenThemeStore():Promise<void>;
 
 export function SearchThemes(arg1:string):Promise<Array<main.OpenVSXExtension>>;
+
+export function SetMinimiseToTrayOnClose(arg1:boolean):Promise<void>;
+
+export function SetRestoreShortcutEnabled(arg1:boolean):Promise<void>;
+
+export function ShowWindow():Promise<void>;

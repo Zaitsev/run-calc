@@ -124,6 +124,30 @@
     font-family: monospace;
 }
 
+.gutter-var-input {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 3px;
+    background: var(--gutter-var-bg, var(--editorGutter-background));
+    color: var(--gutter-var-color);
+    opacity: 1;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    text-transform: uppercase;
+    font-family: monospace;
+    padding: 0;
+    outline: none;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gutter-var-color) 30%, transparent);
+}
+
+.gutter-var-input:focus {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gutter-var-color) 60%, transparent);
+}
+
 .editor-area {
     flex: 1;
     position: relative;
@@ -509,6 +533,56 @@
     padding: 4px 0;
 }
 
+.settings-help-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px 6px;
+    border-bottom: 1px solid var(--sideBar-border);
+}
+
+.settings-help-tab {
+    border: 1px solid var(--sideBar-border);
+    background: var(--stepper-track);
+    color: var(--sideBarTitle-foreground);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.settings-help-tab:hover {
+    background: var(--btn-hover-bg);
+}
+
+.settings-help-tab--active {
+    background: var(--radio-accent);
+    border-color: var(--radio-accent);
+    color: var(--button-primary-foreground, #fff);
+}
+
+.settings-help-content {
+    padding: 10px 16px 12px;
+    color: var(--sideBarTitle-foreground);
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+.settings-help-content ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.settings-help-content li {
+    margin: 0 0 6px;
+}
+
+.settings-help-content li:last-child {
+    margin-bottom: 0;
+}
+
 .settings-option {
     display: flex;
     align-items: center;
@@ -532,6 +606,61 @@
     cursor: pointer;
     flex-shrink: 0;
     margin: 0;
+}
+
+/* ── Chip-style trigger-key options ── */
+
+.settings-options--inline {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 14px 12px;
+}
+
+.settings-option--chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 6px;
+}
+
+.settings-option--chip input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.settings-chip-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--sideBar-border);
+    background: var(--stepper-track);
+    color: var(--sideBarTitle-foreground);
+    font-size: 14px;
+    font-family: monospace;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none;
+}
+
+.settings-option--chip:hover .settings-chip-key {
+    background: var(--btn-hover-bg);
+    border-color: var(--radio-accent);
+}
+
+.settings-option--chip input[type="radio"]:checked + .settings-chip-key {
+    background: var(--radio-accent);
+    border-color: var(--radio-accent);
+    color: var(--button-primary-foreground, #fff);
 }
 
 /* ── Info + control rows ── */

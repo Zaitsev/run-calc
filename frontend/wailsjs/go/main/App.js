@@ -17,3 +17,15 @@ export function OpenThemeStore() {
 export function SearchThemes(arg1) {
   return window['go']['main']['App']['SearchThemes'](arg1);
 }
+
+export function SetMinimiseToTrayOnClose(arg1) {
+  return window['go']['main']['App']['SetMinimiseToTrayOnClose'](arg1);
+}
+
+export function SetRestoreShortcutEnabled(arg1) {
+  return window['go']['main']['App']['SetRestoreShortcutEnabled'](arg1);
+}
+
+export function ShowWindow() {
+  return window['go']['main']['App']['ShowWindow']();
+}

@@ -3,13 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.design/x/hotkey"
 )
 
 // App struct
 type App struct {
 	ctx context.Context
+
+	minimiseToTrayOnClose atomic.Bool
+	restoreShortcutOn     atomic.Bool
+	allowCloseOnce        atomic.Bool
+
+	hotkeyMu      sync.Mutex
+	restoreHotkey []*hotkey.Hotkey
 }
 
 // NewApp creates a new App application struct
@@ -21,6 +31,15 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.minimiseToTrayOnClose.Store(true)
+	a.restoreShortcutOn.Store(true)
+	a.startTray()
+	a.ensureRestoreHotkeyRegistration()
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	a.stopTray()
+	a.unregisterRestoreHotkey()
 }
 
 // Greet returns a greeting for the given name
@@ -65,5 +84,90 @@ func (a *App) showAbout() {
 }
 
 func (a *App) quit() {
+	a.allowCloseOnce.Store(true)
 	wruntime.Quit(a.ctx)
+}
+
+func (a *App) beforeClose(ctx context.Context) bool {
+	if a.allowCloseOnce.Load() {
+		a.allowCloseOnce.Store(false)
+		return false
+	}
+
+	if !a.minimiseToTrayOnClose.Load() {
+		return false
+	}
+
+	wruntime.WindowHide(ctx)
+	return true
+}
+
+func (a *App) ShowWindow() {
+	if a.ctx == nil {
+		return
+	}
+
+	wruntime.WindowShow(a.ctx)
+	wruntime.WindowUnminimise(a.ctx)
+}
+
+func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
+	a.minimiseToTrayOnClose.Store(enabled)
+}
+
+func (a *App) SetRestoreShortcutEnabled(enabled bool) {
+	a.restoreShortcutOn.Store(enabled)
+	a.ensureRestoreHotkeyRegistration()
+}
+
+func (a *App) ensureRestoreHotkeyRegistration() {
+	a.hotkeyMu.Lock()
+	defer a.hotkeyMu.Unlock()
+
+	if !a.restoreShortcutOn.Load() {
+		a.unregisterRestoreHotkeyLocked()
+		return
+	}
+
+	if len(a.restoreHotkey) > 0 {
+		return
+	}
+
+	registered := make([]*hotkey.Hotkey, 0, 2)
+	for _, spec := range restoreHotkeySpecs() {
+		hk := hotkey.New(spec.mods, spec.key)
+		if err := hk.Register(); err != nil {
+			continue
+		}
+
+		registered = append(registered, hk)
+		go func(h *hotkey.Hotkey) {
+			for range h.Keydown() {
+				a.ShowWindow()
+			}
+		}(hk)
+	}
+
+	if len(registered) == 0 {
+		return
+	}
+
+	a.restoreHotkey = registered
+}
+
+func (a *App) unregisterRestoreHotkey() {
+	a.hotkeyMu.Lock()
+	defer a.hotkeyMu.Unlock()
+	a.unregisterRestoreHotkeyLocked()
+}
+
+func (a *App) unregisterRestoreHotkeyLocked() {
+	if len(a.restoreHotkey) == 0 {
+		return
+	}
+
+	for _, hk := range a.restoreHotkey {
+		_ = hk.Unregister()
+	}
+	a.restoreHotkey = nil
 }

@@ -76,8 +76,8 @@ func main() {
 		Title:     "Run-Calc",
 		Width:     1100,
 		Height:    760,
-		MinWidth:  480,
-		MinHeight: 320,
+		MinWidth:  240,
+		MinHeight: 120,
 		Frameless: false,
 		Menu:      appMenu,
 		AssetServer: &assetserver.Options{
@@ -85,10 +85,12 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		Windows: &windows.Options{
-			Theme:                             windows.SystemDefault,
-			BackdropType:                      windows.Mica,
+			Theme:        windows.SystemDefault,
+			BackdropType: windows.Mica,
 		},
-		OnStartup: app.startup,
+		OnStartup:     app.startup,
+		OnShutdown:    app.shutdown,
+		OnBeforeClose: app.beforeClose,
 		Bind: []interface{}{
 			app,
 		},

@@ -2,8 +2,7 @@ export type PrimaryShortcutAction =
     | 'toggle-mark-line'
     | 'increase-font-size'
     | 'decrease-font-size'
-    | 'reset-font-size'
-    | 'assign-variable';
+    | 'reset-font-size';
 
 type ShortcutKeyLike = {
     key: string;
@@ -46,10 +45,6 @@ export function getPrimaryShortcutAction(event: ShortcutKeyLike): PrimaryShortcu
 
     if (event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0') {
         return 'reset-font-size';
-    }
-
-    if (event.key.length === 1 && /[a-zA-Z]/.test(event.key)) {
-        return 'assign-variable';
     }
 
     return null;
