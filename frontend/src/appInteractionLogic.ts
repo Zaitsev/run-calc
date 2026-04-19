@@ -8,6 +8,28 @@ export function shouldSkipEvaluation(lineText: string): boolean {
     return trimmed.length === 0 || body.trim().length === 0;
 }
 
+export function shouldSkipEvaluationAtCaret(lineText: string, caretOffsetInLine: number): boolean {
+    if (shouldSkipEvaluation(lineText)) {
+        return true;
+    }
+
+    const {body, comment} = splitLineComment(lineText);
+    if (comment.length === 0) {
+        return false;
+    }
+
+    return caretOffsetInLine > body.length;
+}
+
+export function getPreservedCaretOffset(caretOffsetInLine: number, replacementLength: number): number {
+    return Math.max(0, Math.min(caretOffsetInLine, replacementLength));
+}
+
+export function isAITriggerSourceLine(lineText: string): boolean {
+    const {body} = splitLineComment(lineText);
+    return body.trimStart().startsWith('?');
+}
+
 export function buildEvaluationExpression(
     editableLine: string,
     trimmedLine: string,
@@ -20,6 +42,30 @@ export function buildEvaluationExpression(
     }
 
     return `${formatNumber(lastResult, decimalDelimiter)}${trimmedLine}`;
+}
+
+export function stripMarkdownCodeFences(text: string): string {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('```')) {
+        return trimmed;
+    }
+
+    const firstLineBreak = trimmed.indexOf('\n');
+    if (firstLineBreak === -1) {
+        return trimmed.replace(/^```[a-zA-Z0-9_-]*\s*/, '').replace(/```$/, '').trim();
+    }
+
+    const openingFence = trimmed.slice(0, firstLineBreak).trim();
+    if (!/^```[a-zA-Z0-9_-]*$/.test(openingFence)) {
+        return trimmed;
+    }
+
+    const bodyWithClosingFence = trimmed.slice(firstLineBreak + 1);
+    if (!bodyWithClosingFence.endsWith('```')) {
+        return trimmed;
+    }
+
+    return bodyWithClosingFence.slice(0, -3).trim();
 }
 
 export function getFriendlyEvalErrorMessage(message: string): string {
@@ -46,7 +92,7 @@ export function getFriendlyEvalErrorMessage(message: string): string {
     }
 
     if (normalized.includes('unsupported pipeline stage') || normalized.includes('invalid pipeline stage')) {
-        return 'A pipeline step after | is not valid. Use filter(...), map(...), each(...), or a function like sum, avg, min, max, median.';
+        return 'A pipeline step after | is not valid. Use filter, map, each, or aggregation functions like sum, count, mean, median, min, max, all, any, reduce, etc.';
     }
 
     if (normalized.includes('expected a list')) {

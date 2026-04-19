@@ -12,6 +12,81 @@ export interface ThemeState {
 const THEME_KEY = 'calc.theme';
 const DEFAULT_THEME: ThemeState = { type: 'system' };
 
+function parseHexColor(color: string): [number, number, number] | null {
+    const trimmed = color.trim();
+    const hexMatch = trimmed.match(/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+    if (!hexMatch) {
+        return null;
+    }
+
+    const hex = hexMatch[1];
+    if (hex.length === 3 || hex.length === 4) {
+        return [
+            parseInt(hex[0] + hex[0], 16),
+            parseInt(hex[1] + hex[1], 16),
+            parseInt(hex[2] + hex[2], 16),
+        ];
+    }
+
+    return [
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16),
+    ];
+}
+
+function parseRgbColor(color: string): [number, number, number] | null {
+    const trimmed = color.trim();
+    const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/i);
+    if (!rgbMatch) {
+        return null;
+    }
+
+    const parts = rgbMatch[1].split(',').map((part) => part.trim());
+    if (parts.length < 3) {
+        return null;
+    }
+
+    const r = Number(parts[0]);
+    const g = Number(parts[1]);
+    const b = Number(parts[2]);
+    if ([r, g, b].some((value) => Number.isNaN(value) || value < 0 || value > 255)) {
+        return null;
+    }
+
+    return [r, g, b];
+}
+
+function parseColor(color?: string): [number, number, number] | null {
+    if (!color) {
+        return null;
+    }
+
+    return parseHexColor(color) || parseRgbColor(color);
+}
+
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+    const toLinear = (channel: number): number => {
+        const normalized = channel / 255;
+        return normalized <= 0.03928
+            ? normalized / 12.92
+            : Math.pow((normalized + 0.055) / 1.055, 2.4);
+    };
+
+    const red = toLinear(r);
+    const green = toLinear(g);
+    const blue = toLinear(b);
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+}
+
+function contrastRatio(foreground: [number, number, number], background: [number, number, number]): number {
+    const l1 = relativeLuminance(foreground);
+    const l2 = relativeLuminance(background);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
 function applyTheme(themeState: ThemeState): void {
     const root = document.documentElement;
 
@@ -51,6 +126,14 @@ function applyTheme(themeState: ThemeState): void {
         const tokenConstant = customColors['tokenColor.constant'];
         const tokenPunctuation = customColors['tokenColor.punctuation'];
         const tokenComment = customColors['tokenColor.comment'];
+        const aiInfoForeground = customColors['editorInfo.foreground'];
+        const aiInfoBackground = customColors['editorInfo.background'];
+        const aiHintForeground = customColors['editorHint.foreground'];
+        const aiHintBackground = customColors['editorHint.background'];
+        const scrollbarThumb = customColors['scrollbarSlider.background'];
+        const scrollbarThumbHover = customColors['scrollbarSlider.hoverBackground'];
+        const scrollbarThumbActive = customColors['scrollbarSlider.activeBackground'];
+        const scrollbarShadow = customColors['scrollbar.shadow'];
 
         // Workbench icon colors (fallback)
         const functionColor = tokenFunction || customColors['symbolIcon.functionForeground'];
@@ -103,6 +186,55 @@ function applyTheme(themeState: ThemeState): void {
 
         if (gutterLineNumberColor) {
             root.style.setProperty('--editorLineNumber-activeForeground', gutterLineNumberColor);
+        }
+
+        const aiForeground = aiInfoForeground || aiHintForeground || linkColor || functionColor || customColors['editor.foreground'];
+        const aiBackground = aiInfoBackground || aiHintBackground || customColors['editor.selectionBackground'];
+
+        if (aiForeground) {
+            root.style.setProperty('--gutter-ai-color', aiForeground);
+            root.style.setProperty('--ai-line-color', aiForeground);
+        }
+
+        if (aiBackground) {
+            root.style.setProperty('--gutter-ai-bg', aiBackground);
+            root.style.setProperty('--ai-line-bg', aiBackground);
+        }
+
+        const scrollbarTrack = scrollbarShadow || customColors['editor.background'] || customColors['sideBar.background'];
+        if (scrollbarTrack) {
+            root.style.setProperty('--scrollbar-track', scrollbarTrack);
+        }
+
+        if (scrollbarThumb) {
+            root.style.setProperty('--scrollbar-thumb', scrollbarThumb);
+        }
+
+        if (scrollbarThumbHover || scrollbarThumb) {
+            root.style.setProperty('--scrollbar-thumb-hover', scrollbarThumbHover || scrollbarThumb || 'currentColor');
+        }
+
+        if (scrollbarThumbActive || scrollbarThumbHover || scrollbarThumb) {
+            root.style.setProperty('--scrollbar-thumb-active', scrollbarThumbActive || scrollbarThumbHover || scrollbarThumb || 'currentColor');
+        }
+
+        const editorBg = parseColor(customColors['editor.background']);
+        const editorFg = parseColor(customColors['editor.foreground']);
+        const errorFg = parseColor(customColors['editorError.foreground'] || customColors['problemsErrorIcon.foreground']);
+        const fallbackError = baseTheme === 'dark' ? '#fda4af' : '#b4233d';
+
+        if (editorBg) {
+            if (!errorFg || contrastRatio(errorFg, editorBg) < 3) {
+                root.style.setProperty('--editorError-foreground', fallbackError);
+            }
+
+            const explainerFallback = baseTheme === 'dark' ? '#fecdd3' : '#6b0f22';
+            const explainerColor = parseColor(customColors['editorError.foreground'] || customColors['problemsErrorIcon.foreground']);
+            if (!explainerColor || contrastRatio(explainerColor, editorBg) < 3.5) {
+                root.style.setProperty('--line-error-explainer-color', explainerFallback);
+            }
+        } else if (!errorFg && editorFg) {
+            root.style.setProperty('--editorError-foreground', fallbackError);
         }
     } else {
         const resolved =

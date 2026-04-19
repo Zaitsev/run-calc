@@ -24,6 +24,7 @@ type App struct {
 	themeSearchMu       sync.Mutex
 	themeSearchCancel   context.CancelFunc
 	themeSearchActiveID uint64
+	aiMu                sync.Mutex
 }
 
 // NewApp creates a new App application struct
@@ -85,6 +86,10 @@ func (a *App) showAbout() {
 		Title:   "About Run-Calc",
 		Message: "Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.",
 	})
+}
+
+func (a *App) openHelp() {
+	wruntime.EventsEmit(a.ctx, "menu:help:open")
 }
 
 func (a *App) quit() {

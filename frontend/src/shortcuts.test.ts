@@ -30,6 +30,11 @@ describe('getPrimaryShortcutAction', () => {
         expect(getPrimaryShortcutAction(event({key: 'M', metaKey: true}))).toBe('toggle-mark-line');
     });
 
+    it('matches word wrap shortcut', () => {
+        expect(getPrimaryShortcutAction(event({key: 'z', altKey: true}))).toBe('toggle-word-wrap');
+        expect(getPrimaryShortcutAction(event({key: 'Z', altKey: true, code: 'KeyZ'}))).toBe('toggle-word-wrap');
+    });
+
     it('matches increase font size shortcuts', () => {
         expect(getPrimaryShortcutAction(event({key: '=', ctrlKey: true}))).toBe('increase-font-size');
         expect(getPrimaryShortcutAction(event({key: '+', ctrlKey: true}))).toBe('increase-font-size');
@@ -56,5 +61,6 @@ describe('getPrimaryShortcutAction', () => {
         expect(getPrimaryShortcutAction(event({key: 'a'}))).toBeNull();
         expect(getPrimaryShortcutAction(event({key: 'a', ctrlKey: true, altKey: true}))).toBeNull();
         expect(getPrimaryShortcutAction(event({key: '0', altKey: true}))).toBeNull();
+        expect(getPrimaryShortcutAction(event({key: 'z', ctrlKey: true, altKey: true}))).toBeNull();
     });
 });

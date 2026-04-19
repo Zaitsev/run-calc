@@ -1,6 +1,7 @@
 export type PrimaryShortcutAction =
     | 'insert-line-below'
     | 'toggle-mark-line'
+    | 'toggle-word-wrap'
     | 'increase-font-size'
     | 'decrease-font-size'
     | 'reset-font-size';
@@ -18,6 +19,13 @@ function isPrimaryModifierPressed(event: ShortcutKeyLike): boolean {
 }
 
 export function getPrimaryShortcutAction(event: ShortcutKeyLike): PrimaryShortcutAction | null {
+    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        if (event.key === 'z' || event.key === 'Z' || event.code === 'KeyZ') {
+            return 'toggle-word-wrap';
+        }
+        return null;
+    }
+
     if (!isPrimaryModifierPressed(event) || event.altKey) {
         return null;
     }

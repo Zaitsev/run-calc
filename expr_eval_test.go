@@ -43,6 +43,54 @@ func TestEvaluateExprProgram_AvgFunction(t *testing.T) {
 	}
 }
 
+func TestEvaluateExprProgram_CountAndAggregationFunctions(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	// Test count as len alias
+	countResult, err := evaluateExprProgram("count([4500, 5200, 3800, 6100])", scope)
+	if err != nil {
+		t.Fatalf("count failed: %v", err)
+	}
+
+	num, ok := toFloat64(countResult)
+	if !ok || num != 4 {
+		t.Fatalf("expected 4 from count, got %#v", countResult)
+	}
+
+	// Test count in pipeline
+	pipelineValue, pipelineErr := evaluateExprProgram("@incomes = [4500, 5200, 3800, 6100]; @incomes | filter(# > 4000) | count", scope)
+	if pipelineErr != nil {
+		t.Fatalf("count pipeline failed: %v", pipelineErr)
+	}
+
+	pipelineNum, pipelineOK := toFloat64(pipelineValue)
+	if !pipelineOK || pipelineNum != 3 {
+		t.Fatalf("expected 3 from count pipeline, got %#v", pipelineValue)
+	}
+
+	// Test avg alias for mean
+	avgResult, avgErr := evaluateExprProgram("avg([1, 2, 3, 4, 5])", scope)
+	if avgErr != nil {
+		t.Fatalf("avg alias failed: %v", avgErr)
+	}
+
+	avgNum, avgOK := toFloat64(avgResult)
+	if !avgOK || avgNum != 3 {
+		t.Fatalf("expected 3 from avg, got %#v", avgResult)
+	}
+
+	// Test native mean
+	meanResult, meanErr := evaluateExprProgram("mean([1, 2, 3, 4, 5])", scope)
+	if meanErr != nil {
+		t.Fatalf("mean failed: %v", meanErr)
+	}
+
+	meanNum, meanOK := toFloat64(meanResult)
+	if !meanOK || meanNum != 3 {
+		t.Fatalf("expected 3 from mean, got %#v", meanResult)
+	}
+}
+
 func TestEvaluateExprProgram_PipelineFunctionShorthand(t *testing.T) {
 	scope := map[string]interface{}{}
 
@@ -88,6 +136,282 @@ func TestEvaluateExprProgram_EachAliasForMap(t *testing.T) {
 
 	if math.Abs(first-0) > 1e-9 || math.Abs(second-1) > 1e-9 {
 		t.Fatalf("expected [0, 1] from each alias, got %#v", items)
+	}
+}
+
+func TestEvaluateExprProgram_ArrayPipelineFunctions(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	sortedValue, err := evaluateExprProgram("[3, 1, 2] | sort", scope)
+	if err != nil {
+		t.Fatalf("sort pipeline failed: %v", err)
+	}
+
+	sortedItems, ok := sortedValue.([]interface{})
+	if !ok || len(sortedItems) != 3 {
+		t.Fatalf("expected sorted array of 3 items, got %#v", sortedValue)
+	}
+
+	if first, _ := toFloat64(sortedItems[0]); first != 1 {
+		t.Fatalf("expected sorted first value 1, got %#v", sortedItems[0])
+	}
+	if second, _ := toFloat64(sortedItems[1]); second != 2 {
+		t.Fatalf("expected sorted second value 2, got %#v", sortedItems[1])
+	}
+	if third, _ := toFloat64(sortedItems[2]); third != 3 {
+		t.Fatalf("expected sorted third value 3, got %#v", sortedItems[2])
+	}
+
+	reversedValue, reverseErr := evaluateExprProgram("[1, 2, 3] | reverse", scope)
+	if reverseErr != nil {
+		t.Fatalf("reverse pipeline failed: %v", reverseErr)
+	}
+
+	reversedItems, ok := reversedValue.([]interface{})
+	if !ok || len(reversedItems) != 3 {
+		t.Fatalf("expected reversed array of 3 items, got %#v", reversedValue)
+	}
+
+	if first, _ := toFloat64(reversedItems[0]); first != 3 {
+		t.Fatalf("expected reverse first value 3, got %#v", reversedItems[0])
+	}
+
+	uniqValue, uniqErr := evaluateExprProgram("[1, 1, 2, 3, 3] | uniq", scope)
+	if uniqErr != nil {
+		t.Fatalf("uniq pipeline failed: %v", uniqErr)
+	}
+
+	uniqItems, ok := uniqValue.([]interface{})
+	if !ok || len(uniqItems) != 3 {
+		t.Fatalf("expected uniq array of 3 items, got %#v", uniqValue)
+	}
+
+	firstValue, firstErr := evaluateExprProgram("[9, 8, 7] | first", scope)
+	if firstErr != nil {
+		t.Fatalf("first pipeline failed: %v", firstErr)
+	}
+	if first, ok := toFloat64(firstValue); !ok || first != 9 {
+		t.Fatalf("expected first value 9, got %#v", firstValue)
+	}
+
+	lastValue, lastErr := evaluateExprProgram("[9, 8, 7] | last", scope)
+	if lastErr != nil {
+		t.Fatalf("last pipeline failed: %v", lastErr)
+	}
+	if last, ok := toFloat64(lastValue); !ok || last != 7 {
+		t.Fatalf("expected last value 7, got %#v", lastValue)
+	}
+
+	takeValue, takeErr := evaluateExprProgram("[9, 8, 7, 6] | take(2)", scope)
+	if takeErr != nil {
+		t.Fatalf("take pipeline failed: %v", takeErr)
+	}
+
+	takenItems, ok := takeValue.([]interface{})
+	if !ok || len(takenItems) != 2 {
+		t.Fatalf("expected take(2) array of 2 items, got %#v", takeValue)
+	}
+	if first, _ := toFloat64(takenItems[0]); first != 9 {
+		t.Fatalf("expected take first value 9, got %#v", takenItems[0])
+	}
+	if second, _ := toFloat64(takenItems[1]); second != 8 {
+		t.Fatalf("expected take second value 8, got %#v", takenItems[1])
+	}
+}
+
+func TestEvaluateExprProgram_TakeCoercesIntegralFloatCount(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("index_floor = floor(2.9); [10, 20, 30, 40] | take(index_floor)", scope)
+	if err != nil {
+		t.Fatalf("take with coerced float count failed: %v", err)
+	}
+
+	items, ok := value.([]interface{})
+	if !ok || len(items) != 2 {
+		t.Fatalf("expected 2 items after take(index_floor), got %#v", value)
+	}
+
+	first, firstOK := toFloat64(items[0])
+	second, secondOK := toFloat64(items[1])
+	if !firstOK || !secondOK || first != 10 || second != 20 {
+		t.Fatalf("expected [10, 20], got %#v", items)
+	}
+}
+
+func TestEvaluateExprProgram_TakeRejectsNonIntegralFloatCount(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	_, err := evaluateExprProgram("[10, 20, 30] | take(1.5)", scope)
+	if err == nil {
+		t.Fatalf("expected take(1.5) to fail")
+	}
+
+	if !strings.Contains(strings.ToLower(err.Error()), "take expects an integer count") {
+		t.Fatalf("expected integer-count error, got %v", err)
+	}
+}
+
+func TestEvaluateExprProgram_ArrayFunctionTypedArgumentFlow(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	// Desc sort order from variable should flow to sort(item, order).
+	sortedDesc, sortErr := evaluateExprProgram("order = 'desc'; [1, 3, 2] | sort(order)", scope)
+	if sortErr != nil {
+		t.Fatalf("sort(order) failed: %v", sortErr)
+	}
+
+	sortedItems, ok := sortedDesc.([]interface{})
+	if !ok || len(sortedItems) != 3 {
+		t.Fatalf("expected sorted array, got %#v", sortedDesc)
+	}
+	if first, _ := toFloat64(sortedItems[0]); first != 3 {
+		t.Fatalf("expected desc sort first value 3, got %#v", sortedItems[0])
+	}
+
+	// This mirrors the real world issue: floor() returns float64 and must still work for take().
+	takeFromFloatExpr, takeErr := evaluateExprProgram("count_floor = floor(3.2); [10, 20, 30, 40] | take(count_floor)", scope)
+	if takeErr != nil {
+		t.Fatalf("take(count_floor) failed: %v", takeErr)
+	}
+
+	taken, ok := takeFromFloatExpr.([]interface{})
+	if !ok || len(taken) != 3 {
+		t.Fatalf("expected 3 taken items, got %#v", takeFromFloatExpr)
+	}
+}
+
+func TestEvaluateExprProgram_TakeCoercionMatrix(t *testing.T) {
+	tests := []struct {
+		name        string
+		expr        string
+		expectedLen int
+		wantErr     bool
+	}{
+		{
+			name:        "int literal",
+			expr:        "[1,2,3,4] | take(2)",
+			expectedLen: 2,
+		},
+		{
+			name:        "integral float literal",
+			expr:        "[1,2,3,4] | take(2.0)",
+			expectedLen: 2,
+		},
+		{
+			name:        "integral float variable",
+			expr:        "n = floor(2.8); [1,2,3,4] | take(n)",
+			expectedLen: 2,
+		},
+		{
+			name:        "direct call integral float",
+			expr:        "take([1,2,3,4], floor(2.8))",
+			expectedLen: 2,
+		},
+		{
+			name:        "zero count",
+			expr:        "[1,2,3] | take(0)",
+			expectedLen: 0,
+		},
+		{
+			name:        "negative count",
+			expr:        "[1,2,3] | take(-3)",
+			expectedLen: 0,
+		},
+		{
+			name:        "non integral float",
+			expr:        "[1,2,3] | take(1.2)",
+			wantErr:     true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scope := map[string]interface{}{}
+			value, err := evaluateExprProgram(tc.expr, scope)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for expression %q", tc.expr)
+				}
+				if !strings.Contains(strings.ToLower(err.Error()), "take expects an integer count") {
+					t.Fatalf("expected integer count error, got %v", err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("expression failed: %v", err)
+			}
+
+			items, ok := value.([]interface{})
+			if !ok {
+				t.Fatalf("expected array result, got %#v", value)
+			}
+			if len(items) != tc.expectedLen {
+				t.Fatalf("expected %d items, got %d (%#v)", tc.expectedLen, len(items), items)
+			}
+		})
+	}
+}
+
+func TestEvaluateExprProgram_ModuloWithVariableOperands(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("a = 11; a % 5", scope)
+	if err != nil {
+		t.Fatalf("a %% 5 failed: %v", err)
+	}
+
+	n, ok := toFloat64(value)
+	if !ok || n != 1 {
+		t.Fatalf("expected 1 for a %% 5, got %#v", value)
+	}
+
+	value, err = evaluateExprProgram("a = 11; 5 % a", scope)
+	if err != nil {
+		t.Fatalf("5 %% a failed: %v", err)
+	}
+
+	n, ok = toFloat64(value)
+	if !ok || n != 5 {
+		t.Fatalf("expected 5 for 5 %% a, got %#v", value)
+	}
+
+	value, err = evaluateExprProgram("a = 17; b = 5; a % b", scope)
+	if err != nil {
+		t.Fatalf("a %% b failed: %v", err)
+	}
+
+	n, ok = toFloat64(value)
+	if !ok || n != 2 {
+		t.Fatalf("expected 2 for a %% b, got %#v", value)
+	}
+}
+
+func TestEvaluateExprProgram_ModuloCoercesIntegralFloats(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("a = floor(11.9); b = floor(3.9); a % b", scope)
+	if err != nil {
+		t.Fatalf("modulo with integral-float vars failed: %v", err)
+	}
+
+	n, ok := toFloat64(value)
+	if !ok || n != 2 {
+		t.Fatalf("expected 2 for floor-based modulo, got %#v", value)
+	}
+}
+
+func TestEvaluateExprProgram_ModuloRejectsNonIntegralOperands(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	_, err := evaluateExprProgram("a = 5.5; a % 2", scope)
+	if err == nil {
+		t.Fatalf("expected non-integral modulo to fail")
+	}
+
+	if !strings.Contains(strings.ToLower(err.Error()), "modulo expects integer operands") {
+		t.Fatalf("expected integer-operand modulo error, got %v", err)
 	}
 }
 
@@ -368,5 +692,109 @@ func TestEvaluateExprProgram_IsCaseAgnostic(t *testing.T) {
 
 	if _, exists := scope["incomes"]; !exists {
 		t.Fatalf("expected normalized lowercase variable key in scope")
+	}
+}
+func TestEvaluateExprProgram_MathFunctionPipelineStage(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected float64
+	}{
+		{"ceil via pipeline", "3.2 | ceil", 4},
+		{"floor via pipeline", "3.9 | floor", 3},
+		{"round via pipeline", "3.5 | round", 4},
+		{"abs via pipeline", "-5 | abs", 5},
+		{"sqrt via pipeline", "9 | sqrt", 3},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scope := map[string]interface{}{}
+			val, err := evaluateExprProgram(tc.expr, scope)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			n, ok := toFloat64(val)
+			if !ok {
+				t.Fatalf("expected number, got %T", val)
+			}
+			if math.Abs(n-tc.expected) > 1e-9 {
+				t.Fatalf("expected %v, got %v", tc.expected, n)
+			}
+		})
+	}
+}
+
+func TestEvaluateExprProgram_EnrichedErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		expr    string
+		wantMsg string
+	}{
+		{
+			name:    "pipe inside arithmetic parens",
+			expr:    "a = [1,2,3,4]; 0.9 * (a | count)",
+			wantMsg: "pipe operator inside parentheses is not supported",
+		},
+		{
+			name:    "pipe inside divisor parens",
+			expr:    "a = [1,2,3]; 100 / (a | sum)",
+			wantMsg: "pipe operator inside parentheses is not supported",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scope := map[string]interface{}{}
+			_, err := evaluateExprProgram(tc.expr, scope)
+			if err == nil {
+				t.Fatalf("expected error for %q", tc.expr)
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Fatalf("expected %q in error, got: %v", tc.wantMsg, err)
+			}
+		})
+	}
+}
+
+func TestEvaluateExprProgram_UniformRandom(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	for i := 0; i < 50; i++ {
+		value, err := evaluateExprProgram("uniform()", scope)
+		if err != nil {
+			t.Fatalf("uniform() failed: %v", err)
+		}
+		n, ok := toFloat64(value)
+		if !ok {
+			t.Fatalf("expected numeric result from uniform(), got %T", value)
+		}
+		if n < 0 || n >= 1 {
+			t.Fatalf("uniform() out of range [0,1): %v", n)
+		}
+	}
+
+	_, err := evaluateExprProgram("uniform(5)", scope)
+	if err == nil {
+		t.Fatalf("expected uniform(5) to fail because uniform() accepts no arguments")
+	}
+}
+
+func TestEvaluateExprProgram_NormalRandom(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("normal()", scope)
+	if err != nil {
+		t.Fatalf("normal() failed: %v", err)
+	}
+	n, ok := toFloat64(value)
+	if !ok {
+		t.Fatalf("expected numeric result from normal(), got %T", value)
+	}
+	if math.IsNaN(n) || math.IsInf(n, 0) {
+		t.Fatalf("expected finite value from normal(), got %v", n)
+	}
+
+	_, err = evaluateExprProgram("normal(0)", scope)
+	if err == nil {
+		t.Fatalf("expected normal(0) to fail because normal() accepts no arguments")
 	}
 }
