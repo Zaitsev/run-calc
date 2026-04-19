@@ -19,6 +19,7 @@ Minimal notepad-style desktop calculator built with Wails + React + TypeScript.
 ## Keyboard Shortcuts
 
 - `Enter`: Evaluate current line
+- `Ctrl/Cmd + Enter`: Insert a new line below without evaluating
 - `Ctrl/Cmd + N`: New worksheet
 - `Ctrl/Cmd + =`: Increase font size
 - `Ctrl/Cmd + -`: Decrease font size
@@ -42,6 +43,7 @@ The `Help: New` section should be appended on each functional change and preserv
 
 ### Help: New (latest)
 
+- Added `Ctrl/Cmd + Enter` to insert a new line below the current line without running evaluation.
 - Added a quick double-Escape shortcut (`Esc` twice quickly) to hide the app window while keeping it running.
 - Added Settings -> Window switches for close button behavior (minimize to tray by default vs normal close) and restore shortcut enablement.
 - Added a global restore shortcut for hidden/minimized windows: `Ctrl + NumLock` on Windows/Linux and `Cmd + Clear` on macOS.

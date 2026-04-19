@@ -3,6 +3,7 @@ module calc
 go 1.23.0
 
 require (
+	github.com/expr-lang/expr v1.17.8
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
 	github.com/wailsapp/wails/v2 v2.12.0

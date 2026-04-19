@@ -58,7 +58,7 @@
 }
 
 .gutter {
-    width: 28px;
+    width: 52px;
     overflow: hidden;
     flex-shrink: 0;
     background: var(--editorGutter-background);
@@ -69,17 +69,36 @@
 .gutter-line {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    color: var(--editorLineNumber-activeForeground);
+    justify-content: space-between;
+    gap: 8px;
     font-size: 8px;
     cursor: pointer;
-    opacity: 0.2;
+    padding: 0 1px;
     transition: opacity 0.12s;
 }
 
-.gutter-line:hover {
-    opacity: 0.55;
+.gutter-line-number {
+    min-width: 22px;
+    width: 22px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--editorLineNumber-activeForeground);
+    font-family: "Courier New", monospace;
+    text-align: left;
+    padding-left: 3px;
+    opacity: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.gutter-line-indicator {
+    width: 12px;
+    min-width: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 3px;
 }
 
 .gutter-line--marked {
@@ -172,6 +191,16 @@
     background: transparent;
     z-index: 1;
     overflow-y: auto;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.editor--wrap {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .editor-overlay {
@@ -185,11 +214,18 @@
     color: var(--editor-foreground);
     background: var(--editor-background);
     pointer-events: none;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    word-break: break-word;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
     overflow: hidden;
     z-index: 0;
+}
+
+.editor-overlay--wrap {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .marked-result {
@@ -201,8 +237,47 @@
     color: var(--result-variable-color);
 }
 
+.syntax-token--variable-decl {
+    color: var(--syntax-variable-declaration);
+}
+
+.syntax-token--variable {
+    color: var(--syntax-variable);
+}
+
+.syntax-token--function {
+    color: var(--syntax-function);
+}
+
+.syntax-token--operator {
+    color: var(--syntax-operator);
+}
+
+.syntax-token--number {
+    color: var(--syntax-number);
+}
+
+.syntax-token--constant {
+    color: var(--syntax-constant);
+}
+
+.syntax-token--punctuation {
+    color: var(--syntax-punctuation);
+}
+
 .line-error {
     color: var(--editorError-foreground);
+}
+
+.line-error .syntax-token--variable-decl,
+.line-error .syntax-token--variable,
+.line-error .syntax-token--function,
+.line-error .syntax-token--operator,
+.line-error .syntax-token--number,
+.line-error .syntax-token--constant,
+.line-error .syntax-token--punctuation {
+    color: inherit;
+    text-decoration: none;
 }
 
 .line-error-floating {
@@ -220,6 +295,70 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.editor-intelligence {
+    position: absolute;
+    z-index: 3;
+    min-width: 220px;
+    max-width: min(360px, calc(100% - 36px));
+    padding: 6px;
+    border-radius: 10px;
+    background: var(--editor-intelligence-bg);
+    border: 1px solid var(--editor-intelligence-border);
+    box-shadow: var(--editor-intelligence-shadow);
+    backdrop-filter: blur(10px);
+}
+
+.editor-intelligence-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    color: var(--editor-foreground);
+}
+
+.editor-intelligence-item--active {
+    background: var(--editor-intelligence-active-bg);
+}
+
+.editor-intelligence-kind {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 58px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 0.72em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.editor-intelligence-kind--variable {
+    color: var(--syntax-variable);
+}
+
+.editor-intelligence-kind--function {
+    color: var(--syntax-function);
+}
+
+.editor-intelligence-kind--constant {
+    color: var(--syntax-constant);
+}
+
+.editor-intelligence-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.editor-intelligence-hint {
+    padding: 6px 8px 2px;
+    font-size: 0.74em;
+    color: var(--editor-intelligence-hint);
 }
 
 .recalc-modal-overlay {
@@ -319,6 +458,109 @@
     padding: 1px 7px;
     user-select: none;
     white-space: nowrap;
+}
+
+.status-chip-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.status-chip-btn {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.status-chip-btn:hover,
+.status-chip-btn--active {
+    color: var(--sideBarTitle-foreground);
+    background: var(--btn-hover-bg);
+    border-color: var(--radio-accent);
+}
+
+.precision-popover {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: min(290px, calc(100vw - 20px));
+    background: var(--sideBar-background);
+    border: 1px solid var(--sideBar-border);
+    border-radius: 10px;
+    box-shadow: var(--drawer-shadow);
+    padding: 12px;
+    color: var(--sideBarTitle-foreground);
+    z-index: 30;
+}
+
+.precision-popover-title {
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.precision-popover-desc {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--descriptionForeground);
+}
+
+.precision-popover-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.precision-popover-row--toggle {
+    align-items: flex-start;
+    padding-top: 10px;
+    border-top: 1px solid var(--sideBar-border);
+}
+
+.precision-popover-row-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.precision-popover-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sideBarTitle-foreground);
+}
+
+.precision-popover-value {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--descriptionForeground);
+    line-height: 1.35;
+}
+
+.precision-popover-stepper {
+    border-radius: 7px;
+}
+
+.precision-popover-actions {
+    display: flex;
+    justify-content: flex-start;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.precision-popover-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--radio-accent);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 0;
+}
+
+.precision-popover-link:hover:not(:disabled) {
+    opacity: 0.75;
+}
+
+.precision-popover-link:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }
 
 .status-bar.error .status-text {

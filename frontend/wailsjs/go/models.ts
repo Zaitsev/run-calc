@@ -3,6 +3,7 @@ export namespace main {
 	export class CustomTheme {
 	    id: string;
 	    colors: Record<string, string>;
+	    type: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CustomTheme(source);
@@ -12,6 +13,29 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.colors = source["colors"];
+	        this.type = source["type"];
+	    }
+	}
+	export class ExprEvalResponse {
+	    ok: boolean;
+	    error?: string;
+	    value?: any;
+	    variables: Record<string, any>;
+	    isNumber: boolean;
+	    numberValue?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExprEvalResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	        this.value = source["value"];
+	        this.variables = source["variables"];
+	        this.isNumber = source["isNumber"];
+	        this.numberValue = source["numberValue"];
 	    }
 	}
 	export class OpenVSXFiles {

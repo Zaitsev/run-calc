@@ -20,6 +20,11 @@ function event(input: TestShortcutEvent) {
 }
 
 describe('getPrimaryShortcutAction', () => {
+    it('matches insert line below shortcut', () => {
+        expect(getPrimaryShortcutAction(event({key: 'Enter', ctrlKey: true}))).toBe('insert-line-below');
+        expect(getPrimaryShortcutAction(event({key: 'Enter', metaKey: true, code: 'NumpadEnter'}))).toBe('insert-line-below');
+    });
+
     it('matches mark toggle shortcut', () => {
         expect(getPrimaryShortcutAction(event({key: 'm', ctrlKey: true}))).toBe('toggle-mark-line');
         expect(getPrimaryShortcutAction(event({key: 'M', metaKey: true}))).toBe('toggle-mark-line');

@@ -20,6 +20,10 @@ type App struct {
 
 	hotkeyMu      sync.Mutex
 	restoreHotkey []*hotkey.Hotkey
+
+	themeSearchMu       sync.Mutex
+	themeSearchCancel   context.CancelFunc
+	themeSearchActiveID uint64
 }
 
 // NewApp creates a new App application struct

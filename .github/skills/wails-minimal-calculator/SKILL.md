@@ -166,3 +166,70 @@ Add all four pairs to the `html` (light) and `html[data-theme="dark"]` blocks in
 - Add memory and history controls (clear, undo, persist session).
 - Add unit tests for parser and line-evaluation behavior.
 - Add locale-aware number formatting and configurable precision.
+
+## Theme System & Syntax Highlighting
+
+### Architecture
+
+The app supports importing VS Code themes from Open VSX. Theme processing has two layers:
+
+1. **Backend** (`theme.go` — `InstallTheme`): Downloads VSIX, extracts JSON/JSONC theme file, parses both `colors` (workbench UI colors) and `tokenColors` (TextMate syntax scopes).
+2. **Frontend** (`useTheme.ts` — `applyTheme`): Maps extracted colors to CSS custom properties on `<html>`.
+
+### Token Colors (TextMate scopes → syntax highlighting)
+
+VS Code themes define syntax colors in `tokenColors` — an array of rules with TextMate scopes and foreground/background settings. The backend extracts these into synthetic keys:
+
+| Synthetic key | TextMate scopes matched (first wins) |
+|---|---|
+| `tokenColor.function` | `support.function`, `entity.name.function` |
+| `tokenColor.variable` | `variable.other`, `variable` |
+| `tokenColor.number` | `constant.numeric` |
+| `tokenColor.operator` | `keyword.operator` |
+| `tokenColor.constant` | `constant.language`, `support.constant`, `constant.other` |
+| `tokenColor.punctuation` | `punctuation` |
+| `tokenColor.keyword` | `keyword` |
+| `tokenColor.string` | `string` |
+
+### Color resolution priority (frontend)
+
+For each syntax token CSS variable, the frontend resolves colors in this order:
+
+```
+tokenColor.* > symbolIcon.*Foreground > textLink.foreground > currentColor
+```
+
+Specifically in `useTheme.ts`:
+```ts
+const functionColor = tokenFunction || customColors['symbolIcon.functionForeground'];
+// ... then fallback chain in setProperty:
+root.style.setProperty('--syntax-function', functionColor || linkColor || 'currentColor');
+```
+
+### CSS variables for syntax tokens
+
+| CSS variable | Token kind | Fallback chain |
+|---|---|---|
+| `--syntax-function` | function calls (`sin`, `sqrt`) | tokenColor.function → symbolIcon.functionForeground → textLink.foreground |
+| `--syntax-variable` | single-letter variables (`s`, `d`) | tokenColor.variable → symbolIcon.variableForeground → textLink.foreground |
+| `--syntax-variable-declaration` | LHS of `x = ...` | same as variable |
+| `--syntax-operator` | `+`, `-`, `*`, `/`, `=` | tokenColor.operator → symbolIcon.operatorForeground → textLink.foreground |
+| `--syntax-number` | numeric literals | tokenColor.number → symbolIcon.numberForeground → symbolIcon.functionForeground |
+| `--syntax-constant` | `PI`, `E`, etc. | tokenColor.constant → symbolIcon.constantForeground → symbolIcon.functionForeground |
+| `--syntax-punctuation` | `(`, `)`, `,` | tokenColor.punctuation → editor.foreground |
+
+### Allowed color keys (backend whitelist)
+
+Only keys listed in `allowedColors` in `theme.go` are passed to the frontend. To add a new workbench or token color:
+1. Add the key to `allowedColors` map in `theme.go`.
+2. If it's a tokenColor, also add a scope mapping in `scopeToTokenKey`.
+3. Map it to a CSS variable in `useTheme.ts` `applyTheme()`.
+4. Use the CSS variable in `App.css` or `style.css`.
+
+### Adding a new syntax token type
+
+1. Add the TextMate scope prefix → `tokenColor.newtype` mapping to `scopeToTokenKey` in `theme.go`.
+2. Add `"tokenColor.newtype"` to `allowedColors` in `theme.go`.
+3. In `useTheme.ts`, read `customColors['tokenColor.newtype']` and set `--syntax-newtype`.
+4. In `App.css`, add `.syntax-token--newtype { color: var(--syntax-newtype); }`.
+5. In `App.tsx` `renderSyntaxText()`, add the tokenizer logic to produce the `newtype` token kind.

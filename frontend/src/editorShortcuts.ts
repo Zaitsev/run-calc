@@ -1,4 +1,5 @@
 export type PrimaryShortcutAction =
+    | 'insert-line-below'
     | 'toggle-mark-line'
     | 'increase-font-size'
     | 'decrease-font-size'
@@ -19,6 +20,10 @@ function isPrimaryModifierPressed(event: ShortcutKeyLike): boolean {
 export function getPrimaryShortcutAction(event: ShortcutKeyLike): PrimaryShortcutAction | null {
     if (!isPrimaryModifierPressed(event) || event.altKey) {
         return null;
+    }
+
+    if (event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter') {
+        return 'insert-line-below';
     }
 
     if (event.key === 'm' || event.key === 'M') {

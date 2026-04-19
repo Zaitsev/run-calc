@@ -1,6 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SearchThemes, InstallTheme } from '../wailsjs/go/main/App';
 import './ThemeStore.css';
+
+const SEARCH_DEBOUNCE_MS = 300;
+
+function isCancelledSearchError(err: unknown): boolean {
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    return /cancelled|canceled|aborted|context canceled/i.test(message);
+}
 
 interface ThemeSearchResult {
     namespace?: string;
@@ -20,6 +27,7 @@ export interface AcceptedThemeEntry {
     publisher?: string;
     iconUrl?: string;
     colors: Record<string, string>;
+    themeBase?: 'dark' | 'light';
 }
 
 export interface ThemeStoreProps {
@@ -31,55 +39,59 @@ export interface ThemeStoreProps {
 
 export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview, currentPreviewThemeId }: ThemeStoreProps) {
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [results, setResults] = useState<ThemeSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [previewMap, setPreviewMap] = useState<Record<string, AcceptedThemeEntry>>({});
+    const searchRequestIdRef = useRef(0);
 
     useEffect(() => {
-        let cancelled = false;
+        const timeoutId = window.setTimeout(() => {
+            setDebouncedQuery(query.trim());
+        }, SEARCH_DEBOUNCE_MS);
 
-        const loadPopularThemes = async () => {
-            setLoading(true);
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [query]);
+
+    useEffect(() => {
+        let active = true;
+        const requestId = ++searchRequestIdRef.current;
+
+        const runSearch = async () => {
             setError('');
+        setLoading(true);
             try {
-                const res = await SearchThemes('');
-                if (!cancelled) {
-                    setResults((res || []) as ThemeSearchResult[]);
+                const res = await SearchThemes(debouncedQuery);
+                if (!active || requestId !== searchRequestIdRef.current) {
+                    return;
                 }
-            } catch (err: any) {
-                if (!cancelled) {
-                    setError(err.message || String(err));
+                setResults((res || []) as ThemeSearchResult[]);
+            } catch (err: unknown) {
+                if (!active || requestId !== searchRequestIdRef.current) {
+                    return;
                 }
+                if (isCancelledSearchError(err)) {
+                    return;
+                }
+                setError(err instanceof Error ? err.message : String(err));
+                setResults([]);
             } finally {
-                if (!cancelled) {
+                if (active && requestId === searchRequestIdRef.current) {
                     setLoading(false);
                 }
             }
         };
 
-        loadPopularThemes();
+        runSearch();
 
         return () => {
-            cancelled = true;
+            active = false;
         };
-    }, []);
-
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-        setResults([]);
-        try {
-            const res = await SearchThemes(query);
-            setResults((res || []) as ThemeSearchResult[]);
-        } catch (err: any) {
-            setError(err.message || String(err));
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [debouncedQuery]);
 
     const handlePreview = async (ext: ThemeSearchResult) => {
         if (!ext.downloadUrl) {
@@ -90,13 +102,14 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
         setInstallingId(ext.name);
         setError('');
         try {
-            const customTheme = await InstallTheme(ext.name, ext.downloadUrl) as { id: string; colors: Record<string, string> };
+            const customTheme = await InstallTheme(ext.name, ext.downloadUrl) as { id: string; colors: Record<string, string>; type?: string };
             const themeToPreview: AcceptedThemeEntry = {
                 id: customTheme.id,
                 name: ext.displayName || ext.name,
                 publisher: ext.publisher,
                 iconUrl: ext.files?.icon,
                 colors: customTheme.colors || {},
+                themeBase: customTheme.type === 'dark' || customTheme.type === 'light' ? customTheme.type : undefined,
             };
             setPreviewMap((prev) => ({ ...prev, [themeToPreview.id]: themeToPreview }));
             onPreviewTheme(themeToPreview);
@@ -119,7 +132,7 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
     return (
         <div className="theme-store-pane">
             <div className="theme-store-body">
-                <form className="theme-store-search" onSubmit={handleSearch}>
+                <div className="theme-store-search">
                     <input
                         type="text"
                         placeholder="Search themes (e.g., dracula, one dark, github)"
@@ -127,10 +140,10 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
                         onChange={e => setQuery(e.target.value)}
                         autoFocus
                     />
-                    <button type="submit" disabled={loading}>
-                        {loading ? 'Searching...' : 'Search'}
-                    </button>
-                </form>
+                    <span aria-live="polite" className="theme-store-search-status">
+                        {loading ? 'Searching...' : ''}
+                    </span>
+                </div>
 
                 {error && <div className="theme-store-error">{error}</div>}
 

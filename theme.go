@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,6 +56,7 @@ type openVSXLatestResponse struct {
 type CustomTheme struct {
 	ID     string            `json:"id"`
 	Colors map[string]string `json:"colors"`
+	Type   string            `json:"type"` // "dark" or "light"
 }
 
 type manifestThemeEntry struct {
@@ -85,6 +87,14 @@ var allowedColors = map[string]bool{
 	"textLink.foreground": true,
 	"symbolIcon.functionForeground": true,
 	"symbolIcon.variableForeground": true,
+	"tokenColor.function":           true,
+	"tokenColor.variable":           true,
+	"tokenColor.number":             true,
+	"tokenColor.operator":           true,
+	"tokenColor.constant":           true,
+	"tokenColor.punctuation":        true,
+	"tokenColor.keyword":            true,
+	"tokenColor.string":             true,
 }
 
 // Strict regex for valid colors (hex, rgb, rgba)
@@ -107,9 +117,14 @@ func isThemeByMetadata(data openVSXLatestResponse) bool {
 	return false
 }
 
-func fetchLatestMetadata(client *http.Client, namespace string, name string) (openVSXLatestResponse, error) {
+func fetchLatestMetadata(ctx context.Context, client *http.Client, namespace string, name string) (openVSXLatestResponse, error) {
 	endpoint := fmt.Sprintf("https://open-vsx.org/api/%s/%s/latest", url.PathEscape(namespace), url.PathEscape(name))
-	resp, err := client.Get(endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return openVSXLatestResponse{}, err
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return openVSXLatestResponse{}, err
 	}
@@ -136,23 +151,61 @@ func isJSONThemePath(path string) bool {
 	return strings.HasSuffix(lower, ".json") || strings.HasSuffix(lower, ".jsonc")
 }
 
-func selectInstallableThemePath(themes []manifestThemeEntry) (string, error) {
+func selectInstallableTheme(themes []manifestThemeEntry) (string, string, error) {
 	if len(themes) == 0 {
-		return "", errors.New("no themes contributed by this extension")
+		return "", "", errors.New("no themes contributed by this extension")
 	}
 
 	for _, t := range themes {
 		clean := normalizeThemePath(t.Path)
 		if isJSONThemePath(clean) {
-			return clean, nil
+			return clean, t.UITheme, nil
 		}
 	}
 
-	return "", errors.New("theme format not supported: extension has no JSON/JSONC theme file")
+	return "", "", errors.New("theme format not supported: extension has no JSON/JSONC theme file")
+}
+
+func (a *App) beginThemeSearch() (context.Context, uint64) {
+	a.themeSearchMu.Lock()
+	defer a.themeSearchMu.Unlock()
+
+	if a.themeSearchCancel != nil {
+		a.themeSearchCancel()
+		a.themeSearchCancel = nil
+	}
+
+	base := a.ctx
+	if base == nil {
+		base = context.Background()
+	}
+
+	ctx, cancel := context.WithCancel(base)
+	a.themeSearchCancel = cancel
+	a.themeSearchActiveID++
+
+	return ctx, a.themeSearchActiveID
+}
+
+func (a *App) endThemeSearch(searchID uint64) {
+	a.themeSearchMu.Lock()
+	defer a.themeSearchMu.Unlock()
+
+	if a.themeSearchActiveID != searchID {
+		return
+	}
+
+	if a.themeSearchCancel != nil {
+		a.themeSearchCancel()
+		a.themeSearchCancel = nil
+	}
 }
 
 // SearchThemes calls Open VSX API
 func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
+	ctx, searchID := a.beginThemeSearch()
+	defer a.endThemeSearch(searchID)
+
 	searchQuery := strings.TrimSpace(query)
 	if searchQuery == "" {
 		searchQuery = "theme"
@@ -162,8 +215,16 @@ func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
 	reqURL := fmt.Sprintf("https://open-vsx.org/api/-/search?query=%s&size=30", url.QueryEscape(searchQuery))
 	
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(reqURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return nil, context.Canceled
+		}
 		return nil, fmt.Errorf("failed to contact Open VSX: %v", err)
 	}
 	defer resp.Body.Close()
@@ -179,9 +240,16 @@ func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
 	
 	filtered := make([]OpenVSXExtension, 0, len(data.Results))
 	for i := range data.Results {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		ext := data.Results[i]
-		meta, err := fetchLatestMetadata(client, ext.Namespace, ext.Name)
+		meta, err := fetchLatestMetadata(ctx, client, ext.Namespace, ext.Name)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil, context.Canceled
+			}
 			continue
 		}
 		if !isThemeByMetadata(meta) {
@@ -212,6 +280,99 @@ func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
 	})
 
 	return filtered, nil
+}
+
+// tokenColorRule represents a single entry in the VS Code theme tokenColors array.
+type tokenColorRule struct {
+	Scope    interface{}            `json:"scope"` // string or []string
+	Settings map[string]string      `json:"settings"`
+}
+
+// scopeToTokenKey maps TextMate scope prefixes to our synthetic token color keys.
+// Order matters: first match wins per category, so more specific scopes come first.
+var scopeToTokenKey = []struct {
+	prefix string
+	key    string
+}{
+	// Functions
+	{"support.function", "tokenColor.function"},
+	{"entity.name.function", "tokenColor.function"},
+	// Variables
+	{"variable.other", "tokenColor.variable"},
+	{"variable", "tokenColor.variable"},
+	// Numbers
+	{"constant.numeric", "tokenColor.number"},
+	// Operators
+	{"keyword.operator", "tokenColor.operator"},
+	// Constants (language builtins like true/false/nil, also math constants)
+	{"constant.language", "tokenColor.constant"},
+	{"support.constant", "tokenColor.constant"},
+	{"constant.other", "tokenColor.constant"},
+	// Punctuation
+	{"punctuation", "tokenColor.punctuation"},
+	// Keywords
+	{"keyword", "tokenColor.keyword"},
+	// Strings
+	{"string", "tokenColor.string"},
+}
+
+// extractTokenColors walks the tokenColors array and picks the first foreground
+// color for each synthetic key we care about.
+func extractTokenColors(rules []tokenColorRule) map[string]string {
+	found := make(map[string]string)
+
+	for _, rule := range rules {
+		fg := rule.Settings["foreground"]
+		if fg == "" {
+			continue
+		}
+		fg = strings.TrimSpace(fg)
+		if !validColorRegex.MatchString(fg) {
+			continue
+		}
+
+		scopes := normalizeScopes(rule.Scope)
+		for _, scope := range scopes {
+			scope = strings.TrimSpace(scope)
+			for _, mapping := range scopeToTokenKey {
+				if _, exists := found[mapping.key]; exists {
+					continue // already found a color for this key
+				}
+				if strings.HasPrefix(scope, mapping.prefix) {
+					found[mapping.key] = fg
+				}
+			}
+		}
+	}
+
+	return found
+}
+
+// normalizeScopes converts the scope field (string or []string) into a []string.
+func normalizeScopes(raw interface{}) []string {
+	switch v := raw.(type) {
+	case string:
+		// Some themes use comma-separated scopes in a single string
+		parts := strings.Split(v, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				result = append(result, p)
+			}
+		}
+		return result
+	case []interface{}:
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				result = append(result, strings.TrimSpace(s))
+			}
+		}
+		return result
+	default:
+		return nil
+	}
 }
 
 // InstallTheme downloads the VSIX, unzips in memory, and parses styles
@@ -267,7 +428,7 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 		return nil, fmt.Errorf("failed to parse package.json: %v", err)
 	}
 
-	cleanThemePath, err := selectInstallableThemePath(manifest.Contributes.Themes)
+	cleanThemePath, uiTheme, err := selectInstallableTheme(manifest.Contributes.Themes)
 	if err != nil {
 		return nil, err
 	}
@@ -305,14 +466,15 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 	standardJSON := jsoncAST.Pack()
 	
 	var themeData struct {
-		Type string `json:"type"` // dark or light
-		Colors map[string]string `json:"colors"`
+		Type        string            `json:"type"` // dark or light
+		Colors      map[string]string `json:"colors"`
+		TokenColors []tokenColorRule  `json:"tokenColors"`
 	}
 	if err := json.Unmarshal(standardJSON, &themeData); err != nil {
 		return nil, fmt.Errorf("theme incompatible: unable to read colors from %s", cleanThemePath)
 	}
 	
-	// 3. Filter strictly
+	// 3. Filter workbench colors strictly
 	validColors := make(map[string]string)
 	for k, v := range themeData.Colors {
 		if allowedColors[k] {
@@ -322,12 +484,31 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 			}
 		}
 	}
-	
-	// Set some defaults if not provided but uiTheme is dark, e.g. for html-bg vs window-bg
-	// In the frontend we map the strict tokens back to css vars
+
+	// 4. Extract syntax colors from tokenColors (TextMate scopes)
+	tokenSyntax := extractTokenColors(themeData.TokenColors)
+	for k, v := range tokenSyntax {
+		if allowedColors[k] {
+			validColors[k] = v
+		}
+	}
+
+	// 5. Determine theme base type (dark or light)
+	themeType := strings.ToLower(strings.TrimSpace(themeData.Type))
+	if themeType != "dark" && themeType != "light" {
+		// Fall back to manifest uiTheme field
+		switch strings.ToLower(uiTheme) {
+		case "vs-dark", "hc-black":
+			themeType = "dark"
+		default:
+			themeType = "light"
+		}
+	}
+
 	result := &CustomTheme{
-		ID: extensionId,
+		ID:     extensionId,
 		Colors: validColors,
+		Type:   themeType,
 	}
 	
 	return result, nil

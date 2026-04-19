@@ -6,6 +6,7 @@ export interface ThemeState {
     type: ThemeType;
     customColors?: Record<string, string>;
     customId?: string;
+    customThemeBase?: 'dark' | 'light';
 }
 
 const THEME_KEY = 'calc.theme';
@@ -23,7 +24,9 @@ function applyTheme(themeState: ThemeState): void {
 
     if (themeState.type === 'custom' && themeState.customColors) {
         const customColors = themeState.customColors;
-        root.setAttribute('data-theme', 'custom');
+        // Use the theme's base type (dark/light) so missing variables inherit correct defaults
+        const baseTheme = themeState.customThemeBase || 'dark';
+        root.setAttribute('data-theme', baseTheme);
         for (const [key, value] of Object.entries(customColors)) {
             // Convert e.g. editor.background -> --editor-background
             const cssVar = '--' + key.replace(/\./g, '-');
@@ -40,8 +43,20 @@ function applyTheme(themeState: ThemeState): void {
             }
         }
 
-        const functionColor = customColors['symbolIcon.functionForeground'];
-        const variableColor = customColors['symbolIcon.variableForeground'];
+        // Token colors from TextMate scopes (highest priority for syntax highlighting)
+        const tokenFunction = customColors['tokenColor.function'];
+        const tokenVariable = customColors['tokenColor.variable'];
+        const tokenNumber = customColors['tokenColor.number'];
+        const tokenOperator = customColors['tokenColor.operator'];
+        const tokenConstant = customColors['tokenColor.constant'];
+        const tokenPunctuation = customColors['tokenColor.punctuation'];
+
+        // Workbench icon colors (fallback)
+        const functionColor = tokenFunction || customColors['symbolIcon.functionForeground'];
+        const variableColor = tokenVariable || customColors['symbolIcon.variableForeground'];
+        const operatorColor = tokenOperator || customColors['symbolIcon.operatorForeground'];
+        const numberColor = tokenNumber || customColors['symbolIcon.numberForeground'];
+        const constantColor = tokenConstant || customColors['symbolIcon.constantForeground'];
         const linkColor = customColors['textLink.foreground'];
         const gutterBg =
             customColors['editorGutter.background']
@@ -59,6 +74,14 @@ function applyTheme(themeState: ThemeState): void {
         if (!functionColor && linkColor) {
             root.style.setProperty('--result-marked-color', linkColor);
         }
+
+        root.style.setProperty('--syntax-function', functionColor || linkColor || 'currentColor');
+        root.style.setProperty('--syntax-variable', variableColor || linkColor || functionColor || 'currentColor');
+        root.style.setProperty('--syntax-variable-declaration', variableColor || functionColor || linkColor || 'currentColor');
+        root.style.setProperty('--syntax-operator', operatorColor || linkColor || functionColor || 'currentColor');
+        root.style.setProperty('--syntax-number', numberColor || functionColor || variableColor || 'currentColor');
+        root.style.setProperty('--syntax-constant', constantColor || functionColor || linkColor || 'currentColor');
+        root.style.setProperty('--syntax-punctuation', tokenPunctuation || customColors['editor.foreground'] || 'currentColor');
 
         if (!variableColor) {
             const fallbackVariableColor = linkColor || functionColor;
