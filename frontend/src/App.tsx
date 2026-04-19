@@ -1,4 +1,4 @@
-import {KeyboardEvent, useEffect, useMemo, useRef, useState} from 'react';
+import {KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
     BrowserOpenURL,
     Environment,
@@ -18,7 +18,7 @@ import {
 } from '../wailsjs/runtime/runtime';
 import './App.css';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
-import {getExpressionSource, stripErrorSuffix} from './lineExpression';
+import {extractExpressionDependencies, getExpressionSource, splitLineComment} from './lineExpression';
 import {useTheme, type ThemeState} from './useTheme';
 import { getPrimaryShortcutAction } from './editorShortcuts';
 import { EvaluateExprProgram, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
@@ -28,7 +28,7 @@ import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 const OPERATOR_KEY_RE = /^[+\-*/]$/;
 const MATH_FUNCTION_NAMES = new Set([
     'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ATAN', 'ATAN2', 'ATANH',
-    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'EXP', 'FILTER', 'FLOOR',
+    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'EACH', 'EXP', 'FILTER', 'FLOOR',
     'HYPOT', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MIN', 'POW',
     'ROUND', 'SIGN', 'SIN', 'SINH', 'SQRT', 'TAN', 'TANH', 'TRUNC',
 ]);
@@ -58,6 +58,9 @@ const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
 const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
 const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;
+const INTELLIGENCE_HINT_SHOW_DELAY_MS = 300;
+const INTELLIGENCE_HINT_HIDE_IDLE_MS = 3000;
+const EDITOR_TOP_PADDING_PX = 42;
 
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
@@ -211,7 +214,7 @@ function getFriendlyEvalErrorMessage(message: string): string {
     }
 
     if (normalized.includes('unsupported pipeline stage') || normalized.includes('invalid pipeline stage')) {
-        return 'A pipeline step after | is not valid. Use filter(...), map(...), or a function like sum, avg, min, max, median.';
+        return 'A pipeline step after | is not valid. Use filter(...), map(...), each(...), or a function like sum, avg, min, max, median.';
     }
 
     if (normalized.includes('expected a list')) {
@@ -338,6 +341,9 @@ function App() {
         }
         return {};
     });
+    const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
+    const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
+    const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
     const previewRestoreThemeRef = useRef<ThemeState | null>(null);
@@ -391,6 +397,7 @@ function App() {
         return new Set<number>();
     });
     const [lineHeightPx, setLineHeightPx] = useState(22);
+    const [lineRowHeights, setLineRowHeights] = useState<number[]>([]);
     const [editorFontSpec, setEditorFontSpec] = useState('16px Nunito, Segoe UI, Tahoma, sans-serif');
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
@@ -398,6 +405,10 @@ function App() {
     const [runtimePlatform, setRuntimePlatform] = useState('');
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
+    const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
+    const [isReevaluatingAll, setIsReevaluatingAll] = useState(false);
+    const intelligenceShowTimerRef = useRef<number | null>(null);
+    const intelligenceHideTimerRef = useRef<number | null>(null);
 
     const systemDecimalDelimiter = getSystemDecimalDelimiter();
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
@@ -605,6 +616,43 @@ function App() {
         setEditorFontSpec(`${cs.fontSize} ${cs.fontFamily}`);
     }, [fontScale]);
 
+    const measureLineRowHeights = () => {
+        const container = overlayRef.current;
+        if (!container) return;
+        const children = container.children;
+        const heights: number[] = [];
+        for (let i = 0; i < children.length; i++) {
+            heights.push((children[i] as HTMLElement).offsetHeight);
+        }
+        setLineRowHeights((prev) => {
+            if (prev.length === heights.length && prev.every((h, idx) => h === heights[idx])) return prev;
+            return heights;
+        });
+    };
+
+    useLayoutEffect(() => {
+        measureLineRowHeights();
+    });
+
+    useEffect(() => {
+        const container = overlayRef.current;
+        if (!container) return;
+        const ro = new ResizeObserver(() => measureLineRowHeights());
+        ro.observe(container);
+        return () => ro.disconnect();
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (intelligenceShowTimerRef.current !== null) {
+                window.clearTimeout(intelligenceShowTimerRef.current);
+            }
+            if (intelligenceHideTimerRef.current !== null) {
+                window.clearTimeout(intelligenceHideTimerRef.current);
+            }
+        };
+    }, []);
+
     // --- Hoisted actions (stable: only use setState callbacks or stable fns) ---
 
     const changeFontScale = (direction: 1 | -1) => {
@@ -622,6 +670,9 @@ function App() {
         setDevError('');
         setMarkedLines(new Set());
         setVariableValues({});
+        setVariableVersions({});
+        setLineDependencies({});
+        setLineDependencyVersions({});
         localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
         localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
 
@@ -899,6 +950,29 @@ function App() {
         setCaretPos(editorRef.current.selectionStart);
     };
 
+    const scheduleIntelligenceHintFromTyping = () => {
+        if (intelligenceShowTimerRef.current !== null) {
+            window.clearTimeout(intelligenceShowTimerRef.current);
+            intelligenceShowTimerRef.current = null;
+        }
+        if (intelligenceHideTimerRef.current !== null) {
+            window.clearTimeout(intelligenceHideTimerRef.current);
+            intelligenceHideTimerRef.current = null;
+        }
+
+        setShowIntelligenceHint(false);
+
+        intelligenceShowTimerRef.current = window.setTimeout(() => {
+            setShowIntelligenceHint(true);
+            intelligenceShowTimerRef.current = null;
+        }, INTELLIGENCE_HINT_SHOW_DELAY_MS);
+
+        intelligenceHideTimerRef.current = window.setTimeout(() => {
+            setShowIntelligenceHint(false);
+            intelligenceHideTimerRef.current = null;
+        }, INTELLIGENCE_HINT_HIDE_IDLE_MS);
+    };
+
     const countLineBreaks = (text: string) => {
         let count = 0;
         for (let i = 0; i < text.length; i++) {
@@ -976,6 +1050,58 @@ function App() {
         return next;
     };
 
+    const remapLineRecordForEdit = <T,>(
+        prevRecord: Record<number, T>,
+        beforeText: string,
+        afterText: string,
+    ): Record<number, T> => {
+        const edit = getLineEditInfo(beforeText, afterText);
+        if (edit.delta === 0) {
+            return prevRecord;
+        }
+
+        const nextRecord: Record<number, T> = {};
+        Object.entries(prevRecord).forEach(([key, value]) => {
+            const lineIndex = Number(key);
+            if (!Number.isFinite(lineIndex)) {
+                return;
+            }
+
+            const remapped = remapLineIndex(lineIndex, edit);
+            if (remapped !== null) {
+                nextRecord[remapped] = value;
+            }
+        });
+
+        return nextRecord;
+    };
+
+    const lineIndexAtPosition = (text: string, position: number): number => {
+        return countLineBreaks(text.slice(0, position));
+    };
+
+    const clearLineEvaluationMetadata = (lineIndex: number) => {
+        setLineDependencies((prev) => {
+            if (!(lineIndex in prev)) {
+                return prev;
+            }
+
+            const next = {...prev};
+            delete next[lineIndex];
+            return next;
+        });
+
+        setLineDependencyVersions((prev) => {
+            if (!(lineIndex in prev)) {
+                return prev;
+            }
+
+            const next = {...prev};
+            delete next[lineIndex];
+            return next;
+        });
+    };
+
     const parseDeclaredVariable = (lineText: string): {key: string; label: string; expression: string} | null => {
         const match = lineText.match(/^\s*(@?[a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([\s\S]+)$/);
         if (!match) {
@@ -990,6 +1116,42 @@ function App() {
             label,
             expression: match[2].trim(),
         };
+    };
+
+    const appendLineComment = (base: string, comment: string): string => {
+        if (!comment) {
+            return base;
+        }
+
+        const trimmedBase = base.trimEnd();
+        return trimmedBase.length > 0 ? `${trimmedBase} ${comment}` : comment;
+    };
+
+    const formatEvaluatedLine = (lineSource: string, resultText: string): string => {
+        const {body, comment} = splitLineComment(lineSource);
+        const bodySource = body.trimEnd();
+        const declaration = parseDeclaredVariable(bodySource);
+        const base = declaration
+            ? `${declaration.label} = ${declaration.expression} = ${resultText}`
+            : `${bodySource} = ${resultText}`;
+
+        return appendLineComment(base, comment);
+    };
+
+    const areValuesEquivalent = (left: unknown, right: unknown): boolean => {
+        if (Object.is(left, right)) {
+            return true;
+        }
+
+        if (typeof left === 'object' && left !== null && typeof right === 'object' && right !== null) {
+            try {
+                return JSON.stringify(left) === JSON.stringify(right);
+            } catch {
+                return false;
+            }
+        }
+
+        return false;
     };
 
     const formatExprValue = (value: unknown, isNumber: boolean, numberValue: number): string => {
@@ -1183,6 +1345,7 @@ function App() {
         setStatusText(`${suggestion.kind}: ${replacementBase}`);
         setIsStatusError(false);
         setDevError('');
+        setShowIntelligenceHint(false);
     };
 
     const renderSyntaxText = (text: string, keyPrefix: string) => {
@@ -1194,7 +1357,8 @@ function App() {
             | 'operator'
             | 'number'
             | 'constant'
-            | 'punctuation';
+            | 'punctuation'
+            | 'comment';
 
         const chunks: Array<{text: string; kind: TokenKind}> = [];
         const pushChunk = (part: string, kind: TokenKind) => {
@@ -1213,6 +1377,11 @@ function App() {
 
         while (i < text.length) {
             const current = text[i];
+
+            if (current === '"') {
+                pushChunk(text.slice(i), 'comment');
+                break;
+            }
 
             if (/\s/.test(current)) {
                 const start = i;
@@ -1326,8 +1495,10 @@ function App() {
         }
 
         const trimmed = editableLine.trim();
+        const {body: editableBody} = splitLineComment(editableLine);
+        const expressionBodyTrimmed = editableBody.trim();
 
-        if (trimmed.length === 0) {
+        if (trimmed.length === 0 || expressionBodyTrimmed.length === 0) {
             insertAtSelection('\n');
             setStatusText('Ready');
             setIsStatusError(false);
@@ -1335,10 +1506,11 @@ function App() {
             return;
         }
 
-        const declaration = parseDeclaredVariable(editableLine);
+        const declaration = parseDeclaredVariable(splitLineComment(editableLine).body.trimEnd());
         const expression = OPERATOR_KEY_RE.test(trimmed[0]) && lastResult !== null
             ? `${formatNumber(lastResult, decimalDelimiter, 'auto', false)}${trimmed}`
             : editableLine;
+        const lineIndex = lineIndexAtPosition(content, lineStart);
 
         try {
             const evalResult = await EvaluateExprProgram(expression, variableValues as Record<string, any>);
@@ -1348,9 +1520,7 @@ function App() {
 
             const numberValue = evalResult.numberValue ?? 0;
             const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue);
-            const replacement = declaration
-                ? `${declaration.label} = ${declaration.expression} = ${formatted}`
-                : `${editableLine} = ${formatted}`;
+            const replacement = formatEvaluatedLine(editableLine, formatted);
             const before = content.slice(0, lineStart);
             const after = content.slice(lineEnd);
             const nextContent = before + replacement + after + (lineEnd === content.length ? '\n' : '');
@@ -1360,26 +1530,172 @@ function App() {
 
             setContentAndCaret(nextContent, nextCaret);
             setLastResult(evalResult.isNumber ? numberValue : null);
-            setVariableValues(evalResult.variables || {});
+            const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
+
+            const changedVariableKeys = new Set<string>();
+            const previousVariableKeys = new Set(Object.keys(variableValues));
+            const nextVariableKeys = new Set(Object.keys(nextVariables));
+            const allVariableKeys = new Set<string>([...previousVariableKeys, ...nextVariableKeys]);
+            allVariableKeys.forEach((key) => {
+                const normalizedKey = key.toLowerCase();
+                const previousValue = variableValues[normalizedKey];
+                const nextValue = nextVariables[normalizedKey];
+                if (!areValuesEquivalent(previousValue, nextValue)) {
+                    changedVariableKeys.add(normalizedKey);
+                }
+            });
+
+            const nextVariableVersions = {...variableVersions};
+            changedVariableKeys.forEach((key) => {
+                nextVariableVersions[key] = (nextVariableVersions[key] ?? 0) + 1;
+            });
+
+            const dependencies = extractExpressionDependencies(editableLine);
+            const dependencySnapshot: Record<string, number> = {};
+            dependencies.forEach((name) => {
+                dependencySnapshot[name] = nextVariableVersions[name] ?? 0;
+            });
+
+            setVariableValues(nextVariables);
+            setVariableVersions(nextVariableVersions);
+            setLineDependencies((prev) => ({
+                ...prev,
+                [lineIndex]: dependencies,
+            }));
+            setLineDependencyVersions((prev) => ({
+                ...prev,
+                [lineIndex]: dependencySnapshot,
+            }));
             setStatusText('Calculated');
             setIsStatusError(false);
             setDevError('');
         } catch (error) {
-            const replacement = declaration
-                ? `${declaration.label} = ${declaration.expression} = error`
-                : `${editableLine} = error`;
+            const replacement = formatEvaluatedLine(editableLine, 'error');
             const before = content.slice(0, lineStart);
             const after = content.slice(lineEnd);
             const nextContent = before + replacement + after;
             const nextCaret = before.length + editableLine.length;
             setContentAndCaret(nextContent, nextCaret);
             setLastResult(null);
+            clearLineEvaluationMetadata(lineIndex);
             setIsStatusError(true);
 
             const errorMessage = error instanceof Error ? error.message : 'Unknown evaluation error';
             setStatusText(getFriendlyEvalErrorMessage(errorMessage));
             setDevError(errorMessage);
         }
+    };
+
+    const reevaluateAllExpressions = async () => {
+        if (isReevaluatingAll) {
+            return;
+        }
+
+        setIsReevaluatingAll(true);
+        try {
+            const sourceLines = content.split('\n');
+            const nextLines = [...sourceLines];
+            let workingVariables: Record<string, unknown> = {};
+            let workingVariableVersions: Record<string, number> = {};
+            const nextLineDependencies: Record<number, string[]> = {};
+            const nextLineDependencyVersions: Record<number, Record<string, number>> = {};
+            let nextLastResult: number | null = null;
+            let calculatedCount = 0;
+            let failedCount = 0;
+
+            for (let i = 0; i < sourceLines.length; i++) {
+                const originalLine = sourceLines[i];
+                const editableLine = getExpressionSource(originalLine);
+                const trimmed = editableLine.trim();
+                const {body: editableBody} = splitLineComment(editableLine);
+                if (trimmed.length === 0 || editableBody.trim().length === 0) {
+                    continue;
+                }
+
+                const declaration = parseDeclaredVariable(splitLineComment(editableLine).body.trimEnd());
+                try {
+                    const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
+                    if (!evalResult.ok) {
+                        throw new Error(evalResult.error || 'Evaluation failed');
+                    }
+
+                    const numberValue = evalResult.numberValue ?? 0;
+                    const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue);
+                    nextLines[i] = formatEvaluatedLine(editableLine, formatted);
+
+                    const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
+                    const changedVariableKeys = new Set<string>();
+                    const allVariableKeys = new Set<string>([
+                        ...Object.keys(workingVariables),
+                        ...Object.keys(nextVariables),
+                    ]);
+                    allVariableKeys.forEach((key) => {
+                        const normalizedKey = key.toLowerCase();
+                        const previousValue = workingVariables[normalizedKey];
+                        const nextValue = nextVariables[normalizedKey];
+                        if (!areValuesEquivalent(previousValue, nextValue)) {
+                            changedVariableKeys.add(normalizedKey);
+                        }
+                    });
+
+                    changedVariableKeys.forEach((key) => {
+                        workingVariableVersions[key] = (workingVariableVersions[key] ?? 0) + 1;
+                    });
+
+                    const dependencies = extractExpressionDependencies(editableLine);
+                    const dependencySnapshot: Record<string, number> = {};
+                    dependencies.forEach((name) => {
+                        dependencySnapshot[name] = workingVariableVersions[name] ?? 0;
+                    });
+
+                    nextLineDependencies[i] = dependencies;
+                    nextLineDependencyVersions[i] = dependencySnapshot;
+                    workingVariables = nextVariables;
+                    nextLastResult = evalResult.isNumber ? numberValue : null;
+                    calculatedCount++;
+                } catch {
+                    nextLines[i] = formatEvaluatedLine(editableLine, 'error');
+                    failedCount++;
+                    nextLastResult = null;
+                }
+            }
+
+            const nextContent = nextLines.join('\n');
+            setContent(nextContent);
+            setVariableValues(workingVariables);
+            setVariableVersions(workingVariableVersions);
+            setLineDependencies(nextLineDependencies);
+            setLineDependencyVersions(nextLineDependencyVersions);
+            setLastResult(nextLastResult);
+            setIsStatusError(failedCount > 0);
+            setDevError('');
+            setStatusText(
+                failedCount > 0
+                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}, ${failedCount} failed`
+                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}`
+            );
+
+            requestAnimationFrame(() => {
+                if (!editorRef.current) {
+                    return;
+                }
+
+                const nextCaret = Math.min(editorRef.current.selectionStart, nextContent.length);
+                editorRef.current.selectionStart = nextCaret;
+                editorRef.current.selectionEnd = nextCaret;
+                setCaretPos(nextCaret);
+            });
+        } finally {
+            setIsReevaluatingAll(false);
+        }
+    };
+
+    const clearStaleStates = () => {
+        setLineDependencies({});
+        setLineDependencyVersions({});
+        setStatusText('Cleared stale markers');
+        setIsStatusError(false);
+        setDevError('');
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1404,6 +1720,7 @@ function App() {
         if (event.key === 'Enter') {
             event.preventDefault();
             void evaluateCurrentLine();
+            setShowIntelligenceHint(false);
             return;
         }
 
@@ -1435,6 +1752,27 @@ function App() {
             event.preventDefault();
             resetFontSize();
             return;
+        }
+
+        const BRACKET_PAIRS: Record<string, string> = {'(': ')', '[': ']', '{': '}'};
+        if (BRACKET_PAIRS[event.key] && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            const editor = editorRef.current;
+            if (editor && editor.selectionStart !== editor.selectionEnd) {
+                event.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const selected = content.slice(start, end);
+                const close = BRACKET_PAIRS[event.key];
+                const nextContent = content.slice(0, start) + event.key + selected + close + content.slice(end);
+                setContent(nextContent);
+                setCaretPos(end + 2);
+                requestAnimationFrame(() => {
+                    if (!editorRef.current) return;
+                    editorRef.current.selectionStart = start + 1;
+                    editorRef.current.selectionEnd = end + 1;
+                });
+                return;
+            }
         }
 
         if (!OPERATOR_KEY_RE.test(event.key) || event.ctrlKey || event.metaKey || event.altKey) {
@@ -1483,7 +1821,8 @@ function App() {
                 return;
             }
 
-            if (line.trimEnd().endsWith(' = error')) {
+            const {body} = splitLineComment(line);
+            if (body.trimEnd().endsWith(' = error')) {
                 nextLineErrors.set(i, 'error');
             }
         });
@@ -1497,29 +1836,50 @@ function App() {
         };
     }, [content]);
 
+    const staleLineDetails = useMemo(() => {
+        const details = new Map<number, string[]>();
+        Object.entries(lineDependencyVersions).forEach(([lineKey, snapshot]) => {
+            const lineIndex = Number(lineKey);
+            if (!Number.isFinite(lineIndex)) {
+                return;
+            }
+
+            const staleVariables: string[] = [];
+            Object.entries(snapshot).forEach(([variableName, version]) => {
+                const currentVersion = variableVersions[variableName] ?? 0;
+                if (currentVersion !== version) {
+                    staleVariables.push(variableName);
+                }
+            });
+
+            if (staleVariables.length > 0) {
+                details.set(lineIndex, staleVariables);
+            }
+        });
+
+        return details;
+    }, [lineDependencyVersions, variableVersions]);
+
     const renderOverlayLines = () => {
         return contentLines.map((line, i) => {
-            const suffix = i < contentLines.length - 1 ? '\n' : '';
-            const lineClassName = lineErrors.has(i) ? 'line-error' : undefined;
+            const lineClassName = `editor-line-row${lineErrors.has(i) ? ' line-error' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' line-stale' : ''}`;
             const isVariableLine = declarationLines.has(i);
             const isMarkedLine = markedLines.has(i);
 
             const eqIdx = isVariableLine ? line.lastIndexOf(' = ') : line.indexOf(' = ');
             if (eqIdx === -1) {
                 return (
-                    <span key={i} className={lineClassName}>
+                    <div key={i} className={lineClassName}>
                         {renderSyntaxText(line, `${i}-full`)}
-                        {suffix}
-                    </span>
+                    </div>
                 );
             }
 
             if (!isMarkedLine && !isVariableLine) {
                 return (
-                    <span key={i} className={lineClassName}>
+                    <div key={i} className={lineClassName}>
                         {renderSyntaxText(line, `${i}-line`)}
-                        {suffix}
-                    </span>
+                    </div>
                 );
             }
 
@@ -1528,11 +1888,10 @@ function App() {
                 : 'marked-result';
 
             return (
-                <span key={i} className={lineClassName}>
+                <div key={i} className={lineClassName}>
                     {renderSyntaxText(line.slice(0, eqIdx), `${i}-lhs`)}
                     <span className={resultClass}>{line.slice(eqIdx)}</span>
-                    {suffix}
-                </span>
+                </div>
             );
         });
     };
@@ -1552,10 +1911,19 @@ function App() {
         }
     };
     const EDITOR_PADDING = 20;
-    const activeLineErrorTop = 18 + activeLineIndex * lineHeightPx - editorScrollTop + lineHeightPx * 0.9;
+    const getLineTop = (idx: number): number => {
+        if (lineRowHeights.length > 0) {
+            let top = 0;
+            for (let j = 0; j < idx && j < lineRowHeights.length; j++) top += lineRowHeights[j];
+            return top;
+        }
+        return idx * lineHeightPx;
+    };
+    const activeLineH = lineRowHeights[activeLineIndex] ?? lineHeightPx;
+    const activeLineErrorTop = EDITOR_TOP_PADDING_PX + getLineTop(activeLineIndex) - editorScrollTop + activeLineH * 0.9;
     const activeLineErrorLeft = Math.max(EDITOR_PADDING, EDITOR_PADDING + measureLineWidth(activeLineText) + 8 - editorScrollLeft);
     const intelligenceTop = identifierContext
-        ? 18 + activeLineIndex * lineHeightPx - editorScrollTop + lineHeightPx * 2.2
+        ? EDITOR_TOP_PADDING_PX + getLineTop(activeLineIndex) - editorScrollTop + activeLineH * 2.2
         : 0;
     const intelligenceLeft = identifierContext
         ? Math.max(EDITOR_PADDING, EDITOR_PADDING + measureLineWidth(activeLineText.slice(0, identifierContext.startInLine)) - editorScrollLeft)
@@ -1665,12 +2033,12 @@ function App() {
             </div>
             <div className="editor-container">
                 <div className="gutter" ref={gutterRef}>
-                    <div className="gutter-lines" style={{paddingTop: 18}}>
+                    <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX}}>
                         {contentLines.map((_, i) => (
                             <div
                                 key={i}
-                                className={`gutter-line${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${declarationLines.has(i) ? ' gutter-line--var' : ''}`}
-                                style={{height: lineHeightPx}}
+                                className={`gutter-line${(lineRowHeights[i] ?? lineHeightPx) > lineHeightPx + 1 ? ' gutter-line--wrapped' : ''}${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' gutter-line--stale' : ''}${declarationLines.has(i) ? ' gutter-line--var' : ''}`}
+                                style={{height: lineRowHeights[i] ?? lineHeightPx}}
                                 onClick={() => {
                                     setMarkedLines((prev) => {
                                         const next = new Set(prev);
@@ -1684,9 +2052,11 @@ function App() {
                                         ? `Result rounded to 0 — actual: ${formatNumber(truncatedZeroLines.get(i)!, decimalDelimiter, 'auto', false)} (precision: ${precision})`
                                         : (truncatedLines.has(i)
                                             ? `Result truncated — actual: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, 'auto', false)}, displayed: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, precision, scientificNotation)} (precision: ${precision})`
+                                            : (staleLineDetails.has(i)
+                                                ? `Stale result: depends on changed variable${staleLineDetails.get(i)!.length === 1 ? '' : 's'} ${staleLineDetails.get(i)!.join(', ')}`
                                             : (declarationLines.has(i)
                                                 ? 'Variable declaration'
-                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line'))))
+                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line')))))
                                 }
                             >
                                 <span className="gutter-line-number" aria-hidden="true">{i + 1}</span>
@@ -1700,10 +2070,13 @@ function App() {
                                     {!lineErrors.has(i) && !truncatedZeroLines.has(i) && truncatedLines.has(i) && (
                                         <span className="gutter-truncated-icon">≈</span>
                                     )}
-                                    {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !declarationLines.has(i) && (
+                                    {!lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && staleLineDetails.has(i) && (
+                                        <span className="gutter-stale-icon">*</span>
+                                    )}
+                                    {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && !declarationLines.has(i) && (
                                         <span className="gutter-mark">&#9670;</span>
                                     )}
-                                    {declarationLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && (
+                                    {declarationLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && (
                                         <span className="gutter-var">@</span>
                                     )}
                                 </span>
@@ -1712,6 +2085,31 @@ function App() {
                     </div>
                 </div>
                 <div className="editor-area">
+                    {staleLineDetails.size > 0 && (
+                        <div className="stale-banner" role="status" aria-live="polite">
+                            <span className="stale-banner-text">
+                                {`Stale results detected on ${staleLineDetails.size} line${staleLineDetails.size === 1 ? '' : 's'}.`}
+                            </span>
+                            <div className="stale-banner-actions">
+                                <button
+                                    type="button"
+                                    className="stale-banner-btn"
+                                    onClick={() => void reevaluateAllExpressions()}
+                                    disabled={isReevaluatingAll}
+                                >
+                                    {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="stale-banner-btn stale-banner-btn--ghost"
+                                    onClick={clearStaleStates}
+                                    disabled={isReevaluatingAll}
+                                >
+                                    Clear Stale
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <textarea
                         ref={editorRef}
                         className={`editor${wordWrap ? ' editor--wrap' : ''}`}
@@ -1720,15 +2118,28 @@ function App() {
                         onChange={(e) => {
                             const rawNextContent = e.target.value;
                             const rawCaretPos = e.target.selectionStart;
+                            scheduleIntelligenceHintFromTyping();
                             const {lineStart, lineEnd} = getLineBounds(rawNextContent, rawCaretPos);
                             const editedLine = rawNextContent.slice(lineStart, lineEnd);
-                            const cleanedLine = stripErrorSuffix(editedLine);
+                            const cleanedLine = getExpressionSource(editedLine);
 
                             let nextContent = rawNextContent;
                             let nextCaretPos = rawCaretPos;
                             if (cleanedLine !== editedLine) {
                                 nextContent = rawNextContent.slice(0, lineStart) + cleanedLine + rawNextContent.slice(lineEnd);
                                 nextCaretPos = Math.min(rawCaretPos, lineStart + cleanedLine.length);
+                            }
+
+                            const activeLineIndex = lineIndexAtPosition(nextContent, nextCaretPos);
+                            const previousLine = content.split('\n')[activeLineIndex] ?? '';
+                            const nextLine = nextContent.split('\n')[activeLineIndex] ?? '';
+                            const previousLineSource = getExpressionSource(previousLine);
+                            const nextLineSource = getExpressionSource(nextLine);
+                            const sourceChanged = previousLineSource !== nextLineSource;
+
+                            if (sourceChanged) {
+                                setLastResult(null);
+                                clearLineEvaluationMetadata(activeLineIndex);
                             }
 
                             setContent(nextContent);
@@ -1769,10 +2180,14 @@ function App() {
                                     }
                                 }
 
+                                // Version bumps are evaluation-driven. Editing alone should not create stale markers.
+
                                 return changed ? nextValues : prevValues;
                             });
 
                             setMarkedLines((prev) => remapMarkedLinesForEdit(prev, content, nextContent));
+                            setLineDependencies((prev) => remapLineRecordForEdit(prev, content, nextContent));
+                            setLineDependencyVersions((prev) => remapLineRecordForEdit(prev, content, nextContent));
                         }}
                         onSelect={updateCaretPosFromEditor}
                         onClick={updateCaretPosFromEditor}
@@ -1789,13 +2204,19 @@ function App() {
                                 overlayRef.current.scrollLeft = el.scrollLeft;
                             }
                         }}
-                        style={{fontSize: `${fontScale}em`}}
+                        style={{
+                            fontSize: `${fontScale}em`,
+                            paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
+                        }}
                     />
                     <div
                         ref={overlayRef}
                         className={`editor-overlay${wordWrap ? ' editor-overlay--wrap' : ''}`}
                         aria-hidden="true"
-                        style={{fontSize: `${fontScale}em`}}
+                        style={{
+                            fontSize: `${fontScale}em`,
+                            paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
+                        }}
                     >
                         {renderOverlayLines()}
                     </div>
@@ -1808,7 +2229,7 @@ function App() {
                             {activeLineError}
                         </div>
                     )}
-                    {intelligenceSuggestions.length > 0 && (
+                    {showIntelligenceHint && intelligenceSuggestions.length > 0 && (
                         <div
                             className="editor-intelligence"
                             style={{top: intelligenceTop, left: intelligenceLeft}}
@@ -2069,17 +2490,25 @@ function App() {
                                         <li>Start a new line with +, -, *, or / to continue from the previous result.</li>
                                         <li>Assign variables with name = expression or @name = expression (example: @incomes = [4500, 5200, 3800]).</li>
                                         <li>Use pipelines with | to pass data to the next step (example: @incomes | filter(# &gt; 4000) | sum).</li>
-                                        <li>Use # inside filter/map stages to refer to the current item.</li>
+                                        <li>Use # inside filter/map/each stages to refer to the current item.</li>
                                         <li>Available aggregation stages include sum, avg, min, max, and median.</li>
                                         <li>Available math functions include sin, cos, tan, asin, acos, atan, atan2, sqrt, pow, abs, ceil, floor, round, trunc, exp, log, log10, log2, hypot, sign, and constants such as PI, TAU, E, PHI, LN2, LN10, LOG2E, LOG10E, SQRT1_2, SQRT2, SQRTE, SQRTPI, and SQRTPHI.</li>
                                         <li>Functions must be called with parentheses (example: sin(PI/2)); bare references such as sin are rejected except in pipeline shorthand like map(sin).</li>
                                         <li>Internal names are read-only and cannot be reassigned, including built-in constants and functions (examples: PI = 30 and sin = 5 are rejected).</li>
                                         <li>Small editor intelligence suggests known variables plus allowed functions and constants near the caret. Press Tab to accept the top suggestion.</li>
+                                        <li>Intelligence hints are typing-triggered: they appear after 300 ms, do not show automatically on app start, and hide after 3 seconds of inactivity.</li>
                                         <li>Backtick blocks can contain multiple statements; Enter inserts a new line while the block is open and evaluates after closing backtick.</li>
+                                        <li>Use " to start an end-of-line comment in expressions and declarations (example: total = price * qty " monthly subtotal).</li>
+                                        <li>Comment-only lines are treated as notes: pressing Enter adds a new line without producing = error.</li>
+                                        <li>Everything after " is treated as comment text, and commented tails are shown in a dedicated style that follows your active theme colors.</li>
+                                        <li>If you need text values inside expressions, use single quotes (') or backticks (`), not double quotes.</li>
                                         <li>Line numbers appear in the left gutter for easy reference and navigation.</li>
                                         <li>Toggle word wrap in Settings → Editor to wrap long lines at the window edge (disabled by default for a clean appearance).</li>
                                         <li>Click the precision chip in the status bar to quickly change decimal precision or toggle scientific mode.</li>
                                         <li>Invalid lines are highlighted in red with a gutter ! marker until corrected.</li>
+                                        <li>When you start editing a calculated line, its existing = result suffix is removed automatically so you can revise the expression cleanly.</li>
+                                        <li>When a variable declaration changes, previously evaluated dependent lines are marked stale with a gutter * indicator until you recalculate them.</li>
+                                        <li>When stale lines exist, a compact banner appears above the first line with actions to Re-evaluate All expressions or Clear Stale markers.</li>
                                         <li>Status messages use plain language and examples to help fix common mistakes quickly, even if you are new to formulas.</li>
                                     </ul>
                                 )}
@@ -2092,6 +2521,7 @@ function App() {
                                         <li>Ctrl/Cmd + -: Decrease font size.</li>
                                         <li>Ctrl/Cmd + 0: Reset font size.</li>
                                         <li>Tab: Accept the top variable/function/constant suggestion when shown.</li>
+                                        <li>( [ {'{'}: With text selected, wraps the selection in the matching bracket pair.</li>
                                         <li>Ctrl/Cmd + R: Reload app window.</li>
                                         <li>Ctrl/Cmd + Q: Quit app.</li>
                                         <li>Press Escape twice quickly: Hide app window.</li>
@@ -2104,6 +2534,7 @@ function App() {
                                         <li>Added Ctrl/Cmd + Enter to insert a new line below the current line without evaluating.</li>
                                         <li>Switched all expression execution to Go backend Expr evaluation with a unified language model across the app.</li>
                                         <li>Added pipeline analytics syntax with | pass-through and # current-item placeholders for filter/map.</li>
+                                        <li>Added each(...) as an alias for map(...) in pipeline stages.</li>
                                         <li>Added @variable syntax and list-focused helpers such as sum, avg, min, max, and median.</li>
                                         <li>Added lightweight editor intelligence for known variables and allowed functions/constants, with Tab completion for the top suggestion.</li>
                                         <li>Extended intelligence coverage to include pipeline helpers such as avg, filter, and map in suggestions and highlighting.</li>
@@ -2125,6 +2556,14 @@ function App() {
                                         <li>Added experimental simple code mode: backtick-wrapped blocks now support let/const/var and return the value of the last expression.</li>
                                         <li>Extended simple code mode so variable declarations can assign a backtick block result (example: v = `a=2; b=3; a+b`).</li>
                                         <li>Added multiline simple code blocks: Enter now adds new lines while a block is open and evaluates when the closing backtick is present.</li>
+                                        <li>Editing a previously calculated line now clears its inline = result suffix immediately, so expression updates happen on a clean source line.</li>
+                                        <li>Added stale dependency markers: changing a variable declaration now marks evaluated dependent lines with a gutter * until they are recalculated.</li>
+                                        <li>Added a top stale-state banner with quick actions to re-evaluate all expression lines or clear stale markers.</li>
+                                        <li>Smart brackets: selecting text and pressing (, [, or {'{'} wraps the selection in the matching bracket pair.</li>
+                                        <li>Updated editor intelligence timing: pop-up hints now wait 300 ms after typing, are not shown on startup, and auto-hide after 3 seconds of no typing.</li>
+                                        <li>Changed end-of-line comment support to use " as the comment starter in backend evaluation and frontend source parsing.</li>
+                                        <li>Updated comment behavior so comment-only lines are treated as notes and no longer evaluate to = error.</li>
+                                        <li>Added theme-aware comment token coloring so text after " is rendered with comment styling from the active theme.</li>
                                     </ul>
                                 )}
                             </div>

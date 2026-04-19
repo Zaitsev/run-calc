@@ -44,10 +44,13 @@ html {
     --syntax-number: #7c3aed;
     --syntax-constant: #b45309;
     --syntax-punctuation: #4b5563;
+    --syntax-comment: #64748b;
     --truncated-zero-gutter-bg: rgba(194, 120, 6, 0.12);
     --truncated-zero-icon-color: #b45309;
     --gutter-var-color: #047857;
     --gutter-var-bg: rgba(5, 150, 105, 0.12);
+    --gutter-stale-color: #92400e;
+    --gutter-stale-bg: rgba(217, 119, 6, 0.14);
     --button-primary-foreground: #ffffff;
     --overlay-scrim: rgba(15, 23, 42, 0.45);
     --panel-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
@@ -105,10 +108,13 @@ html[data-theme="dark"] {
     --syntax-number: #c4b5fd;
     --syntax-constant: #fbbf24;
     --syntax-punctuation: #94a3b8;
+    --syntax-comment: #7a96b2;
     --truncated-zero-gutter-bg: rgba(251, 191, 36, 0.15);
     --truncated-zero-icon-color: #fbbf24;
     --gutter-var-color: #34d399;
     --gutter-var-bg: rgba(52, 211, 153, 0.15);
+    --gutter-stale-color: #fbbf24;
+    --gutter-stale-bg: rgba(251, 191, 36, 0.16);
     --button-primary-foreground: #08111f;
     --overlay-scrim: rgba(0, 0, 0, 0.55);
     --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);

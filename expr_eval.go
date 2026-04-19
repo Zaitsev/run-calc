@@ -99,7 +99,7 @@ var (
 		"sign":  {},
 	}
 	internalExprReservedNames = func() map[string]struct{} {
-		reserved := make(map[string]struct{}, len(internalExprFunctions)+len(internalExprConstants)+6)
+		reserved := make(map[string]struct{}, len(internalExprFunctions)+len(internalExprConstants)+7)
 		for name := range internalExprFunctions {
 			reserved[name] = struct{}{}
 		}
@@ -110,6 +110,7 @@ var (
 		// Stage helpers and language literals are reserved as internal names.
 		reserved["filter"] = struct{}{}
 		reserved["map"] = struct{}{}
+		reserved["each"] = struct{}{}
 		reserved["item"] = struct{}{}
 		reserved["true"] = struct{}{}
 		reserved["false"] = struct{}{}
@@ -151,13 +152,21 @@ func evaluateExprProgram(input string, scope map[string]interface{}) (interface{
 		return nil, fmt.Errorf("expression is empty")
 	}
 
+	// Allow wrapped multiline input by stripping surrounding backticks.
 	if strings.HasPrefix(trimmed, "`") && strings.HasSuffix(trimmed, "`") && len(trimmed) >= 2 {
 		trimmed = strings.TrimSpace(trimmed[1 : len(trimmed)-1])
 	}
 
+	// Remove " comments outside single-quote/backtick strings while keeping line breaks.
+	trimmed = strings.TrimSpace(stripLineComments(trimmed))
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	// Split by top-level ';' so semicolons inside strings/lists are ignored.
 	statements := splitTopLevel(trimmed, ';', true)
 	if len(statements) == 0 {
-		return nil, fmt.Errorf("expression is empty")
+		return nil, nil
 	}
 
 	var last interface{}
@@ -175,7 +184,7 @@ func evaluateExprProgram(input string, scope map[string]interface{}) (interface{
 	}
 
 	if last == nil {
-		return nil, fmt.Errorf("expression is empty")
+		return nil, nil
 	}
 
 	return last, nil
@@ -216,6 +225,7 @@ func evaluateExprStatement(statement string, scope map[string]interface{}) (inte
 }
 
 func evaluateExprValue(expression string, scope map[string]interface{}) (interface{}, error) {
+	// Pipeline stages are separated by top-level '|'.
 	stages := splitTopLevel(expression, '|', false)
 	if len(stages) == 0 {
 		return nil, fmt.Errorf("expression is empty")
@@ -227,6 +237,7 @@ func evaluateExprValue(expression string, scope map[string]interface{}) (interfa
 	}
 
 	for _, stage := range stages[1:] {
+		// Each stage receives the previous stage result as input.
 		nextValue, stageErr := applyPipelineStage(current, stage, scope)
 		if stageErr != nil {
 			return nil, stageErr
@@ -264,6 +275,11 @@ func applyPipelineStage(current interface{}, stage string, scope map[string]inte
 
 	if strings.HasPrefix(lowerTrimmed, "map(") && strings.HasSuffix(trimmed, ")") {
 		mapper := strings.TrimSpace(trimmed[len("map(") : len(trimmed)-1])
+		return mapValue(current, mapper, scope)
+	}
+
+	if strings.HasPrefix(lowerTrimmed, "each(") && strings.HasSuffix(trimmed, ")") {
+		mapper := strings.TrimSpace(trimmed[len("each(") : len(trimmed)-1])
 		return mapValue(current, mapper, scope)
 	}
 
@@ -402,6 +418,59 @@ func preprocessExpr(expression string) string {
 			}
 			out.WriteString(strings.ToLower(expression[start:end]))
 			i = end - 1
+			continue
+		}
+
+		out.WriteRune(ch)
+	}
+
+	return out.String()
+}
+
+func stripLineComments(input string) string {
+	var out strings.Builder
+	var inQuote rune
+
+	for i := 0; i < len(input); i++ {
+		ch := rune(input[i])
+
+		if inQuote != 0 {
+			out.WriteRune(ch)
+			if ch == '\\' {
+				if i+1 < len(input) {
+					i++
+					out.WriteByte(input[i])
+				}
+				continue
+			}
+			if ch == inQuote {
+				inQuote = 0
+			}
+			continue
+		}
+
+		if ch == '\'' || ch == '`' {
+			inQuote = ch
+			out.WriteRune(ch)
+			continue
+		}
+
+		if ch == '"' {
+			i++
+			for ; i < len(input); i++ {
+				next := input[i]
+				if next == '\n' || next == '\r' {
+					out.WriteByte(next)
+					if next == '\r' && i+1 < len(input) && input[i+1] == '\n' {
+						i++
+						out.WriteByte(input[i])
+					}
+					break
+				}
+			}
+			if i >= len(input) {
+				break
+			}
 			continue
 		}
 

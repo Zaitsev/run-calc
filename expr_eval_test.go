@@ -67,6 +67,30 @@ func TestEvaluateExprProgram_PipelineFunctionShorthand(t *testing.T) {
 	}
 }
 
+func TestEvaluateExprProgram_EachAliasForMap(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("@a = [0, PI/2]; @a | each(sin)", scope)
+	if err != nil {
+		t.Fatalf("each shorthand failed: %v", err)
+	}
+
+	items, ok := value.([]interface{})
+	if !ok || len(items) != 2 {
+		t.Fatalf("expected 2 mapped values from each alias, got %#v", value)
+	}
+
+	first, firstOK := toFloat64(items[0])
+	second, secondOK := toFloat64(items[1])
+	if !firstOK || !secondOK {
+		t.Fatalf("expected numeric values from each alias, got %#v", items)
+	}
+
+	if math.Abs(first-0) > 1e-9 || math.Abs(second-1) > 1e-9 {
+		t.Fatalf("expected [0, 1] from each alias, got %#v", items)
+	}
+}
+
 func TestEvaluateExprProgram_MultilineBacktickBlock(t *testing.T) {
 	scope := map[string]interface{}{}
 
@@ -78,6 +102,55 @@ func TestEvaluateExprProgram_MultilineBacktickBlock(t *testing.T) {
 	num, ok := toFloat64(value)
 	if !ok || num != 5 {
 		t.Fatalf("expected 5, got %#v", value)
+	}
+}
+
+func TestEvaluateExprProgram_SupportsLineComments(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("2 + 3 \" simple comment", scope)
+	if err != nil {
+		t.Fatalf("commented expression failed: %v", err)
+	}
+
+	num, ok := toFloat64(value)
+	if !ok || num != 5 {
+		t.Fatalf("expected 5 from commented expression, got %#v", value)
+	}
+
+	_, assignErr := evaluateExprProgram("@a = 10 \" keep for notes", scope)
+	if assignErr != nil {
+		t.Fatalf("commented assignment failed: %v", assignErr)
+	}
+
+	assigned, exists := scope["a"]
+	if !exists {
+		t.Fatalf("expected variable a to be assigned")
+	}
+
+	assignedNum, ok := toFloat64(assigned)
+	if !ok || assignedNum != 10 {
+		t.Fatalf("expected assigned value 10, got %#v", assigned)
+	}
+}
+
+func TestEvaluateExprProgram_CommentOnlyIsNoOp(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	value, err := evaluateExprProgram("\"comment only", scope)
+	if err != nil {
+		t.Fatalf("comment-only expression should not fail: %v", err)
+	}
+	if value != nil {
+		t.Fatalf("expected nil value for comment-only expression, got %#v", value)
+	}
+
+	blockValue, blockErr := evaluateExprProgram("\" first\n\" second", scope)
+	if blockErr != nil {
+		t.Fatalf("comment-only multiline expression should not fail: %v", blockErr)
+	}
+	if blockValue != nil {
+		t.Fatalf("expected nil value for comment-only multiline expression, got %#v", blockValue)
 	}
 }
 
@@ -146,6 +219,7 @@ func TestEvaluateExprProgram_PreventsInternalNameReassignment(t *testing.T) {
 		"sum = 9",
 		"filter = 1",
 		"map = 1",
+		"each = 1",
 		"item = 1",
 		"true = 1",
 	}

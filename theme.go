@@ -93,6 +93,7 @@ var allowedColors = map[string]bool{
 	"tokenColor.operator":           true,
 	"tokenColor.constant":           true,
 	"tokenColor.punctuation":        true,
+	"tokenColor.comment":            true,
 	"tokenColor.keyword":            true,
 	"tokenColor.string":             true,
 }
@@ -310,6 +311,8 @@ var scopeToTokenKey = []struct {
 	{"constant.other", "tokenColor.constant"},
 	// Punctuation
 	{"punctuation", "tokenColor.punctuation"},
+	// Comments
+	{"comment", "tokenColor.comment"},
 	// Keywords
 	{"keyword", "tokenColor.keyword"},
 	// Strings

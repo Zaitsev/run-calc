@@ -58,7 +58,7 @@
 }
 
 .gutter {
-    width: 52px;
+    width: 44px;
     overflow: hidden;
     flex-shrink: 0;
     background: var(--editorGutter-background);
@@ -70,24 +70,24 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 4px;
     font-size: 8px;
     cursor: pointer;
-    padding: 0 1px;
+    padding: 0 4px;
     transition: opacity 0.12s;
+    box-shadow: inset 0 -1px 0 var(--editorGroup-border);
 }
 
 .gutter-line-number {
-    min-width: 22px;
-    width: 22px;
-    flex-shrink: 0;
-    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.2;
     color: var(--editorLineNumber-activeForeground);
     font-family: "Courier New", monospace;
-    text-align: left;
-    padding-left: 3px;
+    text-align: right;
+    padding-top: 0;
     opacity: 1;
     font-variant-numeric: tabular-nums;
 }
@@ -95,10 +95,20 @@
 .gutter-line-indicator {
     width: 12px;
     min-width: 12px;
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-end;
-    padding-right: 3px;
+    justify-content: center;
+    padding-top: 0;
+}
+
+.gutter-line--wrapped {
+    align-items: flex-start;
+}
+
+.gutter-line--wrapped .gutter-line-number,
+.gutter-line--wrapped .gutter-line-indicator {
+    padding-top: 3px;
 }
 
 .gutter-line--marked {
@@ -113,6 +123,11 @@
 .gutter-line--truncated {
     opacity: 1;
     background: var(--truncated-zero-gutter-bg);
+}
+
+.gutter-line--stale {
+    opacity: 1;
+    background: var(--gutter-stale-bg);
 }
 
 .gutter-truncated-icon {
@@ -130,6 +145,19 @@
     line-height: 1;
 }
 
+.gutter-stale-icon {
+    color: var(--gutter-stale-color);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.gutter-mark {
+    color: var(--result-marked-color);
+    font-size: 9px;
+    line-height: 1;
+}
+
 .gutter-line--var {
     opacity: 1;
     background: var(--gutter-var-bg);
@@ -137,10 +165,11 @@
 
 .gutter-var {
     color: var(--gutter-var-color);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
-    line-height: 1;
+    line-height: 1.2;
     font-family: monospace;
+    display: inline-block;
 }
 
 .gutter-var-input {
@@ -171,6 +200,68 @@
     flex: 1;
     position: relative;
     overflow: hidden;
+}
+
+.stale-banner {
+    position: absolute;
+    top: 2px;
+    left: 20px;
+    right: 20px;
+    z-index: 4;
+    min-height: 26px;
+    max-height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    pointer-events: auto;
+    background: color-mix(in srgb, var(--editor-background) 74%, transparent);
+    border: 1px solid color-mix(in srgb, var(--gutter-stale-color) 40%, transparent);
+    border-radius: 8px;
+    padding: 2px 8px;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--gutter-stale-color) 20%, transparent);
+    backdrop-filter: blur(6px);
+}
+
+.stale-banner-text {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--gutter-stale-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stale-banner-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.stale-banner-btn {
+    border: 1px solid color-mix(in srgb, var(--gutter-stale-color) 45%, transparent);
+    background: color-mix(in srgb, var(--gutter-stale-color) 14%, transparent);
+    color: var(--gutter-stale-color);
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 8px;
+    cursor: pointer;
+}
+
+.stale-banner-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--gutter-stale-color) 22%, transparent);
+}
+
+.stale-banner-btn--ghost {
+    background: transparent;
+}
+
+.stale-banner-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .editor {
@@ -214,18 +305,25 @@
     color: var(--editor-foreground);
     background: var(--editor-background);
     pointer-events: none;
-    white-space: pre;
-    overflow-wrap: normal;
-    word-break: normal;
     overflow: hidden;
     z-index: 0;
 }
 
-.editor-overlay--wrap {
+.editor-overlay--wrap .editor-line-row {
     white-space: pre-wrap;
     word-wrap: break-word;
     overflow-wrap: break-word;
     word-break: break-word;
+}
+
+.editor-line-row {
+    display: block;
+    margin: 0;
+    padding: 0;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+    min-height: 1lh;
 }
 
 .marked-result {
@@ -265,8 +363,17 @@
     color: var(--syntax-punctuation);
 }
 
+.syntax-token--comment {
+    color: var(--syntax-comment);
+    font-style: italic;
+}
+
 .line-error {
     color: var(--editorError-foreground);
+}
+
+.line-stale {
+    color: var(--editor-foreground);
 }
 
 .line-error .syntax-token--variable-decl,
@@ -275,7 +382,8 @@
 .line-error .syntax-token--operator,
 .line-error .syntax-token--number,
 .line-error .syntax-token--constant,
-.line-error .syntax-token--punctuation {
+.line-error .syntax-token--punctuation,
+.line-error .syntax-token--comment {
     color: inherit;
     text-decoration: none;
 }

@@ -50,6 +50,7 @@ function applyTheme(themeState: ThemeState): void {
         const tokenOperator = customColors['tokenColor.operator'];
         const tokenConstant = customColors['tokenColor.constant'];
         const tokenPunctuation = customColors['tokenColor.punctuation'];
+        const tokenComment = customColors['tokenColor.comment'];
 
         // Workbench icon colors (fallback)
         const functionColor = tokenFunction || customColors['symbolIcon.functionForeground'];
@@ -82,6 +83,7 @@ function applyTheme(themeState: ThemeState): void {
         root.style.setProperty('--syntax-number', numberColor || functionColor || variableColor || 'currentColor');
         root.style.setProperty('--syntax-constant', constantColor || functionColor || linkColor || 'currentColor');
         root.style.setProperty('--syntax-punctuation', tokenPunctuation || customColors['editor.foreground'] || 'currentColor');
+        root.style.setProperty('--syntax-comment', tokenComment || customColors['descriptionForeground'] || tokenPunctuation || customColors['editor.foreground'] || 'currentColor');
 
         if (!variableColor) {
             const fallbackVariableColor = linkColor || functionColor;
