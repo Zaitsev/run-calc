@@ -100,7 +100,7 @@ export function HelpPanel() {
                     <ul>
                         <li>Replaced browser-native clear confirmation with an in-app dialog that uses a proper title: Confirm Clear Worksheet.</li>
                         <li>Moved the clear chip to the first position in the status bar and added extra spacing after it for faster access.</li>
-                        <li>Added a confirmation dialog before clearing the worksheet (status chip, menu action, and File > New trigger).</li>
+                        <li>Added a confirmation dialog before clearing the worksheet (status chip, menu action, and File {'>'} New trigger).</li>
                         <li>Fixed word-wrap selection drift by aligning overlay wrap width with the editor scrollbar width, so highlighted selection and visible text stay on the same wrapped segments.</li>
                         <li>Fixed bottom scroll desync between expression area and gutter: both now stop at the same end position and stay aligned when reversing scroll direction.</li>
                         <li>Refined Enter behavior on the final line: when Enter does not trigger an evaluation error (for example, note/comment-only lines), the app now creates a new line and moves the caret to it.</li>
