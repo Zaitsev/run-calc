@@ -14,6 +14,8 @@ Minimal notepad-style desktop calculator built with Wails + React + TypeScript.
 - Comment-only lines (for example: `"todo`) are treated as notes and do not produce `= error` when you press `Enter`.
 - Comment text is rendered with dedicated theme-aware comment styling in the editor overlay.
 - If you need text values in expressions, use single quotes (`'text'`) or backticks, because double quotes are reserved for comments.
+- Random generators: use `uniform()` for values in `[0,1)` and `normal()` for standard normal values (mean `0`, stddev `1`).
+- `uniform()` and `normal()` are zero-argument functions; do not pass parameters.
 - As you type, each non-empty line is validated. Invalid lines are shown in red and marked with a `!` icon in the gutter.
 - Type `@` on any line to open a one-character variable input in that line's gutter, then type a single letter (A-Z) to assign it.
 - The worksheet is restored on app restart, including your latest calculations and carry-over result.
@@ -89,3 +91,22 @@ Build a redistributable package:
 ```bash
 wails build
 ```
+
+## Expr Function Coercion Policy
+
+When adding or exposing expression functions in the evaluator backend:
+
+- Assume numeric intermediate values can arrive as `float64` from expr-lang.
+- If a function semantically expects an integer argument (for example count/index/limit), add explicit coercion that:
+	- accepts integral float values (for example `2.0`),
+	- rejects non-integral floats (for example `1.5`),
+	- returns a clear user-facing error.
+- Keep coercion local to the function wrapper (or a shared helper) so behavior is explicit and testable.
+
+### Required Tests For New Functions
+
+- Happy path with literal arguments.
+- Happy path with arguments produced by prior expressions (especially float outputs like `floor(...)` or arithmetic chains).
+- Boundary behavior (zero, negatives, oversized counts where applicable).
+- Rejection cases for wrong types and non-integral numeric values when integer semantics are required.
+- Pipeline form and direct-call form when both are supported.

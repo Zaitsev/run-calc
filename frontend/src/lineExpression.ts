@@ -1,10 +1,10 @@
 const ERROR_SUFFIX = ' = error';
 
 const BUILTIN_FUNCTION_NAMES = new Set([
-    'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ATAN', 'ATAN2', 'ATANH',
-    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'EACH', 'EXP', 'FILTER', 'FLOOR',
-    'HYPOT', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEDIAN', 'MIN', 'POW',
-    'ROUND', 'SIGN', 'SIN', 'SINH', 'SQRT', 'SUM', 'TAN', 'TANH', 'TRUNC',
+    'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ALL', 'ANY', 'ATAN', 'ATAN2', 'ATANH',
+    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'COUNT', 'EACH', 'EXP', 'FILTER', 'FIND', 'FIRST', 'FLATTEN', 'FLOOR',
+    'HYPOT', 'LEN', 'LAST', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEAN', 'MEDIAN', 'MIN', 'NONE', 'ONE', 'POW',
+    'REDUCE', 'REVERSE', 'ROUND', 'SIGN', 'SIN', 'SINH', 'SORT', 'SQRT', 'SUM', 'TAN', 'TANH', 'TAKE', 'TRUNC', 'UNIQ',
 ]);
 
 const BUILTIN_CONSTANT_NAMES = new Set([
@@ -108,6 +108,11 @@ export function getExpressionSource(lineText: string): string {
     const withoutError = stripErrorSuffix(lineText);
     const {body, comment} = splitLineComment(withoutError);
 
+    // AI prompt lines start with '?' and should keep their full source text.
+    if (body.trimStart().startsWith('?')) {
+        return joinBodyAndComment(body, comment);
+    }
+
     // Handle declarations first so result suffixes are removed only from the RHS.
     const declarationMatch = body.match(/^(\s*@?[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*)(.+)$/);
     if (declarationMatch) {
@@ -153,6 +158,21 @@ export function getExpressionSource(lineText: string): string {
 
     const sourceBody = body.slice(0, equalsIndex).trimEnd();
     return joinBodyAndComment(sourceBody, comment);
+}
+
+export function isAITriggerLine(lineText: string): boolean {
+    const {body} = splitLineComment(getExpressionSource(lineText));
+    return body.trimStart().startsWith('?');
+}
+
+export function getAITriggerPrompt(lineText: string): string {
+    const {body} = splitLineComment(getExpressionSource(lineText));
+    const trimmed = body.trimStart();
+    if (!trimmed.startsWith('?')) {
+        return '';
+    }
+
+    return trimmed.slice(1).trim();
 }
 
 export function extractExpressionDependencies(lineText: string): string[] {
