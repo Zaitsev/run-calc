@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {getPrimaryShortcutAction} from './editorShortcuts';
+import {getFontResizeDirectionFromWheel, getPrimaryShortcutAction} from './editorShortcuts';
 
 type TestShortcutEvent = {
     key: string;
@@ -16,6 +16,22 @@ function event(input: TestShortcutEvent) {
         metaKey: input.metaKey ?? false,
         altKey: input.altKey ?? false,
         code: input.code,
+    };
+}
+
+type TestWheelEvent = {
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+    deltaY: number;
+};
+
+function wheelEvent(input: TestWheelEvent) {
+    return {
+        ctrlKey: input.ctrlKey ?? false,
+        metaKey: input.metaKey ?? false,
+        altKey: input.altKey ?? false,
+        deltaY: input.deltaY,
     };
 }
 
@@ -62,5 +78,20 @@ describe('getPrimaryShortcutAction', () => {
         expect(getPrimaryShortcutAction(event({key: 'a', ctrlKey: true, altKey: true}))).toBeNull();
         expect(getPrimaryShortcutAction(event({key: '0', altKey: true}))).toBeNull();
         expect(getPrimaryShortcutAction(event({key: 'z', ctrlKey: true, altKey: true}))).toBeNull();
+    });
+});
+
+describe('getFontResizeDirectionFromWheel', () => {
+    it('matches zoom in and out with Ctrl/Cmd + wheel', () => {
+        expect(getFontResizeDirectionFromWheel(wheelEvent({ctrlKey: true, deltaY: -1}))).toBe(1);
+        expect(getFontResizeDirectionFromWheel(wheelEvent({metaKey: true, deltaY: -10}))).toBe(1);
+        expect(getFontResizeDirectionFromWheel(wheelEvent({ctrlKey: true, deltaY: 1}))).toBe(-1);
+        expect(getFontResizeDirectionFromWheel(wheelEvent({metaKey: true, deltaY: 10}))).toBe(-1);
+    });
+
+    it('ignores wheel without primary modifier, with Alt, or no delta', () => {
+        expect(getFontResizeDirectionFromWheel(wheelEvent({deltaY: -1}))).toBeNull();
+        expect(getFontResizeDirectionFromWheel(wheelEvent({ctrlKey: true, altKey: true, deltaY: -1}))).toBeNull();
+        expect(getFontResizeDirectionFromWheel(wheelEvent({metaKey: true, deltaY: 0}))).toBeNull();
     });
 });
