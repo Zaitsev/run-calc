@@ -2872,6 +2872,16 @@ function App() {
                 >
                     wrap: {wordWrap ? 'on' : 'off'}
                 </button>
+                <button
+                    type="button"
+                    className="status-chip status-chip-btn"
+                    title="Clear all expressions"
+                    aria-label="Clear all expressions"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={clearWorksheet}
+                >
+                    clear
+                </button>
                 <div className="status-chip-wrap" ref={precisionMenuRef}>
                     <button
                         type="button"
