@@ -1,4 +1,4 @@
-import {KeyboardEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {type CSSProperties, KeyboardEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
     BrowserOpenURL,
     Environment,
@@ -18,6 +18,7 @@ import {
 } from '../wailsjs/runtime/runtime';
 import './App.css';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
+import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
 import { AISettingsPanel, type AIContextMode, type AIKeyStatusState, type AISettingsState } from './AISettings';
 import { AIDebugDrawer, type AIDebugEntry } from './AIDebugDrawer';
 import { HelpPanel } from './HelpPanel';
@@ -45,6 +46,26 @@ const MATH_FUNCTION_NAMES = new Set([
     'HYPOT', 'LEN', 'LAST', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEAN', 'MEDIAN', 'MIN', 'NONE', 'ONE', 'POW',
     'REDUCE', 'REVERSE', 'ROUND', 'SIGN', 'SIN', 'SINH', 'SORT', 'SQRT', 'SUM', 'TAN', 'TANH', 'TAKE', 'TRUNC', 'UNIQ',
 ]);
+
+function usePrefersDark(): boolean {
+    const [prefersDark, setPrefersDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (event: MediaQueryListEvent) => {
+            setPrefersDark(event.matches);
+        };
+
+        setPrefersDark(mediaQuery.matches);
+        mediaQuery.addEventListener('change', handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleChange);
+        };
+    }, []);
+
+    return prefersDark;
+}
 const MATH_CONSTANT_NAMES = new Set([
     'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
 ]);
@@ -407,6 +428,12 @@ function App() {
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
+    const prefersDark = usePrefersDark();
+    const isDarkTheme =
+        theme.type === 'dark' ||
+        (theme.type === 'custom' && (theme.customThemeBase ?? inferCustomThemeMode(theme.customColors)) === 'dark') ||
+        (theme.type === 'system' && prefersDark);
+    const isContentEmpty = content.trim() === '';
     const previewRestoreThemeRef = useRef<ThemeState | null>(null);
     const [savedThemes, setSavedThemes] = useState<SavedThemeEntry[]>(() => {
         const raw = localStorage.getItem(ACCEPTED_THEMES_STORAGE_KEY);
@@ -470,6 +497,7 @@ function App() {
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
     const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
+    const [showClearWorksheetConfirm, setShowClearWorksheetConfirm] = useState(false);
     const [isReevaluatingAll, setIsReevaluatingAll] = useState(false);
     const intelligenceShowTimerRef = useRef<number | null>(null);
     const intelligenceHideTimerRef = useRef<number | null>(null);
@@ -707,6 +735,24 @@ function App() {
             document.removeEventListener('keydown', onEscape);
         };
     }, [showBurgerMenu]);
+
+    useEffect(() => {
+        if (!showClearWorksheetConfirm) {
+            return;
+        }
+
+        const onDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setShowClearWorksheetConfirm(false);
+            }
+        };
+
+        document.addEventListener('keydown', onDocumentKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onDocumentKeyDown);
+        };
+    }, [showClearWorksheetConfirm]);
 
     useEffect(() => {
         if (!showPrecisionMenu) {
@@ -1010,6 +1056,21 @@ function App() {
         });
     };
 
+    const requestClearWorksheet = () => {
+        setShowPrecisionMenu(false);
+        setShowBurgerMenu(false);
+        setShowClearWorksheetConfirm(true);
+    };
+
+    const cancelClearWorksheet = () => {
+        setShowClearWorksheetConfirm(false);
+    };
+
+    const confirmClearWorksheet = () => {
+        setShowClearWorksheetConfirm(false);
+        clearWorksheet();
+    };
+
     const toggleMarkLine = () => {
         const editor = editorRef.current;
         if (!editor) return;
@@ -1202,7 +1263,7 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', clearWorksheet);
+        const unsubNew = EventsOn('menu:file:new', requestClearWorksheet);
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
@@ -2610,12 +2671,13 @@ function App() {
             : helpPanelPosition === 'bottom'
                 ? ' window--help-bottom'
                 : ' window--help-right';
+    const windowStyle = {
+        '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
+        '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
+    } as CSSProperties;
 
     return (
-        <div id="app" className={`window${helpDockClass}`}>
-            <div className="window-logo-bg" aria-hidden="true">
-                <img className="window-logo-bg-image" src={appLogo} alt="" />
-            </div>
+        <div id="app" className={`window${helpDockClass}`} style={windowStyle}>
             <div className="editor-container">
                 <div className="gutter" ref={gutterRef}>
                     <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX, paddingBottom: EDITOR_BOTTOM_PADDING_PX}}>
@@ -2864,6 +2926,16 @@ function App() {
                 )}
                 <button
                     type="button"
+                    className="status-chip status-chip-btn status-chip-btn--clear-first"
+                    title="Clear all expressions"
+                    aria-label="Clear all expressions"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={requestClearWorksheet}
+                >
+                    clear
+                </button>
+                <button
+                    type="button"
                     className={`status-chip status-chip-btn${wordWrap ? ' status-chip-btn--active' : ''}`}
                     title={wordWrap ? 'Word wrap: on' : 'Word wrap: off'}
                     aria-label="Toggle word wrap"
@@ -2871,16 +2943,6 @@ function App() {
                     onClick={() => setWordWrap((prev) => !prev)}
                 >
                     wrap: {wordWrap ? 'on' : 'off'}
-                </button>
-                <button
-                    type="button"
-                    className="status-chip status-chip-btn"
-                    title="Clear all expressions"
-                    aria-label="Clear all expressions"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={clearWorksheet}
-                >
-                    clear
                 </button>
                 <div className="status-chip-wrap" ref={precisionMenuRef}>
                     <button
@@ -2988,7 +3050,7 @@ function App() {
                     </button>
                     {showBurgerMenu && (
                         <div className="status-menu-popover" role="menu" aria-label="App menu">
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(clearWorksheet)}>New worksheet</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(requestClearWorksheet)}>New worksheet</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => WindowReload())}>Reload app</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(1))}>Increase font size</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(-1))}>Decrease font size</button>
@@ -3521,6 +3583,25 @@ function App() {
                     </div>
                     <div className="settings-body">
                         <HelpPanel />
+                    </div>
+                </div>
+            )}
+            {showClearWorksheetConfirm && (
+                <div
+                    className="recalc-modal-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="clear-worksheet-title"
+                    aria-describedby="clear-worksheet-message"
+                    onMouseDown={cancelClearWorksheet}
+                >
+                    <div className="recalc-modal" onMouseDown={(event) => event.stopPropagation()}>
+                        <h3 id="clear-worksheet-title">Confirm Clear Worksheet</h3>
+                        <p id="clear-worksheet-message">Clear worksheet and remove all expressions?</p>
+                        <div className="recalc-modal-actions">
+                            <button type="button" className="recalc-btn-no" onClick={cancelClearWorksheet}>Cancel</button>
+                            <button type="button" className="recalc-btn-yes" onClick={confirmClearWorksheet}>Clear</button>
+                        </div>
                     </div>
                 </div>
             )}

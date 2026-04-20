@@ -70,6 +70,7 @@ export function HelpPanel() {
                         <li>If you need text values inside expressions, use single quotes (') or backticks (`), not double quotes.</li>
                         <li>Line numbers appear in the left gutter for easy reference and navigation.</li>
                         <li>Toggle word wrap from the status bar to wrap long lines at the window edge (disabled by default for a clean appearance).</li>
+                        <li>Clear/New worksheet actions now show a confirmation dialog before wiping the worksheet.</li>
                         <li>Click the precision chip in the status bar to quickly change decimal precision or toggle scientific mode.</li>
                         <li>Invalid lines are highlighted in red with a gutter ! marker until corrected.</li>
                         <li>When you start editing a calculated line, its existing = result suffix is removed automatically so you can revise the expression cleanly.</li>
@@ -83,6 +84,7 @@ export function HelpPanel() {
                         <li>Enter: Evaluate current line, or move to the next line when the current line is empty/comment-only or caret is in trailing comment text. On the last line, Enter creates a new line and moves the caret to it when no evaluation error occurs.</li>
                         <li>Ctrl/Cmd + Enter: Always insert a new line below and move the caret to it.</li>
                         <li>Ctrl/Cmd + N: New worksheet.</li>
+                        <li>New worksheet (Ctrl/Cmd + N or menu) asks for confirmation before clearing content.</li>
                         <li>Ctrl/Cmd + =: Increase font size.</li>
                         <li>Ctrl/Cmd + -: Decrease font size.</li>
                         <li>Ctrl/Cmd + 0: Reset font size.</li>
@@ -96,6 +98,9 @@ export function HelpPanel() {
                 )}
                 {activeHelpPage === 'new' && (
                     <ul>
+                        <li>Replaced browser-native clear confirmation with an in-app dialog that uses a proper title: Confirm Clear Worksheet.</li>
+                        <li>Moved the clear chip to the first position in the status bar and added extra spacing after it for faster access.</li>
+                        <li>Added a confirmation dialog before clearing the worksheet (status chip, menu action, and File > New trigger).</li>
                         <li>Fixed word-wrap selection drift by aligning overlay wrap width with the editor scrollbar width, so highlighted selection and visible text stay on the same wrapped segments.</li>
                         <li>Fixed bottom scroll desync between expression area and gutter: both now stop at the same end position and stay aligned when reversing scroll direction.</li>
                         <li>Refined Enter behavior on the final line: when Enter does not trigger an evaluation error (for example, note/comment-only lines), the app now creates a new line and moves the caret to it.</li>
