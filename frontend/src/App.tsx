@@ -1,4 +1,4 @@
-import {KeyboardEvent, MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {KeyboardEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
     BrowserOpenURL,
     Environment,
@@ -33,7 +33,7 @@ import {
     shouldSkipEvaluation,
 } from './appInteractionLogic';
 import {useTheme, type ThemeState} from './useTheme';
-import { getPrimaryShortcutAction } from './editorShortcuts';
+import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { ClearAIAPIKey, EvaluateExprProgram, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
@@ -2312,6 +2312,16 @@ function App() {
         insertAtSelection(`${formatNumber(lastResult, decimalDelimiter, 'auto', false)}${event.key}`);
     };
 
+    const onEditorWheel = (event: ReactWheelEvent<HTMLTextAreaElement>) => {
+        const direction = getFontResizeDirectionFromWheel(event);
+        if (direction === null) {
+            return;
+        }
+
+        event.preventDefault();
+        changeFontScale(direction);
+    };
+
     const {lines: contentLines, lineErrors, truncatedZeroLines, truncatedLines, declarationLines, aiTriggerLines} = useMemo(() => {
         const nextLineErrors = new Map<number, string>();
         const nextTruncatedZeroLines = new Map<number, number>();
@@ -2773,6 +2783,7 @@ function App() {
                         onClick={updateCaretPosFromEditor}
                         onKeyUp={updateCaretPosFromEditor}
                         onKeyDown={onKeyDown}
+                        onWheel={onEditorWheel}
                         onScroll={() => {
                             const el = editorRef.current;
                             if (!el) return;
