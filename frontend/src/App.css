@@ -11,40 +11,6 @@
     overflow: hidden;
 }
 
-.window-logo-bg {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 0;
-}
-
-.window-logo-bg-image {
-    width: clamp(320px, 58vmin, 980px);
-    max-width: calc(100vw - 64px);
-    max-height: calc(100vh - 64px);
-    height: auto;
-    object-fit: contain;
-    opacity: 0.07;
-    mix-blend-mode: soft-light;
-    filter:
-        grayscale(0.08)
-        saturate(0.72)
-        contrast(1.08)
-        brightness(1.02)
-        drop-shadow(-2px -2px 1px var(--logo-shadow-top))
-        drop-shadow(3px 3px 2px var(--logo-shadow-bottom));
-}
-
-@media (max-width: 720px) {
-    .window-logo-bg-image {
-        width: min(82vmin, calc(100vw - 32px));
-        max-height: calc(100vh - 32px);
-    }
-}
-
 .editor-container,
 .status-bar,
 .settings-panel {
@@ -376,6 +342,31 @@
     pointer-events: none;
     overflow: hidden;
     z-index: 0;
+    isolation: isolate;
+}
+
+.editor-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--window-logo-image);
+    background-size: clamp(320px, 58vmin, 980px) auto;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: var(--logo-layer-opacity, 0.12);
+    transition: opacity 1s ease;
+    z-index: 0;
+}
+
+.editor-overlay > * {
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 720px) {
+    .editor-overlay::before {
+        background-size: min(82vmin, calc(100vw - 32px)) auto;
+    }
 }
 
 .editor-overlay--wrap .editor-line-row {
@@ -591,7 +582,7 @@
 }
 
 .recalc-modal {
-    background: var(--editor-background);
+    background: var(--sideBar-background);
     color: var(--editor-foreground);
     padding: 24px 32px;
     border-radius: 8px;
@@ -734,6 +725,10 @@
     color: var(--sideBarTitle-foreground);
     background: var(--btn-hover-bg);
     border-color: var(--radio-accent);
+}
+
+.status-chip-btn--clear-first {
+    margin-right: 4em;
 }
 
 .precision-popover {
