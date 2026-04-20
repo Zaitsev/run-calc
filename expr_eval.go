@@ -162,10 +162,10 @@ var (
 		reserved["none"] = struct{}{}
 		reserved["reduce"] = struct{}{}
 		reserved["find"] = struct{}{}
-		reserved["findIndex"] = struct{}{}
-		reserved["findLast"] = struct{}{}
-		reserved["findLastIndex"] = struct{}{}
-		reserved["groupBy"] = struct{}{}
+		reserved["findindex"] = struct{}{}
+		reserved["findlast"] = struct{}{}
+		reserved["findlastindex"] = struct{}{}
+		reserved["groupby"] = struct{}{}
 		reserved["concat"] = struct{}{}
 		reserved["flatten"] = struct{}{}
 		reserved["uniq"] = struct{}{}
@@ -175,7 +175,7 @@ var (
 		reserved["take"] = struct{}{}
 		reserved["reverse"] = struct{}{}
 		reserved["sort"] = struct{}{}
-		reserved["sortBy"] = struct{}{}
+		reserved["sortby"] = struct{}{}
 		reserved["true"] = struct{}{}
 		reserved["false"] = struct{}{}
 		reserved["nil"] = struct{}{}

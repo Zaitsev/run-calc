@@ -545,6 +545,9 @@ func TestEvaluateExprProgram_PreventsInternalNameReassignment(t *testing.T) {
 		"map = 1",
 		"each = 1",
 		"item = 1",
+		"findIndex = 1",
+		"groupBy = 1",
+		"sortBy = 1",
 		"true = 1",
 	}
 
