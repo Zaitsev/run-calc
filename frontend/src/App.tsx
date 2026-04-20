@@ -2566,7 +2566,13 @@ function App() {
         }
     };
 
+    const shouldAutoResizeWindowForSettingsDrawer = runtimePlatform !== 'windows';
+
     const expandWindowForSettingsDrawer = async () => {
+        if (!shouldAutoResizeWindowForSettingsDrawer) {
+            return;
+        }
+
         try {
             const current = await WindowGetSize();
             const requiredWidth = Math.min(
@@ -2602,6 +2608,11 @@ function App() {
     };
 
     const restoreWindowAfterSettingsDrawer = async () => {
+        if (!shouldAutoResizeWindowForSettingsDrawer) {
+            settingsDrawerOriginalSizeRef.current = null;
+            return;
+        }
+
         const original = settingsDrawerOriginalSizeRef.current;
         if (!original) {
             return;
