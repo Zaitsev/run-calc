@@ -46,6 +46,26 @@ const MATH_FUNCTION_NAMES = new Set([
     'HYPOT', 'LEN', 'LAST', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEAN', 'MEDIAN', 'MIN', 'NONE', 'ONE', 'POW',
     'REDUCE', 'REVERSE', 'ROUND', 'SIGN', 'SIN', 'SINH', 'SORT', 'SQRT', 'SUM', 'TAN', 'TANH', 'TAKE', 'TRUNC', 'UNIQ',
 ]);
+
+function usePrefersDark(): boolean {
+    const [prefersDark, setPrefersDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (event: MediaQueryListEvent) => {
+            setPrefersDark(event.matches);
+        };
+
+        setPrefersDark(mediaQuery.matches);
+        mediaQuery.addEventListener('change', handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleChange);
+        };
+    }, []);
+
+    return prefersDark;
+}
 const MATH_CONSTANT_NAMES = new Set([
     'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
 ]);
@@ -408,10 +428,11 @@ function App() {
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
+    const prefersDark = usePrefersDark();
     const isDarkTheme =
         theme.type === 'dark' ||
         (theme.type === 'custom' && (theme.customThemeBase ?? inferCustomThemeMode(theme.customColors)) === 'dark') ||
-        (theme.type === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        (theme.type === 'system' && prefersDark);
     const isContentEmpty = content.trim() === '';
     const previewRestoreThemeRef = useRef<ThemeState | null>(null);
     const [savedThemes, setSavedThemes] = useState<SavedThemeEntry[]>(() => {
@@ -720,25 +741,18 @@ function App() {
             return;
         }
 
-        const onWindowKeyDown = (event: globalThis.KeyboardEvent) => {
+        const onDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
                 setShowClearWorksheetConfirm(false);
-                return;
-            }
-
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                setShowClearWorksheetConfirm(false);
-                clearWorksheet();
             }
         };
 
-        window.addEventListener('keydown', onWindowKeyDown);
+        document.addEventListener('keydown', onDocumentKeyDown);
         return () => {
-            window.removeEventListener('keydown', onWindowKeyDown);
+            document.removeEventListener('keydown', onDocumentKeyDown);
         };
-    }, [showClearWorksheetConfirm]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [showClearWorksheetConfirm]);
 
     useEffect(() => {
         if (!showPrecisionMenu) {

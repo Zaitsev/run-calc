@@ -61,22 +61,23 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            xvfb
 
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
+      - name: Run frontend production build
+        working-directory: frontend
+        run: npm run build
+
       - name: Run Go tests
-        run: go test ./...
+        run: xvfb-run -a go test ./...
 
       - name: Run frontend tests
         working-directory: frontend
         run: npm test
-
-      - name: Run frontend production build
-        working-directory: frontend
-        run: npm run build
 
   build:
     name: Build ${{ matrix.label }}
