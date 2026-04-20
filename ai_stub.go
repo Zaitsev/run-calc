@@ -1081,7 +1081,14 @@ func callOpenAICompatibleChatMessage(settings AISettings, apiKey string, payload
 		if legacyErr == nil {
 			return legacyMsg, legacyRaw, nil
 		}
-		return openAIMessage{}, "", sdkErr
+		combinedErr := errors.Join(
+			fmt.Errorf("sdk chat completions request failed: %w", sdkErr),
+			fmt.Errorf("legacy OpenAI-compatible fallback failed: %w", legacyErr),
+		)
+		if legacyRaw != "" {
+			return openAIMessage{}, legacyRaw, fmt.Errorf("%w; legacy response body: %s", combinedErr, legacyRaw)
+		}
+		return openAIMessage{}, legacyRaw, combinedErr
 	}
 
 	rawResponseBody := res.RawJSON()

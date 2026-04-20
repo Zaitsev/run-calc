@@ -50,7 +50,7 @@ export function HelpPanel() {
                         <li>Numeric AI answers are inserted as ai0 = Number. AI comments use the same " comment style.</li>
                         <li>If AI returns calc code lines, they are inserted and re-evaluated automatically.</li>
                         <li>While AI is processing, the active AI prompt line in the editor gets an animated background so you can quickly spot what is waiting.</li>
-                        <li>Configure AI in Settings to AI: provider preset (chatgpt, openai, gemini, openrouter, anthropic, or custom), endpoint, model id, timeout, and default context mode.</li>
+                        <li>Configure AI in Settings to AI: provider preset (openai, gemini, openrouter, anthropic, or custom), endpoint, model id, and timeout.</li>
                         <li>AI settings edits are draft-only until you click Test and Save. If testing fails, your changes stay unsaved, and a Revert changes action appears to restore the last saved configuration.</li>
                         <li>BYOK API keys are stored in OS secure storage. On Linux you can explicitly enable insecure file fallback mode in Settings to AI.</li>
                         <li>Start a new line with +, -, *, or / to continue from the previous result.</li>
