@@ -2876,7 +2876,7 @@ function App() {
                     type="button"
                     className="status-chip status-chip-btn"
                     title="Clear all expressions"
-                    aria-label="Clear history"
+                    aria-label="Clear all expressions"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={clearWorksheet}
                 >
