@@ -9,5 +9,10 @@
   "author": {
     "name": "vladzaitsev",
     "email": "vladzaitsev@gmail.com"
+  },
+  "info": {
+    "productVersion": "0.5.1",
+    "companyName": "vladzaitsev",
+    "productName": "Run-Calc"
   }
 }
