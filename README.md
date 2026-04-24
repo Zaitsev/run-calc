@@ -1,5 +1,7 @@
 # Run-Calc
 
+[![Security Checks](https://github.com/Zaitsev/run-calc/actions/workflows/security-checks.yml/badge.svg)](https://github.com/Zaitsev/run-calc/actions/workflows/security-checks.yml)
+
 Minimal notepad-style desktop calculator built with Wails + React + TypeScript.
 
 ## Basic Operations
