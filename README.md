@@ -92,6 +92,15 @@ Build a redistributable package:
 wails build
 ```
 
+## Linux Distribution
+
+GitHub Releases now publish two Linux artifacts:
+
+- `*.AppImage`: portable, self-contained package for most distributions.
+- `*.tar.gz`: raw binary package (may require system runtime libraries).
+
+If you want a Linux build that works without manually installing runtime dependencies, use the AppImage artifact.
+
 ## Expr Function Coercion Policy
 
 When adding or exposing expression functions in the evaluator backend:
