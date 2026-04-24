@@ -42,6 +42,14 @@ jobs:
           npm install --no-fund
           npm run build
 
+      - name: Install Linux headers for cgo dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev \
+            libxtst-dev \
+            libxkbcommon-x11-dev
+
       - name: Run govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
