@@ -64,6 +64,11 @@ Use arithmetic-focused expression support:
 - `wails dev` already handles frontend rebuild/reload, so you do not need to run `npm run build` after each change.
 - Use `npm run build` (frontend) and `wails build` only for release verification/package builds.
 
+## CI Package Manager Rule (Important)
+- For this repository, do not use `npm ci` in CI/frontend build steps.
+- Use `npm install --no-fund` (and then `npm run build` when needed).
+- Reason: this Wails project flow does not rely on `npm ci` lockfile-based installs in automation, and using `npm ci` can break Go-related security/build jobs.
+
 ## Decision Logic
 - If current line is empty on Enter:
   - Insert newline only.
