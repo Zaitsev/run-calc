@@ -5,6 +5,21 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      skip_verify:
+        description: 'Skip verify checks (temporary)'
+        type: boolean
+        required: false
+        default: false
+      build_target:
+        description: 'Build target OS'
+        type: choice
+        required: false
+        default: all
+        options:
+          - all
+          - windows
+          - macos
 
 concurrency:
   group: release-${{ github.ref }}
@@ -35,18 +50,25 @@ jobs:
 
   verify:
     name: Verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
+      - name: Verify skipped by manual input
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_verify }}
+        run: echo "Skipping Verify checks for this manual run"
+
       - name: Check out repository
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         uses: actions/checkout@v4
 
       - name: Set up Go
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
 
       - name: Set up Node.js
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -54,28 +76,33 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Linux build dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
+            libwebkit2gtk-4.0-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
             xvfb
 
       - name: Install frontend dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         working-directory: frontend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Run frontend production build
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         working-directory: frontend
         run: npm run build
 
       - name: Run Go tests
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         run: xvfb-run -a go test ./...
 
       - name: Run frontend tests
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
         working-directory: frontend
         run: npm test
 
@@ -88,16 +115,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            label: Linux
-            artifact_name: release-linux
-          - os: windows-latest
-            label: Windows
-            artifact_name: release-windows
-          - os: macos-latest
-            label: macOS
-            artifact_name: release-macos
+        include: ${{ fromJSON(inputs.build_target == 'windows' && '[{"os":"windows-latest","label":"Windows","artifact_name":"release-windows"}]' || inputs.build_target == 'macos' && '[{"os":"macos-latest","label":"macOS","artifact_name":"release-macos"}]' || '[{"os":"windows-latest","label":"Windows","artifact_name":"release-windows"},{"os":"macos-latest","label":"macOS","artifact_name":"release-macos"}]') }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -121,19 +139,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
+            libwebkit2gtk-4.0-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            xvfb
 
       - name: Install NSIS
         if: runner.os == 'Windows'
         shell: pwsh
         run: choco install nsis --yes --no-progress
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
 
       - name: Add Go bin to PATH
         if: runner.os != 'Windows'
@@ -152,7 +167,12 @@ jobs:
       - name: Build release binaries
         if: runner.os != 'Windows'
         shell: bash
-        run: wails build -clean
+        run: |
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            xvfb-run -a wails build -clean
+          else
+            wails build -clean
+          fi
 
       - name: Build Windows installer
         if: runner.os == 'Windows'
@@ -166,6 +186,8 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           mkdir -p release
+          chmod +x ./scripts/package-linux-appimage.sh
+          APP_NAME="${APP_NAME}" VERSION="${VERSION}" ./scripts/package-linux-appimage.sh
           tar -C build/bin -czf "release/${APP_NAME}-${VERSION}-linux.tar.gz" "${APP_NAME}"
 
       - name: Package macOS release
