@@ -38,14 +38,17 @@ Run-Calc works like a smart text editor. Type your math, and it solves it inline
 
 ### 🤖 AI Assistant
 
-Run-Calc includes an optional AI assistant to answer questions, generate expressions, and perform look-ups directly in your worksheet.
+Run-Calc includes an optional AI assistant to answer questions, generate expressions, and perform look-ups directly in your worksheet. 
+
+> **⚠️ Important: Bring Your Own Key (BYOK)**
+> The AI assistant operates strictly on a BYOK basis. Run-Calc does not include built-in API keys or AI subscriptions. To use this feature, you must provide your own API key from a supported provider or connect to a local/self-hosted model (like Ollama).
 
 #### Setup
 Configure your provider in **Settings -> AI**:
 1. Choose a preset: **OpenAI**, **Gemini**, **OpenRouter**, **Anthropic**, or **Custom** (for self-hosted/Ollama).
-2. Enter your **API key**.
-3. Adjust model ID, timeout, and context modes as needed.
-4. Click **Test & Save**.
+2. Enter your personal **API key** for the selected provider. *(For local models, this can usually be left blank or set to a dummy value).*
+3. Adjust the model ID, timeout, and context modes as needed.
+4. Click **Test & Save** to verify the connection before using it in the worksheet.
 
 #### Usage
 | Command | Action | Example |
@@ -65,8 +68,7 @@ Control how much of your worksheet the AI can "see" (configurable in Settings or
 | **Gemini** | `gemini-3.1-flash-lite-preview` |
 | **OpenRouter** | `openai/gpt-4o-mini` |
 | **Anthropic** (via OpenRouter) | `anthropic/claude-3.5-sonnet` |
-| **Custom** | *Configurable* (Accepts OpenAI-compatible endpoints, e.g., `http://localhost:11434/v1/chat/completions` for Ollama) |
-
+| **Custom** | *Configurable* (Accepts any OpenAI-compatible endpoint, e.g., `http://localhost:11434/v1/chat/completions` for Ollama) |
 ---
 
 ### ⌨️ Keyboard Shortcuts
