@@ -6,6 +6,8 @@ export function ClearAIAPIKey():Promise<main.AIKeyStatus>;
 
 export function EvaluateExprProgram(arg1:string,arg2:Record<string, any>):Promise<main.ExprEvalResponse>;
 
+export function GetAIKeyStatusForSettings(arg1:main.AISettings):Promise<main.AIKeyStatus>;
+
 export function GetAISettings():Promise<main.AISettingsResponse>;
 
 export function Greet(arg1:string):Promise<string>;
