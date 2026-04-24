@@ -145,18 +145,44 @@ jobs:
             patchelf \
             xvfb
 
-      - name: Install NSIS
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: choco install nsis --yes --no-progress
-
-      - name: Verify NSIS is available
+      - name: Ensure NSIS is available
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
-            throw "NSIS (makensis) was not found in PATH."
+          # Search known locations first (pre-installed on windows-latest)
+          $searchPaths = @(
+            "C:\Program Files (x86)\NSIS",
+            "C:\Program Files\NSIS",
+            "C:\ProgramData\chocolatey\bin"
+          )
+          $makensis = $searchPaths |
+            ForEach-Object { Join-Path $_ "makensis.exe" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
+          if (-not $makensis) {
+            Write-Host "NSIS not pre-installed; installing via Chocolatey..."
+            choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) {
+              throw "Chocolatey failed to install NSIS (exit code $LASTEXITCODE)."
+            }
+            # Re-search after install
+            $makensis = $searchPaths |
+              ForEach-Object { Join-Path $_ "makensis.exe" } |
+              Where-Object { Test-Path $_ } |
+              Select-Object -First 1
           }
+
+          if (-not $makensis) {
+            throw "makensis.exe not found in any known location after install attempt."
+          }
+
+          $nsisDir = Split-Path $makensis
+          Write-Host "Using NSIS from: $nsisDir"
+          # Export to PATH for subsequent steps (GITHUB_PATH is the proper mechanism)
+          "$nsisDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Also export as env var so the build step can reference it directly if needed
+          "MAKENSIS=$makensis" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Add Go bin to PATH
         if: runner.os != 'Windows'
