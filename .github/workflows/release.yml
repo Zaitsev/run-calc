@@ -150,6 +150,14 @@ jobs:
         shell: pwsh
         run: choco install nsis --yes --no-progress
 
+      - name: Verify NSIS is available
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            throw "NSIS (makensis) was not found in PATH."
+          }
+
       - name: Add Go bin to PATH
         if: runner.os != 'Windows'
         shell: bash
@@ -206,11 +214,15 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Compress-Archive -Path "build/bin/${env:APP_NAME}.exe" -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows.zip" -Force
-          $installer = Get-ChildItem "build/bin" -Filter "*-installer.exe" | Select-Object -First 1
-          if ($null -ne $installer) {
-            Copy-Item $installer.FullName "release/$($installer.Name)"
+          if (-not (Test-Path "build/bin/${env:APP_NAME}.exe")) {
+            throw "Standalone executable was not generated at build/bin/${env:APP_NAME}.exe."
           }
+          Copy-Item "build/bin/${env:APP_NAME}.exe" "release/${env:APP_NAME}-${env:VERSION}-windows-standalone.exe"
+          $installer = Get-ChildItem "build/bin" -Filter "*-installer.exe" | Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "Windows installer was not generated. Expected a *-installer.exe file in build/bin."
+          }
+          Copy-Item $installer.FullName "release/${env:APP_NAME}-${env:VERSION}-windows-installer.exe"
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
