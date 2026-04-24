@@ -169,6 +169,6 @@ When adding or exposing expression functions in the evaluator backend, please ad
 ## ⚖️ Legal
 
 - **Privacy Policy:** See `PRIVACY_POLICY.md`
-- **License:** See `LICENSE` (MIT)
+- **License:** See `LICENSE` 
 
 > **⚠️ License Note:** Run-Calc is **source-available, not open-source**. You are highly encouraged to read the code, compile it locally, and submit Pull Requests to fix bugs or add features! However, you are not permitted to clone, redistribute, or monetize the app. See the `LICENSE` file for full details.
