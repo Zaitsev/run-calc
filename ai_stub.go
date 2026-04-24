@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -854,7 +855,17 @@ func parseAIPromptMode(rawPrompt string) (string, bool) {
 	return trimmed, false
 }
 
+// isCustomPreset returns true when the user has selected the custom provider,
+// which allows local LLM endpoints (e.g. Ollama on http://localhost).
+func isCustomPreset(preset string) bool {
+	return strings.EqualFold(strings.TrimSpace(preset), customAIProviderPreset)
+}
+
 func normalizedChatEndpoint(rawEndpoint string) (string, error) {
+	return normalizedChatEndpointFor(rawEndpoint, false)
+}
+
+func normalizedChatEndpointFor(rawEndpoint string, allowLocalHost bool) (string, error) {
 	trimmed := strings.TrimSpace(rawEndpoint)
 	if trimmed == "" {
 		return "", fmt.Errorf("AI endpoint is empty")
@@ -866,6 +877,30 @@ func normalizedChatEndpoint(rawEndpoint string) (string, error) {
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return "", fmt.Errorf("AI endpoint must be an absolute URL")
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "https" && scheme != "http" {
+		return "", fmt.Errorf("AI endpoint scheme must be http or https")
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "", fmt.Errorf("AI endpoint host is empty")
+	}
+
+	if !allowLocalHost {
+		if scheme != "https" {
+			return "", fmt.Errorf("AI endpoint must use HTTPS")
+		}
+		if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+			return "", fmt.Errorf("AI endpoint host is not allowed")
+		}
+		if ip := net.ParseIP(host); ip != nil {
+			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalMulticast() || ip.IsLinkLocalUnicast() || ip.IsMulticast() || ip.IsUnspecified() {
+				return "", fmt.Errorf("AI endpoint host is not allowed")
+			}
+		}
 	}
 
 	if strings.HasSuffix(parsed.Path, "/chat/completions") {
@@ -902,7 +937,11 @@ func shouldUseJSONResponseFormat(settings AISettings) bool {
 }
 
 func normalizedSDKBaseURL(rawEndpoint string) (string, error) {
-	chatEndpoint, err := normalizedChatEndpoint(rawEndpoint)
+	return normalizedSDKBaseURLFor(rawEndpoint, false)
+}
+
+func normalizedSDKBaseURLFor(rawEndpoint string, allowLocalHost bool) (string, error) {
+	chatEndpoint, err := normalizedChatEndpointFor(rawEndpoint, allowLocalHost)
 	if err != nil {
 		return "", err
 	}
@@ -959,7 +998,7 @@ func toSDKMessages(messages []openAIMessage) []openai.ChatCompletionMessageParam
 }
 
 func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
-	endpoint, err := normalizedChatEndpoint(settings.Endpoint)
+	endpoint, err := normalizedChatEndpointFor(settings.Endpoint, isCustomPreset(settings.ProviderPreset))
 	if err != nil {
 		return openAIMessage{}, "", err
 	}
@@ -1037,7 +1076,7 @@ func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, p
 }
 
 func callOpenAICompatibleChatMessage(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
-	sdkBaseURL, err := normalizedSDKBaseURL(settings.Endpoint)
+	sdkBaseURL, err := normalizedSDKBaseURLFor(settings.Endpoint, isCustomPreset(settings.ProviderPreset))
 	if err != nil {
 		return openAIMessage{}, "", err
 	}

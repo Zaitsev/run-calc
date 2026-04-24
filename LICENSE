@@ -1,0 +1,29 @@
+# Run-Calc Source-Available License
+
+Copyright (c) 2026 Vlad Zaitsev
+All rights reserved.
+
+This software and associated documentation files (the "Software") are made available to read and review. 
+
+The author retains all rights, title, and interest in and to the Software, including all copyrights, patents, trade secrets, and other intellectual property rights.
+
+## 1. Permissions Granted
+You are granted a limited, non-exclusive, non-transferable license to:
+* View and read the source code.
+* Download and compile the source code locally solely for the purpose of testing, reviewing, or developing improvements.
+* Fork the repository strictly for the purpose of submitting Pull Requests (PRs) back to the original repository.
+
+## 2. Restrictions
+Unless you have been granted prior, explicit, written permission from the author, you MAY NOT:
+* Copy, distribute, or publish the Software, in whole or in part.
+* Modify the Software to create derivative works, competitive products, or "cloned" applications.
+* Use the Software, or any portion of its source code, for commercial purposes.
+* Host, redistribute, or offer the Software as a service to third parties.
+
+## 3. Contributions and Pull Requests
+We welcome and encourage community contributions to improve Run-Calc. 
+
+By submitting a Pull Request, patch, or any other contribution ("Contribution") to this repository, you agree to grant the author an irrevocable, perpetual, worldwide, royalty-free, and non-exclusive license to use, modify, distribute, publish, and sublicense your Contribution as part of the Software. You represent that you are legally entitled to grant this license.
+
+## 4. Disclaimer of Warranty
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
