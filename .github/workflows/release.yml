@@ -243,12 +243,14 @@ jobs:
           if (-not (Test-Path "build/bin/${env:APP_NAME}.exe")) {
             throw "Standalone executable was not generated at build/bin/${env:APP_NAME}.exe."
           }
-          Copy-Item "build/bin/${env:APP_NAME}.exe" "release/${env:APP_NAME}-${env:VERSION}-windows-standalone.exe"
+          Compress-Archive -Path "build/bin/${env:APP_NAME}.exe" `
+            -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows-standalone.zip" -Force
           $installer = Get-ChildItem "build/bin" -Filter "*-installer.exe" | Select-Object -First 1
           if ($null -eq $installer) {
             throw "Windows installer was not generated. Expected a *-installer.exe file in build/bin."
           }
-          Copy-Item $installer.FullName "release/${env:APP_NAME}-${env:VERSION}-windows-installer.exe"
+          Compress-Archive -Path $installer.FullName `
+            -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows-installer.zip" -Force
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
