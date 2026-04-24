@@ -15,6 +15,7 @@ on:
 permissions:
   actions: read
   contents: read
+  packages: read
   security-events: write
 
 jobs:
@@ -25,10 +26,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - language: actions
+            build-mode: none
           - language: javascript-typescript
             build-mode: none
           - language: go
             build-mode: manual
+          - language: python
+            build-mode: none
 
     steps:
       - name: Check out repository
@@ -46,7 +51,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: security-extended
+          queries: security-extended,security-and-quality
 
       - name: Set up Node.js
         if: matrix.language == 'go'
