@@ -25,6 +25,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   APP_NAME: Run-Calc
   GO_VERSION: '1.23.0'
