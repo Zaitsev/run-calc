@@ -999,7 +999,7 @@ func normalizedChatEndpointFor(rawEndpoint string, allowInsecureLocalHTTP bool) 
 
 	isLocalHost := host == "localhost" || strings.HasSuffix(host, ".localhost")
 	if ip := net.ParseIP(host); ip != nil {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalMulticast() || ip.IsLinkLocalUnicast() || ip.IsMulticast() || ip.IsUnspecified() {
+		if ip.IsLoopback() {
 			isLocalHost = true
 		}
 	}
