@@ -12,6 +12,8 @@ export type AISettingsState = {
     modelId: string;
     defaultContextMode: AIContextMode;
     allowInsecureKeyFallback: boolean;
+    allowCustomEndpointKeyReuse: boolean;
+    customKeySourceEndpoint?: string;
     requestTimeoutSeconds: number;
 };
 
@@ -89,6 +91,30 @@ const providerPresetOptions: ProviderPresetOption[] = [
     },
 ];
 
+const chatCompletionsSuffix = '/chat/completions';
+
+function normalizeEndpointForReuseComparison(rawEndpoint: string): string {
+    const trimmed = rawEndpoint.trim();
+    if (trimmed.length === 0) {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(trimmed);
+        if (!parsed.pathname.endsWith(chatCompletionsSuffix)) {
+            if (parsed.pathname.endsWith('/')) {
+                parsed.pathname = `${parsed.pathname}chat/completions`;
+            } else {
+                parsed.pathname = `${parsed.pathname}/chat/completions`;
+            }
+        }
+        return parsed.toString();
+    } catch {
+        // Keep raw value fallback so warning behavior remains conservative for invalid URLs.
+        return trimmed;
+    }
+}
+
 export function AISettingsPanel({
     settings,
     keyStatus,
@@ -103,6 +129,18 @@ export function AISettingsPanel({
     onClearKey,
 }: AISettingsPanelProps) {
     const [apiKeyInput, setAPIKeyInput] = useState('');
+
+    const customEndpointSource = (settings.customKeySourceEndpoint || '').trim();
+    const customEndpointCurrent = settings.endpoint.trim();
+    const normalizedCustomEndpointSource = normalizeEndpointForReuseComparison(customEndpointSource);
+    const normalizedCustomEndpointCurrent = normalizeEndpointForReuseComparison(customEndpointCurrent);
+    const customEndpointReuseRisk =
+        settings.providerPreset === 'custom' &&
+        keyStatus.hasKey &&
+        customEndpointSource.length > 0 &&
+        customEndpointCurrent.length > 0 &&
+        normalizedCustomEndpointSource.toLowerCase() !== normalizedCustomEndpointCurrent.toLowerCase() &&
+        !settings.allowCustomEndpointKeyReuse;
 
     const saveKey = async () => {
         await onSaveKey(apiKeyInput);
@@ -162,6 +200,12 @@ export function AISettingsPanel({
                     <div className="settings-row-info">
                         <div className="settings-row-title">Endpoint</div>
                         <div className="settings-row-desc">OpenAI-compatible chat endpoint or base URL.</div>
+                        {customEndpointReuseRisk && (
+                            <div className="settings-row-desc settings-row-desc--error" role="alert">
+                                Warning: your saved custom API key was last used with {customEndpointSource}. Testing this endpoint will reuse that key.
+                                Enable "Allow key reuse across custom endpoints" below to opt in, or clear/save a key for this endpoint.
+                            </div>
+                        )}
                     </div>
                     <input
                         type="text"
@@ -186,6 +230,23 @@ export function AISettingsPanel({
                         disabled={busy}
                     />
                 </div>
+                {settings.providerPreset === 'custom' && (
+                    <div className="settings-row">
+                        <div className="settings-row-info">
+                            <div className="settings-row-title">Allow key reuse across custom endpoints</div>
+                            <div className="settings-row-desc">Required when changing custom endpoint while a custom API key already exists.</div>
+                        </div>
+                        <label className="settings-toggle" aria-label="Toggle custom endpoint key reuse">
+                            <input
+                                type="checkbox"
+                                checked={settings.allowCustomEndpointKeyReuse}
+                                onChange={(e) => onChange({ ...settings, allowCustomEndpointKeyReuse: e.target.checked })}
+                                disabled={busy}
+                            />
+                            <span className="settings-toggle-track" />
+                        </label>
+                    </div>
+                )}
             </div>
 
             <div className={`settings-card settings-card--apply${hasUnsavedChanges ? ' settings-card--action-required' : ''}`}>
@@ -238,9 +299,9 @@ export function AISettingsPanel({
                     <div className="settings-row-info">
                         <div className="settings-row-title">Current key status</div>
                         <div className="settings-row-desc">
-                            {keyStatus.hasKey ? `Available via ${keyStatus.storageMode}` : 'Not configured'}
+                            {keyStatus.hasKey ? `Available via ${keyStatus.storageMode}` : 'Not configured for selected provider. Save an API key before Test and Save.'}
                         </div>
-                        {keyStatus.lastError && <div className="settings-row-desc">Last error: {keyStatus.lastError}</div>}
+                        {keyStatus.lastError && <div className="settings-row-desc settings-row-desc--error">Last error: {keyStatus.lastError}</div>}
                     </div>
                     <input
                         type="password"

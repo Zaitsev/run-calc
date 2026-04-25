@@ -8,13 +8,13 @@
     !define INFO_PROJECTNAME "Run-Calc"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "Run-Calc"
+    !define INFO_COMPANYNAME "vladzaitsev"
 !endif
 !ifndef INFO_PRODUCTNAME
     !define INFO_PRODUCTNAME "Run-Calc"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "1.0.0"
+    !define INFO_PRODUCTVERSION "0.5.1"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "Copyright........."

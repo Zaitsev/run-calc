@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,7 +26,7 @@ import (
 )
 
 const aiServiceName = "run-calc"
-const aiAPIKeyUser = "byok-openai-compatible"
+const aiLegacyAPIKeyUser = "byok-openai-compatible"
 
 const defaultAIProviderPreset = "openai"
 const geminiAIProviderPreset = "gemini"
@@ -144,6 +145,8 @@ type AISettings struct {
 	ModelID                   string `json:"modelId"`
 	DefaultContextMode        string `json:"defaultContextMode"`
 	AllowInsecureKeyFallback  bool   `json:"allowInsecureKeyFallback"`
+	AllowCustomEndpointKeyReuse bool `json:"allowCustomEndpointKeyReuse"`
+	CustomKeySourceEndpoint   string `json:"customKeySourceEndpoint,omitempty"`
 	RequestTimeoutSeconds     int    `json:"requestTimeoutSeconds"`
 }
 
@@ -280,6 +283,18 @@ func (a *App) GetAISettings() AISettingsResponse {
 	}
 }
 
+func (a *App) GetAIKeyStatusForSettings(input AISettings) AIKeyStatus {
+	a.aiMu.Lock()
+	defer a.aiMu.Unlock()
+
+	settings := normalizeAISettings(input)
+	status := resolveAIKeyStatus(settings)
+	if !status.HasKey && strings.Contains(strings.ToLower(status.LastError), "no api key configured") {
+		status.LastError = fmt.Sprintf("No API key configured for selected provider (%s)", settings.ProviderPreset)
+	}
+	return status
+}
+
 func (a *App) SaveAISettings(next AISettings) AISettingsResponse {
 	a.aiMu.Lock()
 	defer a.aiMu.Unlock()
@@ -291,6 +306,11 @@ func (a *App) SaveAISettings(next AISettings) AISettingsResponse {
 	currentSettings = normalizeAISettings(currentSettings)
 
 	settings := normalizeAISettings(next)
+	if err := validateCustomEndpointKeyReuse(settings); err != nil {
+		keyStatus := resolveAIKeyStatus(currentSettings)
+		keyStatus.LastError = fmt.Sprintf("settings validation failed: %v", err)
+		return AISettingsResponse{Settings: currentSettings, KeyStatus: keyStatus}
+	}
 	if aiConnectionSettingsChanged(currentSettings, settings) {
 		if err := validateAISettingsConnection(settings); err != nil {
 			keyStatus := resolveAIKeyStatus(currentSettings)
@@ -321,6 +341,10 @@ func aiConnectionSettingsChanged(current AISettings, next AISettings) bool {
 }
 
 func validateAISettingsConnection(settings AISettings) error {
+	if err := validateCustomEndpointKeyReuse(settings); err != nil {
+		return err
+	}
+
 	apiKey, _, err := loadAIAPIKey(settings)
 	if err != nil {
 		return fmt.Errorf("AI API key is not available: %w", err)
@@ -342,24 +366,27 @@ func validateAISettingsConnection(settings AISettings) error {
 	return nil
 }
 
-func (a *App) SetAIAPIKey(apiKey string) AIKeyStatus {
+func (a *App) SetAIAPIKey(apiKey string, input AISettings) AIKeyStatus {
 	a.aiMu.Lock()
 	defer a.aiMu.Unlock()
 
-	settings, _ := loadAISettings()
-	settings = normalizeAISettings(settings)
+	settings := normalizeAISettings(input)
 
 	if strings.TrimSpace(apiKey) == "" {
 		return AIKeyStatus{HasKey: false, StorageMode: "none", LastError: "API key is empty"}
 	}
 
-	if err := keyring.Set(aiServiceName, aiAPIKeyUser, strings.TrimSpace(apiKey)); err == nil {
-		_ = removeAIInsecureKeyFile()
-		return AIKeyStatus{HasKey: true, StorageMode: "secure"}
+	if err := keyring.Set(aiServiceName, aiAPIKeyUserForSettings(settings), strings.TrimSpace(apiKey)); err == nil {
+		_ = removeAIInsecureKeyFileForSettings(settings)
+		return resolveAIKeyStatus(settings)
 	} else if canUseLinuxFallback(settings) {
-		writeErr := writeAIInsecureKeyFile(strings.TrimSpace(apiKey))
+		writeErr := writeAIInsecureKeyFileForSettings(settings, strings.TrimSpace(apiKey))
 		if writeErr == nil {
-			return AIKeyStatus{HasKey: true, StorageMode: "insecure-file", LastError: err.Error()}
+			status := resolveAIKeyStatus(settings)
+			if status.LastError == "" {
+				status.LastError = err.Error()
+			}
+			return status
 		}
 		return AIKeyStatus{HasKey: false, StorageMode: "none", LastError: fmt.Sprintf("secure store failed: %v; fallback failed: %v", err, writeErr)}
 	} else {
@@ -367,12 +394,14 @@ func (a *App) SetAIAPIKey(apiKey string) AIKeyStatus {
 	}
 }
 
-func (a *App) ClearAIAPIKey() AIKeyStatus {
+func (a *App) ClearAIAPIKey(input AISettings) AIKeyStatus {
 	a.aiMu.Lock()
 	defer a.aiMu.Unlock()
 
-	_ = keyring.Delete(aiServiceName, aiAPIKeyUser)
-	_ = removeAIInsecureKeyFile()
+	settings := normalizeAISettings(input)
+
+	_ = keyring.Delete(aiServiceName, aiAPIKeyUserForSettings(settings))
+	_ = removeAIInsecureKeyFileForSettings(settings)
 	return AIKeyStatus{HasKey: false, StorageMode: "none"}
 }
 
@@ -384,6 +413,19 @@ func (a *App) RunAIQuery(request AIRunRequest) AIRunResponse {
 	} else {
 		loadedSettings, _ := loadAISettings()
 		settings = normalizeAISettings(loadedSettings)
+	}
+	if reuseErr := validateCustomEndpointKeyReuse(settings); reuseErr != nil {
+		a.aiMu.Unlock()
+		return AIRunResponse{
+			OK:    false,
+			Error: fmt.Sprintf("AI settings validation failed: %v", reuseErr),
+			Preview: AIRequestPreview{
+				SystemPrompt: defaultAISystemPromptTemplate,
+				ContextMode:  normalizeAIContextModeWithDefault(request.ContextMode, settings.DefaultContextMode),
+				Endpoint:     settings.Endpoint,
+				ModelID:      settings.ModelID,
+			},
+		}
 	}
 	apiKey, keyMode, keyErr := loadAIAPIKey(settings)
 	a.aiMu.Unlock()
@@ -653,6 +695,7 @@ func defaultAISettings() AISettings {
 		ModelID:                  defaultAIOpenAIModel,
 		DefaultContextMode:       "above",
 		AllowInsecureKeyFallback: false,
+		AllowCustomEndpointKeyReuse: false,
 		RequestTimeoutSeconds:    45,
 	}
 }
@@ -693,6 +736,11 @@ func normalizeAISettings(in AISettings) AISettings {
 	}
 
 	settings.DefaultContextMode = normalizeAIContextMode(settings.DefaultContextMode)
+	settings.CustomKeySourceEndpoint = strings.TrimSpace(settings.CustomKeySourceEndpoint)
+	if settings.ProviderPreset != customAIProviderPreset {
+		settings.AllowCustomEndpointKeyReuse = false
+		settings.CustomKeySourceEndpoint = ""
+	}
 	if settings.RequestTimeoutSeconds < 5 || settings.RequestTimeoutSeconds > 180 {
 		settings.RequestTimeoutSeconds = 45
 	}
@@ -719,12 +767,16 @@ func aiSettingsFilePath() (string, error) {
 	return filepath.Join(dir, "ai_settings.json"), nil
 }
 
-func aiInsecureKeyFilePath() (string, error) {
+func aiInsecureKeyFilePathForSettings(settings AISettings) (string, error) {
 	dir, err := aiConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "ai_api_key.txt"), nil
+	preset := strings.ToLower(strings.TrimSpace(settings.ProviderPreset))
+	if preset == "" {
+		preset = defaultAIProviderPreset
+	}
+	return filepath.Join(dir, fmt.Sprintf("ai_api_key_%s.txt", preset)), nil
 }
 
 func ensureAIConfigDir() error {
@@ -780,19 +832,19 @@ func canUseLinuxFallback(settings AISettings) bool {
 	return runtime.GOOS == "linux" && settings.AllowInsecureKeyFallback
 }
 
-func writeAIInsecureKeyFile(value string) error {
+func writeAIInsecureKeyFileForSettings(settings AISettings, value string) error {
 	if err := ensureAIConfigDir(); err != nil {
 		return err
 	}
-	filePath, err := aiInsecureKeyFilePath()
+	filePath, err := aiInsecureKeyFilePathForSettings(settings)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(filePath, []byte(value), 0o600)
 }
 
-func removeAIInsecureKeyFile() error {
-	filePath, err := aiInsecureKeyFilePath()
+func removeAIInsecureKeyFileForSettings(settings AISettings) error {
+	filePath, err := aiInsecureKeyFilePathForSettings(settings)
 	if err != nil {
 		return err
 	}
@@ -803,16 +855,42 @@ func removeAIInsecureKeyFile() error {
 	return nil
 }
 
+func aiAPIKeyUserForSettings(settings AISettings) string {
+	preset := strings.ToLower(strings.TrimSpace(settings.ProviderPreset))
+	if preset == "" {
+		preset = defaultAIProviderPreset
+	}
+	return fmt.Sprintf("byok-openai-compatible-%s", preset)
+}
+
 func loadAIAPIKey(settings AISettings) (string, string, error) {
-	secret, secureErr := keyring.Get(aiServiceName, aiAPIKeyUser)
+	secret, secureErr := keyring.Get(aiServiceName, aiAPIKeyUserForSettings(settings))
+	if secureErr != nil && errors.Is(secureErr, keyring.ErrNotFound) {
+		legacySecret, legacyErr := keyring.Get(aiServiceName, aiLegacyAPIKeyUser)
+		if legacyErr == nil {
+			return strings.TrimSpace(legacySecret), "secure", nil
+		}
+	}
 	if secureErr == nil {
 		return strings.TrimSpace(secret), "secure", nil
 	} else if canUseLinuxFallback(settings) {
-		filePath, pathErr := aiInsecureKeyFilePath()
+		filePath, pathErr := aiInsecureKeyFilePathForSettings(settings)
 		if pathErr != nil {
 			return "", "none", pathErr
 		}
 		fileData, fileErr := os.ReadFile(filePath)
+		if fileErr != nil && errors.Is(fileErr, os.ErrNotExist) {
+			legacyFilePath, legacyPathErr := aiConfigDir()
+			if legacyPathErr == nil {
+				legacyData, legacyFileErr := os.ReadFile(filepath.Join(legacyFilePath, "ai_api_key.txt"))
+				if legacyFileErr == nil {
+					value := strings.TrimSpace(string(legacyData))
+					if value != "" {
+						return value, "insecure-file", nil
+					}
+				}
+			}
+		}
 		if fileErr == nil {
 			value := strings.TrimSpace(string(fileData))
 			if value != "" {
@@ -842,6 +920,37 @@ func resolveAIKeyStatus(settings AISettings) AIKeyStatus {
 	return AIKeyStatus{HasKey: true, StorageMode: mode}
 }
 
+func validateCustomEndpointKeyReuse(settings AISettings) error {
+	if settings.ProviderPreset != customAIProviderPreset {
+		return nil
+	}
+
+	apiKey, _, keyErr := loadAIAPIKey(settings)
+	if keyErr != nil || strings.TrimSpace(apiKey) == "" {
+		return nil
+	}
+
+	source := strings.TrimSpace(settings.CustomKeySourceEndpoint)
+	if source == "" {
+		return nil
+	}
+
+	from, fromErr := normalizedChatEndpointFor(source, true)
+	if fromErr != nil {
+		from = source
+	}
+	to, toErr := normalizedChatEndpointFor(settings.Endpoint, true)
+	if toErr != nil {
+		to = strings.TrimSpace(settings.Endpoint)
+	}
+
+	if !strings.EqualFold(from, to) && !settings.AllowCustomEndpointKeyReuse {
+		return fmt.Errorf("custom endpoint changed from %q to %q. Existing custom API key would be reused. Enable \"Allow key reuse across custom endpoints\" or clear/save a new key first", from, to)
+	}
+
+	return nil
+}
+
 func buildAIUserMessage(prompt string, contextMode string, contextText string) string {
 	return fmt.Sprintf("Prompt:\n%s\n\nWorksheet context mode: %s\nWorksheet context:\n%s\n\nReturn only a JSON object.", prompt, contextMode, contextText)
 }
@@ -854,7 +963,17 @@ func parseAIPromptMode(rawPrompt string) (string, bool) {
 	return trimmed, false
 }
 
+// isCustomPreset returns true when the user has selected the custom provider,
+// which allows local LLM endpoints (e.g. Ollama on http://localhost).
+func isCustomPreset(preset string) bool {
+	return strings.EqualFold(strings.TrimSpace(preset), customAIProviderPreset)
+}
+
 func normalizedChatEndpoint(rawEndpoint string) (string, error) {
+	return normalizedChatEndpointFor(rawEndpoint, false)
+}
+
+func normalizedChatEndpointFor(rawEndpoint string, allowInsecureLocalHTTP bool) (string, error) {
 	trimmed := strings.TrimSpace(rawEndpoint)
 	if trimmed == "" {
 		return "", fmt.Errorf("AI endpoint is empty")
@@ -866,6 +985,34 @@ func normalizedChatEndpoint(rawEndpoint string) (string, error) {
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return "", fmt.Errorf("AI endpoint must be an absolute URL")
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "https" && scheme != "http" {
+		return "", fmt.Errorf("AI endpoint scheme must be http or https")
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "", fmt.Errorf("AI endpoint host is empty")
+	}
+
+	isLocalHost := host == "localhost" || strings.HasSuffix(host, ".localhost")
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			isLocalHost = true
+		}
+	}
+
+	if !allowInsecureLocalHTTP {
+		if scheme != "https" {
+			return "", fmt.Errorf("AI endpoint must use HTTPS")
+		}
+		if isLocalHost {
+			return "", fmt.Errorf("AI endpoint host is not allowed")
+		}
+	} else if scheme == "http" && !isLocalHost {
+		return "", fmt.Errorf("AI endpoint must use HTTPS for non-local hosts")
 	}
 
 	if strings.HasSuffix(parsed.Path, "/chat/completions") {
@@ -902,11 +1049,14 @@ func shouldUseJSONResponseFormat(settings AISettings) bool {
 }
 
 func normalizedSDKBaseURL(rawEndpoint string) (string, error) {
-	chatEndpoint, err := normalizedChatEndpoint(rawEndpoint)
+	return normalizedSDKBaseURLFor(rawEndpoint, false)
+}
+
+func normalizedSDKBaseURLFor(rawEndpoint string, allowInsecureLocalHTTP bool) (string, error) {
+	chatEndpoint, err := normalizedChatEndpointFor(rawEndpoint, allowInsecureLocalHTTP)
 	if err != nil {
 		return "", err
 	}
-
 	parsed, err := url.Parse(chatEndpoint)
 	if err != nil {
 		return "", err
@@ -959,7 +1109,7 @@ func toSDKMessages(messages []openAIMessage) []openai.ChatCompletionMessageParam
 }
 
 func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
-	endpoint, err := normalizedChatEndpoint(settings.Endpoint)
+	endpoint, err := normalizedChatEndpointFor(settings.Endpoint, isCustomPreset(settings.ProviderPreset))
 	if err != nil {
 		return openAIMessage{}, "", err
 	}
@@ -1037,7 +1187,7 @@ func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, p
 }
 
 func callOpenAICompatibleChatMessage(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
-	sdkBaseURL, err := normalizedSDKBaseURL(settings.Endpoint)
+	sdkBaseURL, err := normalizedSDKBaseURLFor(settings.Endpoint, isCustomPreset(settings.ProviderPreset))
 	if err != nil {
 		return openAIMessage{}, "", err
 	}

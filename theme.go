@@ -105,6 +105,57 @@ var allowedColors = map[string]bool{
 // Strict regex for valid colors (hex, rgb, rgba)
 var validColorRegex = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[0-9.]+\s*)?\))$`)
 
+const maxOpenVSXSearchResponseBytes = 2 * 1024 * 1024
+const maxOpenVSXMetadataResponseBytes = 512 * 1024
+const maxThemeVSIXBytes = 25 * 1024 * 1024
+const maxThemeManifestBytes = 2 * 1024 * 1024
+const maxThemeJSONBytes = 8 * 1024 * 1024
+
+var allowedThemeDownloadHosts = map[string]struct{}{
+	"open-vsx.org": {},
+}
+
+func normalizeThemeDownloadURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", fmt.Errorf("invalid theme download URL")
+	}
+	if !strings.EqualFold(parsed.Scheme, "https") {
+		return "", fmt.Errorf("theme download must use HTTPS")
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "", fmt.Errorf("theme download host is empty")
+	}
+	if _, ok := allowedThemeDownloadHosts[host]; !ok {
+		return "", fmt.Errorf("theme download host is not allowed")
+	}
+	return parsed.String(), nil
+}
+
+func readZipFileLimited(file *zip.File, maxBytes uint64, fileLabel string) ([]byte, error) {
+	if file.UncompressedSize64 > maxBytes {
+		return nil, fmt.Errorf("%s is too large in archive", fileLabel)
+	}
+
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	limited := io.LimitReader(rc, int64(maxBytes)+1)
+	content, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if uint64(len(content)) > maxBytes {
+		return nil, fmt.Errorf("%s is too large in archive", fileLabel)
+	}
+
+	return content, nil
+}
+
 func isThemeByMetadata(data openVSXLatestResponse) bool {
 	for _, category := range data.Categories {
 		if strings.EqualFold(strings.TrimSpace(category), "Themes") {
@@ -139,8 +190,9 @@ func fetchLatestMetadata(ctx context.Context, client *http.Client, namespace str
 		return openVSXLatestResponse{}, fmt.Errorf("metadata status: %d", resp.StatusCode)
 	}
 
+	limitedBody := io.LimitReader(resp.Body, maxOpenVSXMetadataResponseBytes)
 	var data openVSXLatestResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&data); err != nil {
 		return openVSXLatestResponse{}, err
 	}
 
@@ -238,8 +290,9 @@ func (a *App) SearchThemes(query string) ([]OpenVSXExtension, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	
+	limitedBody := io.LimitReader(resp.Body, maxOpenVSXSearchResponseBytes)
 	var data OpenVSXSearchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&data); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %v", err)
 	}
 	
@@ -384,8 +437,13 @@ func normalizeScopes(raw interface{}) []string {
 
 // InstallTheme downloads the VSIX, unzips in memory, and parses styles
 func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme, error) {
+	safeURL, err := normalizeThemeDownloadURL(downloadURL)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(downloadURL)
+	resp, err := client.Get(safeURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download VSIX: %v", err)
 	}
@@ -394,10 +452,17 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to download VSIX, status: %d", resp.StatusCode)
 	}
+
+	if resp.ContentLength > maxThemeVSIXBytes {
+		return nil, fmt.Errorf("theme package is too large")
+	}
 	
-	buf, err := io.ReadAll(resp.Body)
+	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxThemeVSIXBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read VSIX stream: %v", err)
+	}
+	if len(buf) > maxThemeVSIXBytes {
+		return nil, fmt.Errorf("theme package is too large")
 	}
 	
 	zipReader, err := zip.NewReader(bytes.NewReader(buf), int64(len(buf)))
@@ -411,12 +476,10 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 		// Stop ZipSlip by cleaning path
 		cleanPath := filepath.ToSlash(filepath.Clean(file.Name))
 		if cleanPath == "extension/package.json" {
-			rc, err := file.Open()
+			packageJSON, err = readZipFileLimited(file, maxThemeManifestBytes, "package.json")
 			if err != nil {
 				return nil, err
 			}
-			packageJSON, err = io.ReadAll(rc)
-			rc.Close()
 			break
 		}
 	}
@@ -444,12 +507,10 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 	var themeJSON []byte
 	for _, file := range zipReader.File {
 		if filepath.ToSlash(filepath.Clean(file.Name)) == targetFile {
-			rc, err := file.Open()
+			themeJSON, err = readZipFileLimited(file, maxThemeJSONBytes, cleanThemePath)
 			if err != nil {
 				return nil, err
 			}
-			themeJSON, err = io.ReadAll(rc)
-			rc.Close()
 			break
 		}
 	}

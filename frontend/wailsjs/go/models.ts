@@ -76,6 +76,8 @@ export namespace main {
 	    modelId: string;
 	    defaultContextMode: string;
 	    allowInsecureKeyFallback: boolean;
+	    allowCustomEndpointKeyReuse: boolean;
+	    customKeySourceEndpoint?: string;
 	    requestTimeoutSeconds: number;
 	
 	    static createFrom(source: any = {}) {
@@ -89,6 +91,8 @@ export namespace main {
 	        this.modelId = source["modelId"];
 	        this.defaultContextMode = source["defaultContextMode"];
 	        this.allowInsecureKeyFallback = source["allowInsecureKeyFallback"];
+	        this.allowCustomEndpointKeyReuse = source["allowCustomEndpointKeyReuse"];
+	        this.customKeySourceEndpoint = source["customKeySourceEndpoint"];
 	        this.requestTimeoutSeconds = source["requestTimeoutSeconds"];
 	    }
 	}

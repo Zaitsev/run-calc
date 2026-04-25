@@ -35,7 +35,7 @@ import {
 } from './appInteractionLogic';
 import {useTheme, type ThemeState} from './useTheme';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
-import { ClearAIAPIKey, EvaluateExprProgram, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
+import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
@@ -183,6 +183,8 @@ function defaultAISettingsState(): AISettingsState {
         modelId: 'gpt-4o-mini',
         defaultContextMode: 'above',
         allowInsecureKeyFallback: false,
+        allowCustomEndpointKeyReuse: false,
+        customKeySourceEndpoint: '',
         requestTimeoutSeconds: 45,
     };
 }
@@ -200,6 +202,7 @@ function areAISettingsEqual(left: AISettingsState, right: AISettingsState): bool
         left.modelId === right.modelId &&
         left.defaultContextMode === right.defaultContextMode &&
         left.allowInsecureKeyFallback === right.allowInsecureKeyFallback &&
+    left.allowCustomEndpointKeyReuse === right.allowCustomEndpointKeyReuse &&
         left.requestTimeoutSeconds === right.requestTimeoutSeconds;
 }
 
@@ -899,6 +902,25 @@ function App() {
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    useEffect(() => {
+        let cancelled = false;
+        const refreshDraftKeyStatus = async () => {
+            try {
+                const status = await GetAIKeyStatusForSettings(aiSettingsDraft as any) as AIKeyStatusState;
+                if (!cancelled) {
+                    setAIKeyStatus(status || defaultAIKeyStatusState());
+                }
+            } catch {
+                // Keep currently shown status when draft status lookup fails.
+            }
+        };
+
+        void refreshDraftKeyStatus();
+        return () => {
+            cancelled = true;
+        };
+    }, [aiSettingsDraft.providerPreset, aiSettingsDraft.allowInsecureKeyFallback]);
+
     const aiSettingsHasUnsavedChanges = !areAISettingsEqual(aiSettingsDraft, aiSettings);
 
     const revertAISettingsDraftToSaved = () => {
@@ -983,9 +1005,21 @@ function App() {
     const saveAIKeyToBackend = async (apiKey: string) => {
         setAISettingsBusy(true);
         try {
-            const keyStatus = await SetAIAPIKey(apiKey) as AIKeyStatusState;
+            const keyStatus = await SetAIAPIKey(apiKey, aiSettingsDraft as any) as AIKeyStatusState;
             setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
             if (keyStatus?.hasKey) {
+                setAISettings((current) => {
+                    if (current.providerPreset !== 'custom') {
+                        return current;
+                    }
+                    return { ...current, customKeySourceEndpoint: current.endpoint };
+                });
+                setAISettingsDraft((current) => {
+                    if (current.providerPreset !== 'custom') {
+                        return current;
+                    }
+                    return { ...current, customKeySourceEndpoint: current.endpoint };
+                });
                 setStatusText(`API key saved (${keyStatus.storageMode})`);
                 setIsStatusError(false);
                 setDevError('');
@@ -1007,8 +1041,10 @@ function App() {
     const clearAIKeyInBackend = async () => {
         setAISettingsBusy(true);
         try {
-            const keyStatus = await ClearAIAPIKey() as AIKeyStatusState;
+            const keyStatus = await ClearAIAPIKey(aiSettingsDraft as any) as AIKeyStatusState;
             setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
+            setAISettings((current) => ({ ...current, customKeySourceEndpoint: '' }));
+            setAISettingsDraft((current) => ({ ...current, customKeySourceEndpoint: '' }));
             setStatusText('API key cleared');
             setIsStatusError(false);
             setDevError('');

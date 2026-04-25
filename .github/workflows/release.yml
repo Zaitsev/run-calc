@@ -25,11 +25,15 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   APP_NAME: Run-Calc
-  GO_VERSION: '1.23.0'
+  GO_VERSION: '1.26.2'
   NODE_VERSION: '20'
   WAILS_VERSION: 'v2.12.0'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   prepare:
@@ -58,18 +62,18 @@ jobs:
 
       - name: Check out repository
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
 
       - name: Set up Node.js
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -118,19 +122,22 @@ jobs:
         include: ${{ fromJSON(inputs.build_target == 'windows' && '[{"os":"windows-latest","label":"Windows","artifact_name":"release-windows"}]' || inputs.build_target == 'macos' && '[{"os":"macos-latest","label":"macOS","artifact_name":"release-macos"}]' || '[{"os":"windows-latest","label":"Windows","artifact_name":"release-windows"},{"os":"macos-latest","label":"macOS","artifact_name":"release-macos"}]') }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
+          # Disable built-in cache on Windows: Git tar.exe fails on paths with spaces (C:\Program Files)
+          cache: ${{ runner.os != 'Windows' }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          # Disable built-in cache on Windows: Git tar.exe fails on paths with spaces (C:\Program Files)
+          cache: ${{ runner.os != 'Windows' && 'npm' || '' }}
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Linux build dependencies
@@ -145,10 +152,44 @@ jobs:
             patchelf \
             xvfb
 
-      - name: Install NSIS
+      - name: Ensure NSIS is available
         if: runner.os == 'Windows'
         shell: pwsh
-        run: choco install nsis --yes --no-progress
+        run: |
+          # Search known locations first (pre-installed on windows-latest)
+          $searchPaths = @(
+            "C:\Program Files (x86)\NSIS",
+            "C:\Program Files\NSIS",
+            "C:\ProgramData\chocolatey\bin"
+          )
+          $makensis = $searchPaths |
+            ForEach-Object { Join-Path $_ "makensis.exe" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
+          if (-not $makensis) {
+            Write-Host "NSIS not pre-installed; installing via Chocolatey..."
+            choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) {
+              throw "Chocolatey failed to install NSIS (exit code $LASTEXITCODE)."
+            }
+            # Re-search after install
+            $makensis = $searchPaths |
+              ForEach-Object { Join-Path $_ "makensis.exe" } |
+              Where-Object { Test-Path $_ } |
+              Select-Object -First 1
+          }
+
+          if (-not $makensis) {
+            throw "makensis.exe not found in any known location after install attempt."
+          }
+
+          $nsisDir = Split-Path $makensis
+          Write-Host "Using NSIS from: $nsisDir"
+          # Export to PATH for subsequent steps (GITHUB_PATH is the proper mechanism)
+          "$nsisDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Also export as env var so the build step can reference it directly if needed
+          "MAKENSIS=$makensis" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Add Go bin to PATH
         if: runner.os != 'Windows'
@@ -206,17 +247,40 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Compress-Archive -Path "build/bin/${env:APP_NAME}.exe" -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows.zip" -Force
-          $installer = Get-ChildItem "build/bin" -Filter "*-installer.exe" | Select-Object -First 1
-          if ($null -ne $installer) {
-            Copy-Item $installer.FullName "release/$($installer.Name)"
+          if (-not (Test-Path "build/bin/${env:APP_NAME}.exe")) {
+            throw "Standalone executable was not generated at build/bin/${env:APP_NAME}.exe."
           }
+          Compress-Archive -Path "build/bin/${env:APP_NAME}.exe" `
+            -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows-standalone.zip" -Force
+          $installer = Get-ChildItem "build/bin" -Filter "*-installer.exe" | Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "Windows installer was not generated. Expected a *-installer.exe file in build/bin."
+          }
+          Compress-Archive -Path $installer.FullName `
+            -DestinationPath "release/${env:APP_NAME}-${env:VERSION}-windows-installer.zip" -Force
 
-      - name: Upload packaged artifacts
+      - name: Upload packaged artifacts (non-Windows)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: release/*
+          if-no-files-found: error
+
+      - name: Upload Windows standalone artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-standalone
+          path: release/*-windows-standalone.zip
+          if-no-files-found: error
+
+      - name: Upload Windows installer artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-installer
+          path: release/*-windows-installer.zip
           if-no-files-found: error
 
   release:
