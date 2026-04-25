@@ -22,6 +22,10 @@ html {
     --stepper-track: rgba(0, 0, 0, 0.03);
     --editorGutter-background: rgba(233, 238, 246, 0.8);
     --editorGroup-border: rgba(30, 41, 59, 0.09);
+    --scrollbar-track: rgba(30, 41, 59, 0.06);
+    --scrollbar-thumb: rgba(71, 85, 105, 0.35);
+    --scrollbar-thumb-hover: rgba(51, 65, 85, 0.48);
+    --scrollbar-thumb-active: rgba(37, 99, 235, 0.6);
     --editorLineNumber-activeForeground: #2563eb;
     --editorError-foreground: #b4233d;
     --problemsErrorIcon-foreground: #c0213c;
@@ -51,6 +55,12 @@ html {
     --gutter-var-bg: rgba(5, 150, 105, 0.12);
     --gutter-stale-color: #92400e;
     --gutter-stale-bg: rgba(217, 119, 6, 0.14);
+    --gutter-ai-color: #0f766e;
+    --gutter-ai-bg: rgba(13, 148, 136, 0.14);
+    --ai-line-color: #0f172a;
+    --ai-line-bg: rgba(13, 148, 136, 0.14);
+    --ai-progress-bg: color-mix(in srgb, var(--editor-background) 96%, white 4%);
+    --ai-progress-border: color-mix(in srgb, var(--gutter-ai-color) 38%, transparent);
     --button-primary-foreground: #ffffff;
     --overlay-scrim: rgba(15, 23, 42, 0.45);
     --panel-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
@@ -86,6 +96,10 @@ html[data-theme="dark"] {
     --stepper-track: rgba(255, 255, 255, 0.04);
     --editorGutter-background: rgba(8, 14, 26, 0.7);
     --editorGroup-border: rgba(255, 255, 255, 0.06);
+    --scrollbar-track: rgba(148, 163, 184, 0.12);
+    --scrollbar-thumb: rgba(148, 163, 184, 0.34);
+    --scrollbar-thumb-hover: rgba(148, 163, 184, 0.5);
+    --scrollbar-thumb-active: rgba(96, 165, 250, 0.7);
     --editorLineNumber-activeForeground: #60a5fa;
     --editorError-foreground: #fda4af;
     --problemsErrorIcon-foreground: #fb7185;
@@ -115,6 +129,12 @@ html[data-theme="dark"] {
     --gutter-var-bg: rgba(52, 211, 153, 0.15);
     --gutter-stale-color: #fbbf24;
     --gutter-stale-bg: rgba(251, 191, 36, 0.16);
+    --gutter-ai-color: #2dd4bf;
+    --gutter-ai-bg: rgba(45, 212, 191, 0.18);
+    --ai-line-color: #d2f8f2;
+    --ai-line-bg: rgba(45, 212, 191, 0.14);
+    --ai-progress-bg: color-mix(in srgb, var(--editor-background) 94%, black 6%);
+    --ai-progress-border: color-mix(in srgb, var(--gutter-ai-color) 42%, transparent);
     --button-primary-foreground: #08111f;
     --overlay-scrim: rgba(0, 0, 0, 0.55);
     --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);

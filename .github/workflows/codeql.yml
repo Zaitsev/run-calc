@@ -1,0 +1,110 @@
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+  schedule:
+    - cron: '20 5 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: go
+            build-mode: manual
+          - language: python
+            build-mode: none
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.2'
+          cache-dependency-path: go.sum
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended,security-and-quality
+
+      - name: Set up Node.js
+        if: matrix.language == 'go'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Node.js for npm audit
+        if: matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Run npm audit (high severity)
+        if: matrix.language == 'javascript-typescript'
+        working-directory: frontend
+        run: |
+          npm install --no-fund
+          npm audit --audit-level=high
+
+      - name: Install Linux build dependencies
+        if: matrix.language == 'go'
+        run: |
+          sudo apt-get update
+          WEBKIT_PACKAGE="libwebkit2gtk-4.1-dev"
+          if ! apt-cache show "$WEBKIT_PACKAGE" >/dev/null 2>&1; then
+            WEBKIT_PACKAGE="libwebkit2gtk-4.0-dev"
+          fi
+
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            "$WEBKIT_PACKAGE" \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xvfb
+
+      - name: Build frontend assets for Go analysis
+        if: matrix.language == 'go'
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Build Go project for CodeQL
+        if: matrix.language == 'go'
+        run: xvfb-run -a go build ./...
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:${{ matrix.language }}'

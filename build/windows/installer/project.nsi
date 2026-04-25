@@ -32,6 +32,8 @@ Unicode true
 ####
 ## Include the wails tools
 ####
+!define REQUEST_EXECUTION_LEVEL "user"
+
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
@@ -72,11 +74,15 @@ ManifestDPIAware true
 
 Name "${INFO_PRODUCTNAME}"
 OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
-InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}" # Default installing folder ($PROGRAMFILES is Program Files folder).
+InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}" # Per-user install folder so the installer does not require elevation.
 ShowInstDetails show # This will always show the installation details.
 
 Function .onInit
-   !insertmacro wails.checkArchitecture
+    !insertmacro wails.checkArchitecture
+    InitPluginsDir
+    File /oname=$PLUGINSDIR\splash.bmp "resources\splash.bmp"
+    Splash::show 2200 $PLUGINSDIR\splash.bmp
+    Pop $0
 FunctionEnd
 
 Section
@@ -94,7 +100,19 @@ Section
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
-    !insertmacro wails.writeUninstaller
+    WriteUninstaller "$INSTDIR\uninstall.exe"
+
+    SetRegView 64
+    WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "${INFO_COMPANYNAME}"
+    WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${INFO_PRODUCTNAME}"
+    WriteRegStr HKCU "${UNINST_KEY}" "DisplayVersion" "${INFO_PRODUCTVERSION}"
+    WriteRegStr HKCU "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    WriteRegStr HKCU "${UNINST_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
+    WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
+
+    ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
+    IntFmt $0 "0x%08X" $0
+    WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" "$0"
 SectionEnd
 
 Section "uninstall"
@@ -110,5 +128,8 @@ Section "uninstall"
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols
 
-    !insertmacro wails.deleteUninstaller
+    Delete "$INSTDIR\uninstall.exe"
+
+    SetRegView 64
+    DeleteRegKey HKCU "${UNINST_KEY}"
 SectionEnd

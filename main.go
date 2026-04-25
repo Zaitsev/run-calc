@@ -49,6 +49,10 @@ func applicationMenu(app *App) *menu.Menu {
 	})
 
 	helpMenu := appMenu.AddSubmenu("Help")
+	helpMenu.AddText("Calculator Help", nil, func(_ *menu.CallbackData) {
+		app.openHelp()
+	})
+	helpMenu.AddSeparator()
 	helpMenu.AddText("About Run-Calc", nil, func(_ *menu.CallbackData) {
 		app.showAbout()
 	})

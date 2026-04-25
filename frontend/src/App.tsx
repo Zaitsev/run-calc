@@ -1,4 +1,4 @@
-import {KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {type CSSProperties, KeyboardEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
     BrowserOpenURL,
     Environment,
@@ -18,20 +18,54 @@ import {
 } from '../wailsjs/runtime/runtime';
 import './App.css';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
-import {extractExpressionDependencies, getExpressionSource, splitLineComment} from './lineExpression';
+import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
+import { AISettingsPanel, type AIContextMode, type AIKeyStatusState, type AISettingsState } from './AISettings';
+import { AIDebugDrawer, type AIDebugEntry } from './AIDebugDrawer';
+import { HelpPanel } from './HelpPanel';
+import {extractExpressionDependencies, getAITriggerPrompt, getExpressionSource, isAITriggerLine, splitLineComment} from './lineExpression';
+import {
+    buildEvaluationExpression,
+    buildStaleLineDetails,
+    getPreservedCaretOffset,
+    getFriendlyEvalErrorMessage,
+    isAITriggerSourceLine,
+    stripMarkdownCodeFences,
+    shouldSkipEvaluationAtCaret,
+    shouldSkipEvaluation,
+} from './appInteractionLogic';
 import {useTheme, type ThemeState} from './useTheme';
-import { getPrimaryShortcutAction } from './editorShortcuts';
-import { EvaluateExprProgram, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
+import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
+import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
 const OPERATOR_KEY_RE = /^[+\-*/]$/;
 const MATH_FUNCTION_NAMES = new Set([
-    'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ATAN', 'ATAN2', 'ATANH',
-    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'EACH', 'EXP', 'FILTER', 'FLOOR',
-    'HYPOT', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MIN', 'POW',
-    'ROUND', 'SIGN', 'SIN', 'SINH', 'SQRT', 'TAN', 'TANH', 'TRUNC',
+    'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ALL', 'ANY', 'ATAN', 'ATAN2', 'ATANH',
+    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'COUNT', 'EACH', 'EXP', 'FILTER', 'FIND', 'FIRST', 'FLATTEN', 'FLOOR',
+    'HYPOT', 'LEN', 'LAST', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEAN', 'MEDIAN', 'MIN', 'NONE', 'ONE', 'POW',
+    'REDUCE', 'REVERSE', 'ROUND', 'SIGN', 'SIN', 'SINH', 'SORT', 'SQRT', 'SUM', 'TAN', 'TANH', 'TAKE', 'TRUNC', 'UNIQ',
 ]);
+
+function usePrefersDark(): boolean {
+    const [prefersDark, setPrefersDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (event: MediaQueryListEvent) => {
+            setPrefersDark(event.matches);
+        };
+
+        setPrefersDark(mediaQuery.matches);
+        mediaQuery.addEventListener('change', handleChange);
+
+        return () => {
+            mediaQuery.removeEventListener('change', handleChange);
+        };
+    }, []);
+
+    return prefersDark;
+}
 const MATH_CONSTANT_NAMES = new Set([
     'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
 ]);
@@ -46,6 +80,7 @@ const FONT_SCALE_STEP = 0.1;
 const FONT_SCALE_MIN = 0.7;
 const FONT_SCALE_MAX = 2.2;
 const DEFAULT_FONT_SCALE = 1;
+const EDITOR_SIDE_PADDING_PX = 20;
 const MARKED_LINES_STORAGE_KEY = 'calc.editor.markedLines';
 const DECIMAL_DELIMITER_STORAGE_KEY = 'calc.editor.decimalDelimiter';
 const PRECISION_STORAGE_KEY = 'calc.editor.precision';
@@ -55,12 +90,20 @@ const WORKSHEET_CONTENT_STORAGE_KEY = 'calc.editor.content';
 const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
 const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
 const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
+const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
 const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
+const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
 const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;
 const INTELLIGENCE_HINT_SHOW_DELAY_MS = 300;
 const INTELLIGENCE_HINT_HIDE_IDLE_MS = 3000;
 const EDITOR_TOP_PADDING_PX = 42;
+const EDITOR_BOTTOM_PADDING_PX = 18;
+const DEFAULT_SETTINGS_DRAWER_WIDTH = 420;
+const SETTINGS_DRAWER_MIN_WIDTH = 360;
+const SETTINGS_DRAWER_MAX_WIDTH = 1520;
+const SETTINGS_DRAWER_MIN_EDITOR_WIDTH = 380;
+const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
 
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
@@ -70,7 +113,7 @@ type DecimalDelimiter = '.' | ',';
 
 type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
 type PrecisionMode = 'auto' | 'full' | number;
-type HelpPage = 'operations' | 'shortcuts' | 'new';
+type HelpPanelPosition = 'left' | 'right' | 'bottom';
 type SuggestionKind = 'variable' | 'function' | 'constant';
 
 type SuggestionItem = {
@@ -95,6 +138,73 @@ type StoredWindowState = {
     x: number;
     y: number;
 };
+
+type AIModelOutput = {
+    answer?: string;
+    answerNumber?: number;
+    comment?: string;
+    code?: string;
+};
+
+type AIRunResponse = {
+    ok: boolean;
+    error?: string;
+    output: AIModelOutput;
+    preview: {
+        systemPrompt: string;
+        userPrompt: string;
+        contextMode: string;
+        contextLineCount: number;
+        endpoint?: string;
+        modelId?: string;
+        rawContextText?: string;
+        rawLinesAbove?: string[];
+        rawFullContent?: string;
+        rawInitialPayload?: string;
+        rawExchangeLog?: string;
+        rawFinalMessage?: string;
+        rawFinalContent?: string;
+    };
+};
+
+type AISettingsResponse = {
+    settings: AISettingsState;
+    keyStatus: AIKeyStatusState;
+};
+
+type AIProgressEvent = {
+    message?: string;
+};
+
+function defaultAISettingsState(): AISettingsState {
+    return {
+        providerPreset: 'openai',
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        modelId: 'gpt-4o-mini',
+        defaultContextMode: 'above',
+        allowInsecureKeyFallback: false,
+        allowCustomEndpointKeyReuse: false,
+        customKeySourceEndpoint: '',
+        requestTimeoutSeconds: 45,
+    };
+}
+
+function defaultAIKeyStatusState(): AIKeyStatusState {
+    return {
+        hasKey: false,
+        storageMode: 'none',
+    };
+}
+
+function areAISettingsEqual(left: AISettingsState, right: AISettingsState): boolean {
+    return left.providerPreset === right.providerPreset &&
+        left.endpoint === right.endpoint &&
+        left.modelId === right.modelId &&
+        left.defaultContextMode === right.defaultContextMode &&
+        left.allowInsecureKeyFallback === right.allowInsecureKeyFallback &&
+    left.allowCustomEndpointKeyReuse === right.allowCustomEndpointKeyReuse &&
+        left.requestTimeoutSeconds === right.requestTimeoutSeconds;
+}
 
 function getSystemDecimalDelimiter(): '.' | ',' {
     const parts = new Intl.NumberFormat().formatToParts(1.1);
@@ -190,60 +300,6 @@ function parseRgbColor(rgbColor: string): [number, number, number] | null {
     return [r, g, b];
 }
 
-function getFriendlyEvalErrorMessage(message: string): string {
-    const normalized = message.toLowerCase();
-
-    if (normalized.includes('expression is empty')) {
-        return 'There is nothing to calculate on this line yet. Type an expression and press Enter.';
-    }
-
-    if (normalized.includes('result contains nan or inf')) {
-        return 'This line produced an invalid number. Try values in a valid range (for example: ASIN needs -1..1, LOG needs a number above 0), then press Enter again.';
-    }
-
-    if (normalized.includes('filter predicate must return true or false')) {
-        return 'FILTER needs a yes/no test for each item. Example: filter(# > 10). Then press Enter again.';
-    }
-
-    if (normalized.includes('function values are not supported')) {
-        return 'Use function calls with parentheses, like SIN(item) or SQRT(9), then press Enter again.';
-    }
-
-    if (normalized.includes('cannot reassign internal name')) {
-        return 'Internal names are read-only. Use a different variable name and press Enter again.';
-    }
-
-    if (normalized.includes('unsupported pipeline stage') || normalized.includes('invalid pipeline stage')) {
-        return 'A pipeline step after | is not valid. Use filter(...), map(...), each(...), or a function like sum, avg, min, max, median.';
-    }
-
-    if (normalized.includes('expected a list')) {
-        return 'This step needs a list of values. Example: a = [1,2,3] then a | map(# * 2).';
-    }
-
-    if (normalized.includes('expected numeric values') || normalized.includes('expects a numeric value')) {
-        return 'This operation needs numbers only. Check for text, empty values, or missing variables.';
-    }
-
-    if (normalized.includes('requires at least one value')) {
-        return 'This operation needs at least one value in the list.';
-    }
-
-    if (normalized.includes('unexpected token') || normalized.includes('unexpected character') || normalized.includes('mismatched input') || normalized.includes('syntax')) {
-        return 'There is a typing mistake in this expression. Check brackets, commas, and operators, then press Enter again.';
-    }
-
-    if (normalized.includes('unknown name') || normalized.includes('unknown variable') || normalized.includes('undefined')) {
-        return 'A name in this line is not recognized. Define it first (example: price = 20), then try again.';
-    }
-
-    if (normalized.includes('divide by zero') || normalized.includes('division by zero')) {
-        return 'Division by zero is not allowed. Change the denominator and press Enter again.';
-    }
-
-    return 'Cannot evaluate this line yet. Fix it and press Enter again.';
-}
-
 function inferCustomThemeMode(customColors?: Record<string, string>): 'light' | 'dark' {
     const bg = customColors?.['editor.background'] || customColors?.['sideBar.background'];
     if (!bg) {
@@ -298,14 +354,29 @@ function App() {
         return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, parsed));
     });
     const [showSettings, setShowSettings] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
+    const [helpPanelPosition, setHelpPanelPosition] = useState<HelpPanelPosition>(() => {
+        const raw = localStorage.getItem(HELP_PANEL_POSITION_STORAGE_KEY);
+        if (raw === 'left' || raw === 'right' || raw === 'bottom') {
+            return raw;
+        }
+        return 'right';
+    });
     const [showThemeStore, setShowThemeStore] = useState(false);
+    const [settingsDrawerWidth, setSettingsDrawerWidth] = useState(() => {
+        const raw = localStorage.getItem(SETTINGS_DRAWER_WIDTH_STORAGE_KEY);
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+            return DEFAULT_SETTINGS_DRAWER_WIDTH;
+        }
+        return Math.round(Math.min(SETTINGS_DRAWER_MAX_WIDTH, Math.max(SETTINGS_DRAWER_MIN_WIDTH, parsed)));
+    });
     const [minimiseToTrayOnClose, setMinimiseToTrayOnClose] = useState(() => {
         return localStorage.getItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY) !== 'false';
     });
     const [restoreShortcutEnabled, setRestoreShortcutEnabled] = useState(() => {
         return localStorage.getItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY) !== 'false';
     });
-    const [activeHelpPage, setActiveHelpPage] = useState<HelpPage>('operations');
     const [decimalDelimiterMode, setDecimalDelimiterMode] = useState<DecimalDelimiterMode>(() => {
         const raw = localStorage.getItem(DECIMAL_DELIMITER_STORAGE_KEY);
         if (raw === 'dot' || raw === 'comma' || raw === 'system') {
@@ -328,6 +399,20 @@ function App() {
     const [wordWrap, setWordWrap] = useState(() => {
         return localStorage.getItem(WORD_WRAP_STORAGE_KEY) === 'true';
     });
+    const [aiContextMode, setAIContextMode] = useState<AIContextMode>('above');
+    const [aiSettings, setAISettings] = useState<AISettingsState>(() => defaultAISettingsState());
+    const [aiSettingsDraft, setAISettingsDraft] = useState<AISettingsState>(() => defaultAISettingsState());
+    const [aiSettingsActionFailed, setAISettingsActionFailed] = useState(false);
+    const [aiSettingsApplyError, setAISettingsApplyError] = useState('');
+    const [aiKeyStatus, setAIKeyStatus] = useState<AIKeyStatusState>(() => defaultAIKeyStatusState());
+    const [aiSettingsBusy, setAISettingsBusy] = useState(false);
+    const [aiDebugLog, setAIDebugLog] = useState<AIDebugEntry[]>([]);
+    const [isAIQueryPending, setIsAIQueryPending] = useState(false);
+    const [aiPendingLineIndex, setAIPendingLineIndex] = useState<number | null>(null);
+    const [aiProgressMessage, setAIProgressMessage] = useState('');
+    const aiDebugIdRef = useRef(0);
+    const [showAIDebug, setShowAIDebug] = useState(false);
+    const [isResizingSettingsDrawer, setIsResizingSettingsDrawer] = useState(false);
     const [variableValues, setVariableValues] = useState<Record<string, unknown>>(() => {
         const raw = localStorage.getItem(VARIABLE_VALUES_STORAGE_KEY);
         if (!raw) return {};
@@ -346,6 +431,12 @@ function App() {
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
+    const prefersDark = usePrefersDark();
+    const isDarkTheme =
+        theme.type === 'dark' ||
+        (theme.type === 'custom' && (theme.customThemeBase ?? inferCustomThemeMode(theme.customColors)) === 'dark') ||
+        (theme.type === 'system' && prefersDark);
+    const isContentEmpty = content.trim() === '';
     const previewRestoreThemeRef = useRef<ThemeState | null>(null);
     const [savedThemes, setSavedThemes] = useState<SavedThemeEntry[]>(() => {
         const raw = localStorage.getItem(ACCEPTED_THEMES_STORAGE_KEY);
@@ -377,6 +468,8 @@ function App() {
         }
     });
     const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const settingsDrawerOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const settingsDrawerResizeStartRef = useRef<{ x: number; width: number } | null>(null);
     const burgerMenuRef = useRef<HTMLDivElement | null>(null);
     const precisionMenuRef = useRef<HTMLDivElement | null>(null);
     const editorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -399,6 +492,7 @@ function App() {
     const [lineHeightPx, setLineHeightPx] = useState(22);
     const [lineRowHeights, setLineRowHeights] = useState<number[]>([]);
     const [editorFontSpec, setEditorFontSpec] = useState('16px Nunito, Segoe UI, Tahoma, sans-serif');
+    const [editorScrollbarWidth, setEditorScrollbarWidth] = useState(0);
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [caretPos, setCaretPos] = useState(0);
@@ -406,6 +500,7 @@ function App() {
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
     const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
+    const [showClearWorksheetConfirm, setShowClearWorksheetConfirm] = useState(false);
     const [isReevaluatingAll, setIsReevaluatingAll] = useState(false);
     const intelligenceShowTimerRef = useRef<number | null>(null);
     const intelligenceHideTimerRef = useRef<number | null>(null);
@@ -490,6 +585,10 @@ function App() {
     }, [savedThemes]);
 
     useEffect(() => {
+        localStorage.setItem(SETTINGS_DRAWER_WIDTH_STORAGE_KEY, String(settingsDrawerWidth));
+    }, [settingsDrawerWidth]);
+
+    useEffect(() => {
         localStorage.setItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY, String(minimiseToTrayOnClose));
         SetMinimiseToTrayOnClose(minimiseToTrayOnClose).catch(() => {
             // Keep settings responsive even if backend sync fails.
@@ -502,6 +601,10 @@ function App() {
             // Keep settings responsive even if backend sync fails.
         });
     }, [restoreShortcutEnabled]);
+
+    useEffect(() => {
+        localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
+    }, [helpPanelPosition]);
 
     useEffect(() => {
         let cancelled = false;
@@ -521,6 +624,63 @@ function App() {
             cancelled = true;
         };
     }, []);
+
+    const getSettingsDrawerMaxWidth = () => {
+        const viewportWidth = Math.max(window.innerWidth, SETTINGS_DRAWER_MIN_WIDTH + SETTINGS_DRAWER_MIN_EDITOR_WIDTH);
+        return Math.max(
+            SETTINGS_DRAWER_MIN_WIDTH,
+            Math.min(SETTINGS_DRAWER_MAX_WIDTH, viewportWidth - SETTINGS_DRAWER_MIN_EDITOR_WIDTH),
+        );
+    };
+
+    const clampSettingsDrawerWidth = (width: number) => {
+        const clampedMax = getSettingsDrawerMaxWidth();
+        return Math.round(Math.min(clampedMax, Math.max(SETTINGS_DRAWER_MIN_WIDTH, width)));
+    };
+
+    useEffect(() => {
+        const onWindowResize = () => {
+            setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current));
+        };
+
+        window.addEventListener('resize', onWindowResize);
+        return () => {
+            window.removeEventListener('resize', onWindowResize);
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!isResizingSettingsDrawer) {
+            return;
+        }
+
+        const onMouseMove = (event: MouseEvent) => {
+            const start = settingsDrawerResizeStartRef.current;
+            if (!start) {
+                return;
+            }
+
+            const delta = start.x - event.clientX;
+            setSettingsDrawerWidth(clampSettingsDrawerWidth(start.width + delta));
+        };
+
+        const stopResize = () => {
+            settingsDrawerResizeStartRef.current = null;
+            setIsResizingSettingsDrawer(false);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', stopResize);
+        window.addEventListener('blur', stopResize);
+        document.body.classList.add('is-resizing-settings-drawer');
+
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', stopResize);
+            window.removeEventListener('blur', stopResize);
+            document.body.classList.remove('is-resizing-settings-drawer');
+        };
+    }, [isResizingSettingsDrawer]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (runtimePlatform !== 'windows') {
@@ -580,6 +740,24 @@ function App() {
     }, [showBurgerMenu]);
 
     useEffect(() => {
+        if (!showClearWorksheetConfirm) {
+            return;
+        }
+
+        const onDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setShowClearWorksheetConfirm(false);
+            }
+        };
+
+        document.addEventListener('keydown', onDocumentKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onDocumentKeyDown);
+        };
+    }, [showClearWorksheetConfirm]);
+
+    useEffect(() => {
         if (!showPrecisionMenu) {
             return;
         }
@@ -616,16 +794,50 @@ function App() {
         setEditorFontSpec(`${cs.fontSize} ${cs.fontFamily}`);
     }, [fontScale]);
 
+    const syncEditorScrollbarWidth = () => {
+        const editor = editorRef.current;
+        if (!editor) {
+            return;
+        }
+
+        const nextWidth = Math.max(0, editor.offsetWidth - editor.clientWidth);
+        setEditorScrollbarWidth((prev) => (Math.abs(prev - nextWidth) < 0.5 ? prev : nextWidth));
+    };
+
+    useLayoutEffect(() => {
+        syncEditorScrollbarWidth();
+    }, [content, wordWrap, fontScale]);
+
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) {
+            return;
+        }
+
+        const ro = new ResizeObserver(() => {
+            syncEditorScrollbarWidth();
+        });
+        ro.observe(editor);
+        return () => ro.disconnect();
+    }, []);
+
     const measureLineRowHeights = () => {
         const container = overlayRef.current;
         if (!container) return;
         const children = container.children;
         const heights: number[] = [];
         for (let i = 0; i < children.length; i++) {
-            heights.push((children[i] as HTMLElement).offsetHeight);
+            const row = children[i] as HTMLElement;
+            const measured = row.getBoundingClientRect().height;
+            heights.push(measured > 0 ? measured : row.offsetHeight);
         }
         setLineRowHeights((prev) => {
-            if (prev.length === heights.length && prev.every((h, idx) => h === heights[idx])) return prev;
+            if (
+                prev.length === heights.length
+                && prev.every((h, idx) => Math.abs(h - heights[idx]) < 0.01)
+            ) {
+                return prev;
+            }
             return heights;
         });
     };
@@ -652,6 +864,199 @@ function App() {
             }
         };
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            setAISettingsBusy(true);
+            try {
+                const response = await GetAISettings() as AISettingsResponse;
+                if (cancelled) {
+                    return;
+                }
+                const loadedSettings = response.settings || defaultAISettingsState();
+                setAISettings(loadedSettings);
+                setAISettingsDraft(loadedSettings);
+                setAISettingsActionFailed(false);
+                setAISettingsApplyError('');
+                setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
+                setAIContextMode((loadedSettings.defaultContextMode === 'full' ? 'full' : 'above'));
+            } catch (error) {
+                if (cancelled) {
+                    return;
+                }
+                const message = error instanceof Error ? error.message : 'Unknown AI settings error';
+                setStatusText(`AI settings load failed: ${message}`);
+                setIsStatusError(true);
+                setDevError(message);
+            } finally {
+                if (!cancelled) {
+                    setAISettingsBusy(false);
+                }
+            }
+        };
+
+        void load();
+        return () => {
+            cancelled = true;
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        let cancelled = false;
+        const refreshDraftKeyStatus = async () => {
+            try {
+                const status = await GetAIKeyStatusForSettings(aiSettingsDraft as any) as AIKeyStatusState;
+                if (!cancelled) {
+                    setAIKeyStatus(status || defaultAIKeyStatusState());
+                }
+            } catch {
+                // Keep currently shown status when draft status lookup fails.
+            }
+        };
+
+        void refreshDraftKeyStatus();
+        return () => {
+            cancelled = true;
+        };
+    }, [aiSettingsDraft.providerPreset, aiSettingsDraft.allowInsecureKeyFallback]);
+
+    const aiSettingsHasUnsavedChanges = !areAISettingsEqual(aiSettingsDraft, aiSettings);
+
+    const revertAISettingsDraftToSaved = () => {
+        setAISettingsDraft(aiSettings);
+        setAIContextMode((aiSettings.defaultContextMode === 'full' ? 'full' : 'above'));
+        setAISettingsActionFailed(false);
+        setAISettingsApplyError('');
+        setStatusText('AI settings draft reverted to last saved state.');
+        setIsStatusError(false);
+        setDevError('');
+    };
+
+    const testAndSaveAISettings = async () => {
+        if (!aiSettingsHasUnsavedChanges) {
+            setStatusText('AI settings are already up to date.');
+            setIsStatusError(false);
+            setAISettingsApplyError('');
+            setDevError('');
+            return;
+        }
+
+        setAISettingsBusy(true);
+        setAISettingsActionFailed(false);
+        setAISettingsApplyError('');
+        try {
+            setStatusText('Testing AI settings...');
+            setIsStatusError(false);
+            setDevError('');
+
+            const health = await RunAIQuery({
+                prompt: 'Health check: respond with answerNumber 1.',
+                contextMode: aiSettingsDraft.defaultContextMode,
+                linesAbove: [],
+                fullContent: '',
+                settingsOverride: aiSettingsDraft,
+            } as any) as AIRunResponse;
+
+            if (!health.ok) {
+                const message = health.error || 'AI settings test failed';
+                setStatusText(`AI settings test failed. Changes were not saved: ${message}`);
+                setIsStatusError(true);
+                setDevError(message);
+                setAISettingsActionFailed(true);
+                setAISettingsApplyError(message);
+                return;
+            }
+
+            const response = await SaveAISettings(aiSettingsDraft as any) as AISettingsResponse;
+            const settingsError = response.keyStatus?.lastError || '';
+            if (settingsError.startsWith('settings validation failed:') || settingsError.startsWith('settings save failed:')) {
+                setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
+                setStatusText(`AI settings save failed. Changes were not saved: ${settingsError}`);
+                setIsStatusError(true);
+                setDevError(settingsError);
+                setAISettingsActionFailed(true);
+                setAISettingsApplyError(settingsError);
+                return;
+            }
+
+            const savedSettings = response.settings || aiSettingsDraft;
+            setAISettings(savedSettings);
+            setAISettingsDraft(savedSettings);
+            setAISettingsActionFailed(false);
+            setAISettingsApplyError('');
+            setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
+            setAIContextMode((savedSettings.defaultContextMode === 'full' ? 'full' : 'above'));
+            setStatusText('AI settings test passed and settings were saved.');
+            setIsStatusError(false);
+            setDevError('');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown AI settings test error';
+            setStatusText(`AI settings test failed. Changes were not saved: ${message}`);
+            setIsStatusError(true);
+            setDevError(message);
+            setAISettingsActionFailed(true);
+            setAISettingsApplyError(message);
+        } finally {
+            setAISettingsBusy(false);
+        }
+    };
+
+    const saveAIKeyToBackend = async (apiKey: string) => {
+        setAISettingsBusy(true);
+        try {
+            const keyStatus = await SetAIAPIKey(apiKey, aiSettingsDraft as any) as AIKeyStatusState;
+            setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
+            if (keyStatus?.hasKey) {
+                setAISettings((current) => {
+                    if (current.providerPreset !== 'custom') {
+                        return current;
+                    }
+                    return { ...current, customKeySourceEndpoint: current.endpoint };
+                });
+                setAISettingsDraft((current) => {
+                    if (current.providerPreset !== 'custom') {
+                        return current;
+                    }
+                    return { ...current, customKeySourceEndpoint: current.endpoint };
+                });
+                setStatusText(`API key saved (${keyStatus.storageMode})`);
+                setIsStatusError(false);
+                setDevError('');
+            } else {
+                setStatusText(`API key save failed: ${keyStatus?.lastError || 'unknown error'}`);
+                setIsStatusError(true);
+                setDevError(keyStatus?.lastError || 'AI key save failed');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown API key error';
+            setStatusText(`API key save failed: ${message}`);
+            setIsStatusError(true);
+            setDevError(message);
+        } finally {
+            setAISettingsBusy(false);
+        }
+    };
+
+    const clearAIKeyInBackend = async () => {
+        setAISettingsBusy(true);
+        try {
+            const keyStatus = await ClearAIAPIKey(aiSettingsDraft as any) as AIKeyStatusState;
+            setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
+            setAISettings((current) => ({ ...current, customKeySourceEndpoint: '' }));
+            setAISettingsDraft((current) => ({ ...current, customKeySourceEndpoint: '' }));
+            setStatusText('API key cleared');
+            setIsStatusError(false);
+            setDevError('');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown API key clear error';
+            setStatusText(`API key clear failed: ${message}`);
+            setIsStatusError(true);
+            setDevError(message);
+        } finally {
+            setAISettingsBusy(false);
+        }
+    };
 
     // --- Hoisted actions (stable: only use setState callbacks or stable fns) ---
 
@@ -685,6 +1090,21 @@ function App() {
             editorRef.current.selectionStart = 0;
             editorRef.current.selectionEnd = 0;
         });
+    };
+
+    const requestClearWorksheet = () => {
+        setShowPrecisionMenu(false);
+        setShowBurgerMenu(false);
+        setShowClearWorksheetConfirm(true);
+    };
+
+    const cancelClearWorksheet = () => {
+        setShowClearWorksheetConfirm(false);
+    };
+
+    const confirmClearWorksheet = () => {
+        setShowClearWorksheetConfirm(false);
+        clearWorksheet();
     };
 
     const toggleMarkLine = () => {
@@ -874,15 +1294,31 @@ function App() {
 
     useEffect(() => {
         const unsubThemeStore = EventsOn('theme-store:open', () => {
+            setShowHelp(false);
             setShowSettings(true);
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', clearWorksheet);
+        const unsubNew = EventsOn('menu:file:new', requestClearWorksheet);
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
         const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
+        const unsubOpenHelp = EventsOn('menu:help:open', () => {
+            setShowPrecisionMenu(false);
+            setShowBurgerMenu(false);
+            setShowThemeStore(false);
+            setShowSettings(false);
+            setShowHelp(true);
+        });
+        const unsubAIProgress = EventsOn('ai:progress', (payload: AIProgressEvent | string | null | undefined) => {
+            if (typeof payload === 'string') {
+                setAIProgressMessage(payload.trim());
+                return;
+            }
+            const nextMessage = payload?.message?.trim() || '';
+            setAIProgressMessage(nextMessage);
+        });
         return () => {
             unsubThemeStore();
             unsubNew();
@@ -890,6 +1326,8 @@ function App() {
             unsubIncrease();
             unsubDecrease();
             unsubResetFont();
+            unsubOpenHelp();
+            unsubAIProgress();
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1178,32 +1616,6 @@ function App() {
         }
     };
 
-    const getEnclosingBacktickBlock = (text: string, caret: number): {open: number; close: number | null} | null => {
-        const ticks: number[] = [];
-        for (let i = 0; i < text.length; i++) {
-            if (text[i] === '`') {
-                ticks.push(i);
-            }
-        }
-
-        for (let i = 0; i + 1 < ticks.length; i += 2) {
-            const open = ticks[i];
-            const close = ticks[i + 1];
-            if (open <= caret && caret <= close + 1) {
-                return {open, close};
-            }
-        }
-
-        if (ticks.length % 2 === 1) {
-            const open = ticks[ticks.length - 1];
-            if (open <= caret) {
-                return {open, close: null};
-            }
-        }
-
-        return null;
-    };
-
     const knownVariableNames = useMemo(() => {
         const names = new Set<string>();
         content.split('\n').forEach((line) => {
@@ -1465,52 +1877,243 @@ function App() {
         }
 
         const caretPos = editor.selectionStart;
-        const codeBlockRegion = getEnclosingBacktickBlock(content, caretPos);
-        if (codeBlockRegion && codeBlockRegion.close === null) {
-            insertAtSelection('\n');
-            setStatusText('Continue typing the code block. Close it with a backtick to evaluate.');
-            setIsStatusError(false);
-            setDevError('');
-            return;
-        }
+        const bounds = getLineBounds(content, caretPos);
+        const lineStart = bounds.lineStart;
+        const lineEnd = bounds.lineEnd;
+        const lineText = content.slice(lineStart, lineEnd);
+        const editableLine = getExpressionSource(lineText);
 
-        let lineStart: number;
-        let lineEnd: number;
-        let lineText: string;
-        let editableLine: string;
+        const lineIndex = lineIndexAtPosition(content, lineStart);
+        const caretOffsetInLine = Math.min(Math.max(caretPos - lineStart, 0), lineText.length);
 
-        if (codeBlockRegion && codeBlockRegion.close !== null) {
-            lineStart = content.lastIndexOf('\n', Math.max(0, codeBlockRegion.open - 1)) + 1;
-            const nextBreak = content.indexOf('\n', codeBlockRegion.close);
-            lineEnd = nextBreak === -1 ? content.length : nextBreak;
-            lineText = content.slice(lineStart, lineEnd);
-            const closeOffset = codeBlockRegion.close - lineStart;
-            editableLine = lineText.slice(0, closeOffset + 1).trimEnd();
-        } else {
-            const bounds = getLineBounds(content, caretPos);
-            lineStart = bounds.lineStart;
-            lineEnd = bounds.lineEnd;
-            lineText = content.slice(lineStart, lineEnd);
-            editableLine = getExpressionSource(lineText);
-        }
-
-        const trimmed = editableLine.trim();
-        const {body: editableBody} = splitLineComment(editableLine);
-        const expressionBodyTrimmed = editableBody.trim();
-
-        if (trimmed.length === 0 || expressionBodyTrimmed.length === 0) {
-            insertAtSelection('\n');
+        if (shouldSkipEvaluationAtCaret(lineText, caretOffsetInLine)) {
             setStatusText('Ready');
             setIsStatusError(false);
             setDevError('');
+            if (lineEnd === content.length) {
+                const nextContent = content + '\n';
+                const nextCaret = nextContent.length;
+                setContentAndCaret(nextContent, nextCaret);
+                return;
+            }
+            const nextLineStart = lineEnd < content.length ? lineEnd + 1 : lineEnd;
+            if (nextLineStart !== caretPos) {
+                setCaretPos(nextLineStart);
+                requestAnimationFrame(() => {
+                    if (!editorRef.current) {
+                        return;
+                    }
+                    editorRef.current.selectionStart = nextLineStart;
+                    editorRef.current.selectionEnd = nextLineStart;
+                });
+            }
             return;
         }
 
+        if (isAITriggerLine(editableLine)) {
+            const prompt = getAITriggerPrompt(editableLine);
+            if (!prompt) {
+                insertAtSelection('\n');
+                setStatusText('AI prompt is empty. Add text after ? and press Enter.');
+                setIsStatusError(true);
+                setDevError('AI prompt is empty');
+                return;
+            }
+
+            if (isAIQueryPending) {
+                setStatusText('AI request already in progress...');
+                setIsStatusError(false);
+                setDevError('');
+                return;
+            }
+
+            let aiStart = 0;
+            try {
+                const lines = content.split('\n');
+                const linesAbove = lines.slice(0, lineIndex).map((line) => getExpressionSource(line));
+                aiStart = Date.now();
+                setAIPendingLineIndex(lineIndex);
+                setIsAIQueryPending(true);
+                setAIProgressMessage('preparing request');
+                setStatusText('AI request sent... waiting for response');
+                setIsStatusError(false);
+                setDevError('');
+                const aiResult = await RunAIQuery({
+                    prompt,
+                    contextMode: aiContextMode,
+                    linesAbove,
+                    fullContent: content,
+                    settingsOverride: aiSettings,
+                } as any) as AIRunResponse;
+
+                if (!aiResult.ok) {
+                    const errorMessage = aiResult.error || 'AI request failed';
+                    setLastResult(null);
+                    clearLineEvaluationMetadata(lineIndex);
+                    setIsStatusError(true);
+                    setStatusText(`AI mode failed: ${errorMessage}`);
+                    setDevError(errorMessage);
+
+                    setAIDebugLog((prev) => {
+                        const id = ++aiDebugIdRef.current;
+                        const entry: AIDebugEntry = {
+                            id,
+                            timestamp: new Date(),
+                            prompt,
+                            model: aiResult.preview?.modelId ?? '',
+                            endpoint: aiResult.preview?.endpoint ?? '',
+                            systemPrompt: aiResult.preview?.systemPrompt || '',
+                            userPrompt: aiResult.preview?.userPrompt || '',
+                            contextMode: aiResult.preview?.contextMode || aiContextMode,
+                            contextLineCount: aiResult.preview?.contextLineCount ?? linesAbove.length,
+                            status: 'error',
+                            error: errorMessage,
+                            durationMs: Date.now() - aiStart,
+                            raw: {
+                                frontendRequest: {
+                                    prompt,
+                                    contextMode: aiContextMode,
+                                    linesAbove,
+                                    fullContent: content,
+                                },
+                                backendPreview: aiResult.preview,
+                                backendResponse: aiResult,
+                            },
+                        };
+                        return [...prev, entry];
+                    });
+                    return;
+                }
+
+                const output = aiResult.output || {};
+                const insertionLines: string[] = [];
+                const answerNumber = output.answerNumber;
+                const hasNumericAnswer = typeof answerNumber === 'number' && Number.isFinite(answerNumber);
+                const normalizedComment = (output.comment || '').trim();
+                if (hasNumericAnswer) {
+                    let answerLine = `ai0 = ${formatNumber(answerNumber, decimalDelimiter, precision, scientificNotation)}`;
+                    if (normalizedComment.length > 0) {
+                        answerLine = `${answerLine} " ${normalizedComment}`;
+                    }
+                    insertionLines.push(answerLine);
+                } else {
+                    const normalizedAnswer = (output.answer || '').trim();
+                    if (normalizedAnswer.length > 0) {
+                        insertionLines.push(`" ${normalizedAnswer}`);
+                    }
+                    if (normalizedComment.length > 0) {
+                        insertionLines.push(`" ${normalizedComment}`);
+                    }
+                }
+
+                const normalizedCode = stripMarkdownCodeFences(output.code || '');
+                const codeLines = normalizedCode.length > 0
+                    ? normalizedCode.split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.length > 0)
+                    : [];
+                if (codeLines.length > 0) {
+                    insertionLines.push(...codeLines);
+                }
+
+                const before = content.slice(0, lineEnd);
+                const after = content.slice(lineEnd);
+                const insertionBlock = `\n${insertionLines.join('\n')}`;
+                const nextContent = before + insertionBlock + after + (lineEnd === content.length ? '\n' : '');
+                const nextCaret = before.length + insertionBlock.length;
+
+                setContentAndCaret(nextContent, nextCaret);
+                clearLineEvaluationMetadata(lineIndex);
+                setLastResult(null);
+                setStatusText('AI response inserted');
+                setIsStatusError(false);
+                setDevError('');
+
+                setAIDebugLog((prev) => {
+                    const id = ++aiDebugIdRef.current;
+                    const entry: AIDebugEntry = {
+                        id,
+                        timestamp: new Date(),
+                        prompt,
+                        model: aiResult.preview.modelId ?? '',
+                        endpoint: aiResult.preview.endpoint ?? '',
+                        systemPrompt: aiResult.preview.systemPrompt,
+                        userPrompt: aiResult.preview.userPrompt,
+                        contextMode: aiResult.preview.contextMode,
+                        contextLineCount: aiResult.preview.contextLineCount,
+                        status: 'ok',
+                        output: aiResult.output,
+                        durationMs: Date.now() - aiStart,
+                        raw: {
+                            frontendRequest: {
+                                prompt,
+                                contextMode: aiContextMode,
+                                linesAbove,
+                                fullContent: content,
+                            },
+                            backendPreview: aiResult.preview,
+                            backendResponse: aiResult,
+                        },
+                    };
+                    return [...prev, entry];
+                });
+
+                if (codeLines.length > 0) {
+                    const contentForReeval = nextContent;
+                    requestAnimationFrame(() => {
+                        void reevaluateAllExpressions(contentForReeval);
+                    });
+                }
+            } catch (error) {
+                setLastResult(null);
+                clearLineEvaluationMetadata(lineIndex);
+                setIsStatusError(true);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown AI error';
+                setStatusText(`AI mode failed: ${errorMessage}`);
+                setDevError(errorMessage);
+
+                setAIDebugLog((prev) => {
+                    const id = ++aiDebugIdRef.current;
+                    const entry: AIDebugEntry = {
+                        id,
+                        timestamp: new Date(),
+                        prompt,
+                        model: '',
+                        endpoint: '',
+                        systemPrompt: '',
+                        userPrompt: '',
+                        contextMode: aiContextMode,
+                        contextLineCount: 0,
+                        status: 'error',
+                        error: errorMessage,
+                        durationMs: Date.now() - aiStart,
+                        raw: {
+                            frontendRequest: {
+                                prompt,
+                                contextMode: aiContextMode,
+                                fullContent: content,
+                            },
+                            thrownError: error,
+                        },
+                    };
+                    return [...prev, entry];
+                });
+            } finally {
+                setIsAIQueryPending(false);
+                setAIPendingLineIndex(null);
+                setAIProgressMessage('');
+            }
+            return;
+        }
+
+        const trimmed = editableLine.trim();
+
         const declaration = parseDeclaredVariable(splitLineComment(editableLine).body.trimEnd());
-        const expression = OPERATOR_KEY_RE.test(trimmed[0]) && lastResult !== null
-            ? `${formatNumber(lastResult, decimalDelimiter, 'auto', false)}${trimmed}`
-            : editableLine;
-        const lineIndex = lineIndexAtPosition(content, lineStart);
+        const expression = buildEvaluationExpression(
+            editableLine,
+            trimmed,
+            lastResult,
+            decimalDelimiter,
+            (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
+        );
 
         try {
             const evalResult = await EvaluateExprProgram(expression, variableValues as Record<string, any>);
@@ -1574,7 +2177,7 @@ function App() {
             const before = content.slice(0, lineStart);
             const after = content.slice(lineEnd);
             const nextContent = before + replacement + after;
-            const nextCaret = before.length + editableLine.length;
+            const nextCaret = before.length + getPreservedCaretOffset(caretOffsetInLine, replacement.length);
             setContentAndCaret(nextContent, nextCaret);
             setLastResult(null);
             clearLineEvaluationMetadata(lineIndex);
@@ -1586,14 +2189,14 @@ function App() {
         }
     };
 
-    const reevaluateAllExpressions = async () => {
+    const reevaluateAllExpressions = async (contentOverride?: string) => {
         if (isReevaluatingAll) {
             return;
         }
 
         setIsReevaluatingAll(true);
         try {
-            const sourceLines = content.split('\n');
+            const sourceLines = (contentOverride ?? content).split('\n');
             const nextLines = [...sourceLines];
             let workingVariables: Record<string, unknown> = {};
             let workingVariableVersions: Record<string, number> = {};
@@ -1606,9 +2209,11 @@ function App() {
             for (let i = 0; i < sourceLines.length; i++) {
                 const originalLine = sourceLines[i];
                 const editableLine = getExpressionSource(originalLine);
-                const trimmed = editableLine.trim();
-                const {body: editableBody} = splitLineComment(editableLine);
-                if (trimmed.length === 0 || editableBody.trim().length === 0) {
+                if (shouldSkipEvaluation(editableLine)) {
+                    continue;
+                }
+
+                if (isAITriggerSourceLine(editableLine)) {
                     continue;
                 }
 
@@ -1736,6 +2341,12 @@ function App() {
             return;
         }
 
+        if (shortcutAction === 'toggle-word-wrap') {
+            event.preventDefault();
+            setWordWrap((prev) => !prev);
+            return;
+        }
+
         if (shortcutAction === 'increase-font-size') {
             event.preventDefault();
             changeFontScale(1);
@@ -1798,11 +2409,22 @@ function App() {
         insertAtSelection(`${formatNumber(lastResult, decimalDelimiter, 'auto', false)}${event.key}`);
     };
 
-    const {lines: contentLines, lineErrors, truncatedZeroLines, truncatedLines, declarationLines} = useMemo(() => {
+    const onEditorWheel = (event: ReactWheelEvent<HTMLTextAreaElement>) => {
+        const direction = getFontResizeDirectionFromWheel(event);
+        if (direction === null) {
+            return;
+        }
+
+        event.preventDefault();
+        changeFontScale(direction);
+    };
+
+    const {lines: contentLines, lineErrors, truncatedZeroLines, truncatedLines, declarationLines, aiTriggerLines} = useMemo(() => {
         const nextLineErrors = new Map<number, string>();
         const nextTruncatedZeroLines = new Map<number, number>();
         const nextTruncatedLines = new Map<number, number>(); // significant truncation, non-zero
         const nextDeclarationLines = new Set<number>();
+        const nextAITriggerLines = new Set<number>();
         const lines = content.split('\n');
         let insideMultilineCodeBlock = false;
 
@@ -1812,6 +2434,10 @@ function App() {
             const declaration = parseDeclaredVariable(source);
             if (declaration) {
                 nextDeclarationLines.add(i);
+            }
+
+            if (isAITriggerSourceLine(source)) {
+                nextAITriggerLines.add(i);
             }
 
             if (insideMultilineCodeBlock || tickCount % 2 === 1) {
@@ -1833,40 +2459,23 @@ function App() {
             truncatedZeroLines: nextTruncatedZeroLines,
             truncatedLines: nextTruncatedLines,
             declarationLines: nextDeclarationLines,
+            aiTriggerLines: nextAITriggerLines,
         };
     }, [content]);
 
     const staleLineDetails = useMemo(() => {
-        const details = new Map<number, string[]>();
-        Object.entries(lineDependencyVersions).forEach(([lineKey, snapshot]) => {
-            const lineIndex = Number(lineKey);
-            if (!Number.isFinite(lineIndex)) {
-                return;
-            }
-
-            const staleVariables: string[] = [];
-            Object.entries(snapshot).forEach(([variableName, version]) => {
-                const currentVersion = variableVersions[variableName] ?? 0;
-                if (currentVersion !== version) {
-                    staleVariables.push(variableName);
-                }
-            });
-
-            if (staleVariables.length > 0) {
-                details.set(lineIndex, staleVariables);
-            }
-        });
-
-        return details;
+        return buildStaleLineDetails(lineDependencyVersions, variableVersions);
     }, [lineDependencyVersions, variableVersions]);
 
     const renderOverlayLines = () => {
         return contentLines.map((line, i) => {
-            const lineClassName = `editor-line-row${lineErrors.has(i) ? ' line-error' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' line-stale' : ''}`;
+            const isPendingAILine = isAIQueryPending && aiPendingLineIndex === i;
+            const lineClassName = `editor-line-row${lineErrors.has(i) ? ' line-error' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' line-stale' : ''}${aiTriggerLines.has(i) ? ' line-ai' : ''}${isPendingAILine ? ' line-ai-waiting' : ''}`;
             const isVariableLine = declarationLines.has(i);
             const isMarkedLine = markedLines.has(i);
 
-            const eqIdx = isVariableLine ? line.lastIndexOf(' = ') : line.indexOf(' = ');
+            const {body: lineBody, comment: lineComment} = splitLineComment(line);
+            const eqIdx = isVariableLine ? lineBody.lastIndexOf(' = ') : lineBody.indexOf(' = ');
             if (eqIdx === -1) {
                 return (
                     <div key={i} className={lineClassName}>
@@ -1889,8 +2498,9 @@ function App() {
 
             return (
                 <div key={i} className={lineClassName}>
-                    {renderSyntaxText(line.slice(0, eqIdx), `${i}-lhs`)}
-                    <span className={resultClass}>{line.slice(eqIdx)}</span>
+                    {renderSyntaxText(lineBody.slice(0, eqIdx), `${i}-lhs`)}
+                    <span className={resultClass}>{lineBody.slice(eqIdx)}</span>
+                    {lineComment && renderSyntaxText(lineComment, `${i}-cmt`)}
                 </div>
             );
         });
@@ -1922,6 +2532,10 @@ function App() {
     const activeLineH = lineRowHeights[activeLineIndex] ?? lineHeightPx;
     const activeLineErrorTop = EDITOR_TOP_PADDING_PX + getLineTop(activeLineIndex) - editorScrollTop + activeLineH * 0.9;
     const activeLineErrorLeft = Math.max(EDITOR_PADDING, EDITOR_PADDING + measureLineWidth(activeLineText) + 8 - editorScrollLeft);
+    const pendingAILineHeight = aiPendingLineIndex !== null ? (lineRowHeights[aiPendingLineIndex] ?? lineHeightPx) : lineHeightPx;
+    const aiProgressTop = aiPendingLineIndex !== null
+        ? EDITOR_TOP_PADDING_PX + getLineTop(aiPendingLineIndex) - editorScrollTop + pendingAILineHeight + 4
+        : 0;
     const intelligenceTop = identifierContext
         ? EDITOR_TOP_PADDING_PX + getLineTop(activeLineIndex) - editorScrollTop + activeLineH * 2.2
         : 0;
@@ -1988,6 +2602,27 @@ function App() {
         }
     };
 
+    const expandWindowForSettingsDrawer = async () => {
+        try {
+            const current = await WindowGetSize();
+            const requiredWidth = Math.min(
+                1800,
+                Math.max(SETTINGS_DRAWER_MIN_WINDOW_WIDTH, settingsDrawerWidth + SETTINGS_DRAWER_MIN_EDITOR_WIDTH),
+            );
+            if (current.w >= requiredWidth) {
+                return;
+            }
+
+            if (!settingsDrawerOriginalSizeRef.current) {
+                settingsDrawerOriginalSizeRef.current = { w: current.w, h: current.h };
+            }
+
+            WindowSetSize(requiredWidth, current.h);
+        } catch {
+            // Keep UI functional even if window APIs fail.
+        }
+    };
+
     const restoreWindowAfterThemeStore = async () => {
         const original = themeStoreOriginalSizeRef.current;
         if (!original) {
@@ -2002,15 +2637,54 @@ function App() {
         }
     };
 
+    const restoreWindowAfterSettingsDrawer = async () => {
+        const original = settingsDrawerOriginalSizeRef.current;
+        if (!original) {
+            return;
+        }
+
+        settingsDrawerOriginalSizeRef.current = null;
+        try {
+            WindowSetSize(original.w, original.h);
+        } catch {
+            // Ignore restore failures.
+        }
+    };
+
+    useEffect(() => {
+        if (showSettings && !showThemeStore) {
+            void expandWindowForSettingsDrawer();
+            return;
+        }
+
+        void restoreWindowAfterSettingsDrawer();
+    }, [showSettings, showThemeStore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const startSettingsDrawerResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if (event.button !== 0 || showThemeStore) {
+            return;
+        }
+
+        event.preventDefault();
+        settingsDrawerResizeStartRef.current = {
+            x: event.clientX,
+            width: settingsDrawerWidth,
+        };
+        setIsResizingSettingsDrawer(true);
+    };
+
     const openThemeStoreInSidebar = () => {
+        void restoreWindowAfterSettingsDrawer();
         setShowThemeStore(true);
         void expandWindowForThemeStore();
     };
 
-    const openHelpPanel = (page: HelpPage) => {
+    const openHelpPanel = () => {
+        setShowPrecisionMenu(false);
+        setShowBurgerMenu(false);
         setShowThemeStore(false);
-        setActiveHelpPage(page);
-        setShowSettings(true);
+        setShowSettings(false);
+        setShowHelp(true);
     };
 
     const closeThemeStoreInSidebar = () => {
@@ -2026,18 +2700,27 @@ function App() {
         action();
     };
 
+    const helpDockClass = !showHelp
+        ? ''
+        : helpPanelPosition === 'left'
+            ? ' window--help-left'
+            : helpPanelPosition === 'bottom'
+                ? ' window--help-bottom'
+                : ' window--help-right';
+    const windowStyle = {
+        '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
+        '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
+    } as CSSProperties;
+
     return (
-        <div id="app" className="window">
-            <div className="window-logo-bg" aria-hidden="true">
-                <img className="window-logo-bg-image" src={appLogo} alt="" />
-            </div>
+        <div id="app" className={`window${helpDockClass}`} style={windowStyle}>
             <div className="editor-container">
                 <div className="gutter" ref={gutterRef}>
-                    <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX}}>
+                    <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX, paddingBottom: EDITOR_BOTTOM_PADDING_PX}}>
                         {contentLines.map((_, i) => (
                             <div
                                 key={i}
-                                className={`gutter-line${(lineRowHeights[i] ?? lineHeightPx) > lineHeightPx + 1 ? ' gutter-line--wrapped' : ''}${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' gutter-line--stale' : ''}${declarationLines.has(i) ? ' gutter-line--var' : ''}`}
+                                className={`gutter-line${(lineRowHeights[i] ?? lineHeightPx) > lineHeightPx + 1 ? ' gutter-line--wrapped' : ''}${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' gutter-line--stale' : ''}${declarationLines.has(i) ? ' gutter-line--var' : ''}${aiTriggerLines.has(i) ? ' gutter-line--ai' : ''}`}
                                 style={{height: lineRowHeights[i] ?? lineHeightPx}}
                                 onClick={() => {
                                     setMarkedLines((prev) => {
@@ -2054,9 +2737,11 @@ function App() {
                                             ? `Result truncated — actual: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, 'auto', false)}, displayed: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, precision, scientificNotation)} (precision: ${precision})`
                                             : (staleLineDetails.has(i)
                                                 ? `Stale result: depends on changed variable${staleLineDetails.get(i)!.length === 1 ? '' : 's'} ${staleLineDetails.get(i)!.join(', ')}`
+                                            : (aiTriggerLines.has(i)
+                                                ? 'AI prompt line'
                                             : (declarationLines.has(i)
                                                 ? 'Variable declaration'
-                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line')))))
+                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line'))))))
                                 }
                             >
                                 <span className="gutter-line-number" aria-hidden="true">{i + 1}</span>
@@ -2071,7 +2756,10 @@ function App() {
                                         <span className="gutter-truncated-icon">≈</span>
                                     )}
                                     {!lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && staleLineDetails.has(i) && (
-                                        <span className="gutter-stale-icon">*</span>
+                                        <span className="gutter-stale-icon">↻</span>
+                                    )}
+                                    {!lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && aiTriggerLines.has(i) && (
+                                        <span className="gutter-ai-icon">?</span>
                                     )}
                                     {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && !declarationLines.has(i) && (
                                         <span className="gutter-mark">&#9670;</span>
@@ -2193,11 +2881,13 @@ function App() {
                         onClick={updateCaretPosFromEditor}
                         onKeyUp={updateCaretPosFromEditor}
                         onKeyDown={onKeyDown}
+                        onWheel={onEditorWheel}
                         onScroll={() => {
                             const el = editorRef.current;
                             if (!el) return;
                             setEditorScrollTop(el.scrollTop);
                             setEditorScrollLeft(el.scrollLeft);
+                            syncEditorScrollbarWidth();
                             if (gutterRef.current) gutterRef.current.scrollTop = el.scrollTop;
                             if (overlayRef.current) {
                                 overlayRef.current.scrollTop = el.scrollTop;
@@ -2207,6 +2897,7 @@ function App() {
                         style={{
                             fontSize: `${fontScale}em`,
                             paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
+                            paddingBottom: `${EDITOR_BOTTOM_PADDING_PX}px`,
                         }}
                     />
                     <div
@@ -2216,6 +2907,8 @@ function App() {
                         style={{
                             fontSize: `${fontScale}em`,
                             paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
+                            paddingBottom: `${EDITOR_BOTTOM_PADDING_PX}px`,
+                            paddingRight: `${EDITOR_SIDE_PADDING_PX + editorScrollbarWidth}px`,
                         }}
                     >
                         {renderOverlayLines()}
@@ -2227,6 +2920,16 @@ function App() {
                             aria-live="polite"
                         >
                             {activeLineError}
+                        </div>
+                    )}
+                    {isAIQueryPending && aiPendingLineIndex !== null && aiProgressMessage && (
+                        <div
+                            className="line-ai-progress"
+                            style={{top: aiProgressTop, left: EDITOR_PADDING - editorScrollLeft}}
+                            aria-live="polite"
+                        >
+                            <span className="line-ai-progress-prefix">" </span>
+                            <span>AI: {aiProgressMessage}</span>
                         </div>
                     )}
                     {showIntelligenceHint && intelligenceSuggestions.length > 0 && (
@@ -2251,6 +2954,32 @@ function App() {
                     {statusText}
                     {IS_DEV && devError ? ` | dev: ${devError}` : ''}
                 </span>
+                {isAIQueryPending && (
+                    <span className="status-chip status-chip--busy" title="AI request is in progress">
+                        <span className="status-spinner" aria-hidden="true" />
+                        AI waiting...
+                    </span>
+                )}
+                <button
+                    type="button"
+                    className="status-chip status-chip-btn status-chip-btn--clear-first"
+                    title="Clear all expressions"
+                    aria-label="Clear all expressions"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={requestClearWorksheet}
+                >
+                    clear
+                </button>
+                <button
+                    type="button"
+                    className={`status-chip status-chip-btn${wordWrap ? ' status-chip-btn--active' : ''}`}
+                    title={wordWrap ? 'Word wrap: on' : 'Word wrap: off'}
+                    aria-label="Toggle word wrap"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setWordWrap((prev) => !prev)}
+                >
+                    wrap: {wordWrap ? 'on' : 'off'}
+                </button>
                 <div className="status-chip-wrap" ref={precisionMenuRef}>
                     <button
                         type="button"
@@ -2337,8 +3066,8 @@ function App() {
                                     />
                                     <span className="settings-toggle-track" />
                                 </label>
+                                                        </div>
                             </div>
-                        </div>
                     )}
                 </div>
                 <div className="status-menu-wrap" ref={burgerMenuRef}>
@@ -2357,7 +3086,7 @@ function App() {
                     </button>
                     {showBurgerMenu && (
                         <div className="status-menu-popover" role="menu" aria-label="App menu">
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(clearWorksheet)}>New worksheet</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(requestClearWorksheet)}>New worksheet</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => WindowReload())}>Reload app</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(1))}>Increase font size</button>
                             <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(-1))}>Decrease font size</button>
@@ -2367,15 +3096,21 @@ function App() {
                                 type="button"
                                 className="status-menu-item"
                                 onClick={() => runBurgerAction(() => {
+                                    setShowHelp(false);
                                     setShowSettings(true);
                                     openThemeStoreInSidebar();
                                 })}
                             >
                                 Open Theme Store
                             </button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('operations'))}>Help: Operations</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('shortcuts'))}>Help: Shortcuts</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => openHelpPanel('new'))}>Help: New</button>
+                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(openHelpPanel)}>Help</button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => setShowAIDebug(true))}
+                            >
+                                AI Debug Log{aiDebugLog.length > 0 ? ` (${aiDebugLog.length})` : ''}
+                            </button>
                             <button
                                 type="button"
                                 className="status-menu-item"
@@ -2400,6 +3135,25 @@ function App() {
                     onClick={() => {
                         setShowPrecisionMenu(false);
                         setShowBurgerMenu(false);
+                        if (showHelp) {
+                            setShowHelp(false);
+                            return;
+                        }
+                        openHelpPanel();
+                    }}
+                    aria-label="Help"
+                    title="Help"
+                >
+                    ?
+                </button>
+                <button
+                    type="button"
+                    className="settings-btn"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                        setShowPrecisionMenu(false);
+                        setShowBurgerMenu(false);
+                        setShowHelp(false);
                         setShowSettings(true);
                         setShowThemeStore(false);
                     }}
@@ -2411,11 +3165,39 @@ function App() {
             </div>
 
             <div
-                className={`settings-panel${showSettings ? ' settings-panel--open' : ''}${showThemeStore ? ' settings-panel--theme-store' : ''}`}
+                className={`settings-panel settings-panel--main${showSettings ? ' settings-panel--open' : ''}${showThemeStore ? ' settings-panel--theme-store' : ''}`}
                 role="dialog"
                 aria-label="Settings"
                 aria-hidden={!showSettings}
+                style={showThemeStore ? undefined : { width: `${settingsDrawerWidth}px` }}
             >
+                    {!showThemeStore && (
+                        <div
+                            className="settings-resize-handle"
+                            role="separator"
+                            aria-label="Resize settings drawer"
+                            aria-orientation="vertical"
+                            tabIndex={0}
+                            onMouseDown={startSettingsDrawerResize}
+                            onDoubleClick={() => setSettingsDrawerWidth(DEFAULT_SETTINGS_DRAWER_WIDTH)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'ArrowLeft') {
+                                    event.preventDefault();
+                                    setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current + 16));
+                                } else if (event.key === 'ArrowRight') {
+                                    event.preventDefault();
+                                    setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current - 16));
+                                } else if (event.key === 'Home') {
+                                    event.preventDefault();
+                                    setSettingsDrawerWidth(SETTINGS_DRAWER_MIN_WIDTH);
+                                } else if (event.key === 'End') {
+                                    event.preventDefault();
+                                    setSettingsDrawerWidth(clampSettingsDrawerWidth(SETTINGS_DRAWER_MAX_WIDTH));
+                                }
+                            }}
+                            title="Drag to resize"
+                        />
+                    )}
                     <div className="settings-header">
                         <button
                             type="button"
@@ -2445,128 +3227,29 @@ function App() {
                         </div>
                     ) : (
                     <div className="settings-body">
-
-                        {/* ── Help ── */}
-                        <p className="settings-section-label">Help</p>
-                        <div className="settings-card">
-                            <div className="settings-card-header">
-                                <div className="settings-card-title">In-app help</div>
-                                <div className="settings-card-desc">Reference pages for operations, shortcuts, and latest changes</div>
-                            </div>
-                            <div className="settings-help-tabs" role="tablist" aria-label="Help pages">
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeHelpPage === 'operations'}
-                                    className={`settings-help-tab${activeHelpPage === 'operations' ? ' settings-help-tab--active' : ''}`}
-                                    onClick={() => setActiveHelpPage('operations')}
-                                >
-                                    Operations
-                                </button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeHelpPage === 'shortcuts'}
-                                    className={`settings-help-tab${activeHelpPage === 'shortcuts' ? ' settings-help-tab--active' : ''}`}
-                                    onClick={() => setActiveHelpPage('shortcuts')}
-                                >
-                                    Shortcuts
-                                </button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeHelpPage === 'new'}
-                                    className={`settings-help-tab${activeHelpPage === 'new' ? ' settings-help-tab--active' : ''}`}
-                                    onClick={() => setActiveHelpPage('new')}
-                                >
-                                    New
-                                </button>
-                            </div>
-                            <div className="settings-help-content" role="tabpanel">
-                                {activeHelpPage === 'operations' && (
-                                    <ul>
-                                        <li>Type an expression directly in the editor (example: 2+3*4).</li>
-                                        <li>Press Enter to evaluate the current line and append result inline as expression = result.</li>
-                                        <li>Start a new line with +, -, *, or / to continue from the previous result.</li>
-                                        <li>Assign variables with name = expression or @name = expression (example: @incomes = [4500, 5200, 3800]).</li>
-                                        <li>Use pipelines with | to pass data to the next step (example: @incomes | filter(# &gt; 4000) | sum).</li>
-                                        <li>Use # inside filter/map/each stages to refer to the current item.</li>
-                                        <li>Available aggregation stages include sum, avg, min, max, and median.</li>
-                                        <li>Available math functions include sin, cos, tan, asin, acos, atan, atan2, sqrt, pow, abs, ceil, floor, round, trunc, exp, log, log10, log2, hypot, sign, and constants such as PI, TAU, E, PHI, LN2, LN10, LOG2E, LOG10E, SQRT1_2, SQRT2, SQRTE, SQRTPI, and SQRTPHI.</li>
-                                        <li>Functions must be called with parentheses (example: sin(PI/2)); bare references such as sin are rejected except in pipeline shorthand like map(sin).</li>
-                                        <li>Internal names are read-only and cannot be reassigned, including built-in constants and functions (examples: PI = 30 and sin = 5 are rejected).</li>
-                                        <li>Small editor intelligence suggests known variables plus allowed functions and constants near the caret. Press Tab to accept the top suggestion.</li>
-                                        <li>Intelligence hints are typing-triggered: they appear after 300 ms, do not show automatically on app start, and hide after 3 seconds of inactivity.</li>
-                                        <li>Backtick blocks can contain multiple statements; Enter inserts a new line while the block is open and evaluates after closing backtick.</li>
-                                        <li>Use " to start an end-of-line comment in expressions and declarations (example: total = price * qty " monthly subtotal).</li>
-                                        <li>Comment-only lines are treated as notes: pressing Enter adds a new line without producing = error.</li>
-                                        <li>Everything after " is treated as comment text, and commented tails are shown in a dedicated style that follows your active theme colors.</li>
-                                        <li>If you need text values inside expressions, use single quotes (') or backticks (`), not double quotes.</li>
-                                        <li>Line numbers appear in the left gutter for easy reference and navigation.</li>
-                                        <li>Toggle word wrap in Settings → Editor to wrap long lines at the window edge (disabled by default for a clean appearance).</li>
-                                        <li>Click the precision chip in the status bar to quickly change decimal precision or toggle scientific mode.</li>
-                                        <li>Invalid lines are highlighted in red with a gutter ! marker until corrected.</li>
-                                        <li>When you start editing a calculated line, its existing = result suffix is removed automatically so you can revise the expression cleanly.</li>
-                                        <li>When a variable declaration changes, previously evaluated dependent lines are marked stale with a gutter * indicator until you recalculate them.</li>
-                                        <li>When stale lines exist, a compact banner appears above the first line with actions to Re-evaluate All expressions or Clear Stale markers.</li>
-                                        <li>Status messages use plain language and examples to help fix common mistakes quickly, even if you are new to formulas.</li>
-                                    </ul>
+                        {/* ── AI ── */}
+                        <div className={`settings-ai-block${aiSettingsHasUnsavedChanges ? ' settings-ai-block--action-required' : ''}`}>
+                            <p className="settings-section-label settings-section-label--with-chip">
+                                <span>AI</span>
+                                {aiSettingsHasUnsavedChanges && (
+                                    <span className="settings-status-chip" aria-label="AI settings have unsaved changes">Unsaved</span>
                                 )}
-                                {activeHelpPage === 'shortcuts' && (
-                                    <ul>
-                                        <li>Enter: Evaluate current line.</li>
-                                        <li>Ctrl/Cmd + Enter: Insert a new line below without evaluating.</li>
-                                        <li>Ctrl/Cmd + N: New worksheet.</li>
-                                        <li>Ctrl/Cmd + =: Increase font size.</li>
-                                        <li>Ctrl/Cmd + -: Decrease font size.</li>
-                                        <li>Ctrl/Cmd + 0: Reset font size.</li>
-                                        <li>Tab: Accept the top variable/function/constant suggestion when shown.</li>
-                                        <li>( [ {'{'}: With text selected, wraps the selection in the matching bracket pair.</li>
-                                        <li>Ctrl/Cmd + R: Reload app window.</li>
-                                        <li>Ctrl/Cmd + Q: Quit app.</li>
-                                        <li>Press Escape twice quickly: Hide app window.</li>
-                                    </ul>
-                                )}
-                                {activeHelpPage === 'new' && (
-                                    <ul>
-                                        <li>Added line numbers in the editor gutter for easy reference. Numbers now appear alongside error icons and other indicators.</li>
-                                        <li>Added word wrap toggle in Settings → Editor to wrap long lines at the window edge. Word wrap is disabled by default for a clean, code-like appearance.</li>
-                                        <li>Added Ctrl/Cmd + Enter to insert a new line below the current line without evaluating.</li>
-                                        <li>Switched all expression execution to Go backend Expr evaluation with a unified language model across the app.</li>
-                                        <li>Added pipeline analytics syntax with | pass-through and # current-item placeholders for filter/map.</li>
-                                        <li>Added each(...) as an alias for map(...) in pipeline stages.</li>
-                                        <li>Added @variable syntax and list-focused helpers such as sum, avg, min, max, and median.</li>
-                                        <li>Added lightweight editor intelligence for known variables and allowed functions/constants, with Tab completion for the top suggestion.</li>
-                                        <li>Extended intelligence coverage to include pipeline helpers such as avg, filter, and map in suggestions and highlighting.</li>
-                                        <li>Added safe handling for bare function references so expressions like sin now return a user error instead of triggering a backend JSON panic, while map(sin) shorthand maps over each item.</li>
-                                        <li>Improved status-bar error messages with clearer guidance for invalid math domains (NaN/Inf), FILTER predicates, internal-name reassignment, and missing function parentheses.</li>
-                                        <li>Protected all internal names from reassignment so built-ins like PI, E, TAU, and sin remain immutable.</li>
-                                        <li>Expanded Expr math constants to include the practical full set from Go math plus TAU, including PHI, SQRTE, SQRTPI, SQRTPHI, SQRT1_2, and the existing logarithmic constants.</li>
-                                        <li>Added JS Math-style functions and constants in expressions (sin, cos, sqrt, pow, max, min, PI, E, and more).</li>
-                                        <li>Variables now use classic inline declarations like s = 2+6, with @ markers in the gutter for declaration lines.</li>
-                                        <li>Removed configurable variable trigger key behavior from Editor settings.</li>
-                                        <li>Added a quick double-Escape shortcut to hide the app window while keeping the app running.</li>
-                                        <li>Fixed line-bound variable remapping: deleting or inserting lines now keeps variable letters attached to the correct lines instead of moving onto empty lines.</li>
-                                        <li>Restored Help pages in menus: native Help menu entries and in-app menu shortcuts now open Help pages directly.</li>
-                                        <li>Added worksheet persistence so your content and carry-over result are restored on restart.</li>
-                                        <li>Added on-type line validation with red line state and gutter ! markers.</li>
-                                        <li>Added scientific notation support in expressions such as 1e6 and 2.5E-3.</li>
-                                        <li>Added decimal delimiter mode in Settings with dot, comma, and system options.</li>
-                                        <li>Precision modes: Auto = 10 decimal places, Full = no rounding, or set a fixed 0–15 decimal count. Use the status-bar chip or Settings to switch.</li>
-                                        <li>Added experimental simple code mode: backtick-wrapped blocks now support let/const/var and return the value of the last expression.</li>
-                                        <li>Extended simple code mode so variable declarations can assign a backtick block result (example: v = `a=2; b=3; a+b`).</li>
-                                        <li>Added multiline simple code blocks: Enter now adds new lines while a block is open and evaluates when the closing backtick is present.</li>
-                                        <li>Editing a previously calculated line now clears its inline = result suffix immediately, so expression updates happen on a clean source line.</li>
-                                        <li>Added stale dependency markers: changing a variable declaration now marks evaluated dependent lines with a gutter * until they are recalculated.</li>
-                                        <li>Added a top stale-state banner with quick actions to re-evaluate all expression lines or clear stale markers.</li>
-                                        <li>Smart brackets: selecting text and pressing (, [, or {'{'} wraps the selection in the matching bracket pair.</li>
-                                        <li>Updated editor intelligence timing: pop-up hints now wait 300 ms after typing, are not shown on startup, and auto-hide after 3 seconds of no typing.</li>
-                                        <li>Changed end-of-line comment support to use " as the comment starter in backend evaluation and frontend source parsing.</li>
-                                        <li>Updated comment behavior so comment-only lines are treated as notes and no longer evaluate to = error.</li>
-                                        <li>Added theme-aware comment token coloring so text after " is rendered with comment styling from the active theme.</li>
-                                    </ul>
-                                )}
-                            </div>
+                            </p>
+                            <AISettingsPanel
+                                settings={aiSettingsDraft}
+                                keyStatus={aiKeyStatus}
+                                busy={aiSettingsBusy}
+                                hasUnsavedChanges={aiSettingsHasUnsavedChanges}
+                                showRevertChanges={aiSettingsActionFailed}
+                                applyErrorMessage={aiSettingsApplyError}
+                                onChange={(next) => {
+                                    setAISettingsDraft(next);
+                                }}
+                                onTestAndSave={testAndSaveAISettings}
+                                onRevertChanges={revertAISettingsDraftToSaved}
+                                onSaveKey={saveAIKeyToBackend}
+                                onClearKey={clearAIKeyInBackend}
+                            />
                         </div>
 
                         {/* ── Appearance ── */}
@@ -2576,67 +3259,85 @@ function App() {
                                 <div className="settings-card-title">App theme</div>
                                 <div className="settings-card-desc">Select which app theme to display</div>
                             </div>
-                            <div className="settings-options">
-                                {(['light', 'dark', 'system'] as const).map((t) => (
-                                    <label key={t} className="settings-option">
-                                        <input
-                                            type="radio"
-                                            name="theme"
-                                            value={t}
-                                            checked={theme.type === t}
-                                            onChange={() => setTheme({ type: t as any })}
-                                        />
-                                        <span>
-                                            {t === 'light' ? 'Light' : t === 'dark' ? 'Dark' : 'Use system setting'}
+                            <div className="saved-theme-list" role="list">
+                                <div className="saved-theme-group" role="group" aria-label="Browse themes">
+                                    <button
+                                        type="button"
+                                        className="saved-theme-item saved-theme-browse-btn"
+                                        onClick={openThemeStoreInSidebar}
+                                        role="listitem"
+                                    >
+                                        <span className="saved-theme-icon saved-theme-icon--browse" aria-hidden="true">+</span>
+                                        <span className="saved-theme-text">
+                                            <span className="saved-theme-name">Browse themes</span>
+                                            <span className="saved-theme-meta">Theme store</span>
                                         </span>
-                                    </label>
-                                ))}
-                            </div>
-                            <div className="settings-options" style={{ marginTop: '12px' }}>
-                                <button 
-                                    className="settings-action-btn settings-open-theme-store-btn"
-                                    onClick={openThemeStoreInSidebar}
-                                >
-                                    Browse Theme Store
-                                </button>
-                            </div>
-                            {savedThemes.length > 0 && (
-                                <div className="saved-theme-section">
-                                    <div className="saved-theme-title">Saved themes</div>
-                                    <div className="saved-theme-list">
-                                        {savedThemes.map((entry) => {
-                                            const isActive = theme.type === 'custom' && theme.customId === entry.id;
-                                            return (
-                                                <div key={entry.id} className="saved-theme-chip-row">
-                                                    <button
-                                                        type="button"
-                                                        className={`saved-theme-chip${isActive ? ' saved-theme-chip--active' : ''}`}
-                                                        onClick={() => setTheme({
-                                                            type: 'custom',
-                                                            customColors: entry.colors,
-                                                            customId: entry.id,
-                                                            customThemeBase: entry.themeBase,
-                                                        })}
-                                                        title={entry.publisher ? `${entry.name} by ${entry.publisher}` : entry.name}
-                                                    >
-                                                        {entry.iconUrl && <img src={entry.iconUrl} alt="" aria-hidden="true" />}
-                                                        <span>{entry.name}</span>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="saved-theme-delete-btn"
-                                                        onClick={() => deleteSavedTheme(entry.id)}
-                                                        aria-label={`Delete saved theme ${entry.name}`}
-                                                        title={`Delete ${entry.name}`}
-                                                    >
-                                                        ×
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    </button>
                                 </div>
-                            )}
+
+                                <div className="saved-theme-group" role="group" aria-label="Default themes">
+                                    {([
+                                        { key: 'light', name: 'Light', meta: 'Default theme', icon: 'L' },
+                                        { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
+                                        { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
+                                    ] as const).map((entry) => {
+                                        const isActive = theme.type === entry.key;
+                                        return (
+                                            <button
+                                                key={entry.key}
+                                                type="button"
+                                                className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
+                                                onClick={() => setTheme({ type: entry.key })}
+                                                role="listitem"
+                                            >
+                                                <span className="saved-theme-icon saved-theme-icon--builtin" aria-hidden="true">{entry.icon}</span>
+                                                <span className="saved-theme-text">
+                                                    <span className="saved-theme-name">{entry.name}</span>
+                                                    <span className="saved-theme-meta">{entry.meta}</span>
+                                                </span>
+                                                <span className="saved-theme-check" aria-hidden="true">v</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="saved-theme-group" role="group" aria-label="Downloaded themes">
+                                    {savedThemes.map((entry) => {
+                                        const isActive = theme.type === 'custom' && theme.customId === entry.id;
+                                        return (
+                                            <div key={entry.id} className="saved-theme-item-wrapper">
+                                                <button
+                                                    type="button"
+                                                    className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
+                                                    onClick={() => setTheme({
+                                                        type: 'custom',
+                                                        customColors: entry.colors,
+                                                        customId: entry.id,
+                                                        customThemeBase: entry.themeBase,
+                                                    })}
+                                                    role="listitem"
+                                                >
+                                                    {entry.iconUrl && <img src={entry.iconUrl} alt="" aria-hidden="true" className="saved-theme-icon" />}
+                                                    <span className="saved-theme-text">
+                                                        <span className="saved-theme-name">{entry.name}</span>
+                                                        {entry.publisher && <span className="saved-theme-meta">{entry.publisher}</span>}
+                                                    </span>
+                                                    <span className="saved-theme-check" aria-hidden="true">v</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="saved-theme-delete-btn"
+                                                    onClick={() => deleteSavedTheme(entry.id)}
+                                                    aria-label={`Delete saved theme ${entry.name}`}
+                                                    title={`Delete ${entry.name}`}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
 
                         {/* ── Editor ── */}
@@ -2685,6 +3386,23 @@ function App() {
                                     </button>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Word wrap</div>
+                                    <div className="settings-row-desc">Wrap long lines inside the editor</div>
+                                </div>
+                                <label className="settings-toggle" aria-label="Toggle word wrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={wordWrap}
+                                        onChange={(e) => setWordWrap(e.target.checked)}
+                                    />
+                                    <span className="settings-toggle-track" />
+                                </label>
+                            </div>
                         </div>
 
                         {/* ── Calculation ── */}
@@ -2779,23 +3497,6 @@ function App() {
                             </div>
                         </div>
 
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Word wrap</div>
-                                    <div className="settings-row-desc">Wrap long lines at window edge</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle word wrap">
-                                    <input
-                                        type="checkbox"
-                                        checked={wordWrap}
-                                        onChange={(e) => setWordWrap(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                            </div>
-                        </div>
-
                         {/* ── Window ── */}
                         <p className="settings-section-label">Window</p>
                         <div className="settings-card">
@@ -2856,6 +3557,90 @@ function App() {
                     </div>
                     )}
                 </div>
+
+            <div
+                className={`settings-panel settings-panel--ai-debug${showAIDebug ? ' settings-panel--open' : ''}`}
+                role="dialog"
+                aria-label="AI Debug Log"
+                aria-hidden={!showAIDebug}
+            >
+                <AIDebugDrawer
+                    entries={aiDebugLog}
+                    onClear={() => setAIDebugLog([])}
+                    onClose={() => setShowAIDebug(false)}
+                />
+            </div>
+
+            {showHelp && (
+                <div
+                    className={`settings-panel settings-panel--open${helpPanelPosition === 'left' ? ' settings-panel--left' : ''}${helpPanelPosition === 'bottom' ? ' settings-panel--bottom' : ''}`}
+                    role="dialog"
+                    aria-label="Help"
+                >
+                    <div className="settings-header">
+                        <button
+                            type="button"
+                            className="settings-back"
+                            onClick={() => setShowHelp(false)}
+                            aria-label="Back"
+                        >
+                            &#8594;
+                        </button>
+                        <span className="settings-title">Help</span>
+                        <div className="settings-header-actions" role="group" aria-label="Help panel position">
+                            <button
+                                type="button"
+                                className={`settings-pos-btn${helpPanelPosition === 'left' ? ' settings-pos-btn--active' : ''}`}
+                                aria-label="Move help panel to left"
+                                title="Move help panel to left"
+                                onClick={() => setHelpPanelPosition('left')}
+                            >
+                                <span className="settings-pos-icon settings-pos-icon--left" aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                className={`settings-pos-btn${helpPanelPosition === 'right' ? ' settings-pos-btn--active' : ''}`}
+                                aria-label="Move help panel to right"
+                                title="Move help panel to right"
+                                onClick={() => setHelpPanelPosition('right')}
+                            >
+                                <span className="settings-pos-icon settings-pos-icon--right" aria-hidden="true" />
+                            </button>
+                            <button
+                                type="button"
+                                className={`settings-pos-btn${helpPanelPosition === 'bottom' ? ' settings-pos-btn--active' : ''}`}
+                                aria-label="Move help panel to bottom"
+                                title="Move help panel to bottom"
+                                onClick={() => setHelpPanelPosition('bottom')}
+                            >
+                                <span className="settings-pos-icon settings-pos-icon--bottom" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="settings-body">
+                        <HelpPanel />
+                    </div>
+                </div>
+            )}
+            {showClearWorksheetConfirm && (
+                <div
+                    className="recalc-modal-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="clear-worksheet-title"
+                    aria-describedby="clear-worksheet-message"
+                    onMouseDown={cancelClearWorksheet}
+                >
+                    <div className="recalc-modal" onMouseDown={(event) => event.stopPropagation()}>
+                        <h3 id="clear-worksheet-title">Confirm Clear Worksheet</h3>
+                        <p id="clear-worksheet-message">Clear worksheet and remove all expressions?</p>
+                        <div className="recalc-modal-actions">
+                            <button type="button" className="recalc-btn-no" onClick={cancelClearWorksheet}>Cancel</button>
+                            <button type="button" className="recalc-btn-yes" onClick={confirmClearWorksheet}>Clear</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
