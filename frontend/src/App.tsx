@@ -1005,7 +1005,7 @@ function App() {
     const saveAIKeyToBackend = async (apiKey: string) => {
         setAISettingsBusy(true);
         try {
-            const keyStatus = await SetAIAPIKey(apiKey) as AIKeyStatusState;
+            const keyStatus = await SetAIAPIKey(apiKey, aiSettingsDraft as any) as AIKeyStatusState;
             setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
             if (keyStatus?.hasKey) {
                 setAISettings((current) => {
@@ -1041,7 +1041,7 @@ function App() {
     const clearAIKeyInBackend = async () => {
         setAISettingsBusy(true);
         try {
-            const keyStatus = await ClearAIAPIKey() as AIKeyStatusState;
+            const keyStatus = await ClearAIAPIKey(aiSettingsDraft as any) as AIKeyStatusState;
             setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
             setAISettings((current) => ({ ...current, customKeySourceEndpoint: '' }));
             setAISettingsDraft((current) => ({ ...current, customKeySourceEndpoint: '' }));

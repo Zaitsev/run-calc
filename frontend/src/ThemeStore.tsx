@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { SearchThemes, InstallTheme } from '../wailsjs/go/main/App';
 import './ThemeStore.css';
 
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 1000;
 
 function isCancelledSearchError(err: unknown): boolean {
     const message = err instanceof Error ? err.message : String(err ?? '');

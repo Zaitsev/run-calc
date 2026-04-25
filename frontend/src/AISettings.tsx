@@ -91,6 +91,30 @@ const providerPresetOptions: ProviderPresetOption[] = [
     },
 ];
 
+const chatCompletionsSuffix = '/chat/completions';
+
+function normalizeEndpointForReuseComparison(rawEndpoint: string): string {
+    const trimmed = rawEndpoint.trim();
+    if (trimmed.length === 0) {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(trimmed);
+        if (!parsed.pathname.endsWith(chatCompletionsSuffix)) {
+            if (parsed.pathname.endsWith('/')) {
+                parsed.pathname = `${parsed.pathname}chat/completions`;
+            } else {
+                parsed.pathname = `${parsed.pathname}/chat/completions`;
+            }
+        }
+        return parsed.toString();
+    } catch {
+        // Keep raw value fallback so warning behavior remains conservative for invalid URLs.
+        return trimmed;
+    }
+}
+
 export function AISettingsPanel({
     settings,
     keyStatus,
@@ -108,12 +132,14 @@ export function AISettingsPanel({
 
     const customEndpointSource = (settings.customKeySourceEndpoint || '').trim();
     const customEndpointCurrent = settings.endpoint.trim();
+    const normalizedCustomEndpointSource = normalizeEndpointForReuseComparison(customEndpointSource);
+    const normalizedCustomEndpointCurrent = normalizeEndpointForReuseComparison(customEndpointCurrent);
     const customEndpointReuseRisk =
         settings.providerPreset === 'custom' &&
         keyStatus.hasKey &&
         customEndpointSource.length > 0 &&
         customEndpointCurrent.length > 0 &&
-        customEndpointSource.toLowerCase() !== customEndpointCurrent.toLowerCase() &&
+        normalizedCustomEndpointSource.toLowerCase() !== normalizedCustomEndpointCurrent.toLowerCase() &&
         !settings.allowCustomEndpointKeyReuse;
 
     const saveKey = async () => {
