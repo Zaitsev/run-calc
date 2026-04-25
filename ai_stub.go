@@ -366,12 +366,11 @@ func validateAISettingsConnection(settings AISettings) error {
 	return nil
 }
 
-func (a *App) SetAIAPIKey(apiKey string) AIKeyStatus {
+func (a *App) SetAIAPIKey(apiKey string, input AISettings) AIKeyStatus {
 	a.aiMu.Lock()
 	defer a.aiMu.Unlock()
 
-	settings, _ := loadAISettings()
-	settings = normalizeAISettings(settings)
+	settings := normalizeAISettings(input)
 
 	if strings.TrimSpace(apiKey) == "" {
 		return AIKeyStatus{HasKey: false, StorageMode: "none", LastError: "API key is empty"}
@@ -379,18 +378,10 @@ func (a *App) SetAIAPIKey(apiKey string) AIKeyStatus {
 
 	if err := keyring.Set(aiServiceName, aiAPIKeyUserForSettings(settings), strings.TrimSpace(apiKey)); err == nil {
 		_ = removeAIInsecureKeyFileForSettings(settings)
-		if strings.EqualFold(settings.ProviderPreset, customAIProviderPreset) {
-			settings.CustomKeySourceEndpoint = settings.Endpoint
-			_ = saveAISettings(settings)
-		}
 		return resolveAIKeyStatus(settings)
 	} else if canUseLinuxFallback(settings) {
 		writeErr := writeAIInsecureKeyFileForSettings(settings, strings.TrimSpace(apiKey))
 		if writeErr == nil {
-			if strings.EqualFold(settings.ProviderPreset, customAIProviderPreset) {
-				settings.CustomKeySourceEndpoint = settings.Endpoint
-				_ = saveAISettings(settings)
-			}
 			status := resolveAIKeyStatus(settings)
 			if status.LastError == "" {
 				status.LastError = err.Error()
@@ -403,19 +394,14 @@ func (a *App) SetAIAPIKey(apiKey string) AIKeyStatus {
 	}
 }
 
-func (a *App) ClearAIAPIKey() AIKeyStatus {
+func (a *App) ClearAIAPIKey(input AISettings) AIKeyStatus {
 	a.aiMu.Lock()
 	defer a.aiMu.Unlock()
 
-	settings, _ := loadAISettings()
-	settings = normalizeAISettings(settings)
+	settings := normalizeAISettings(input)
 
 	_ = keyring.Delete(aiServiceName, aiAPIKeyUserForSettings(settings))
 	_ = removeAIInsecureKeyFileForSettings(settings)
-	if strings.EqualFold(settings.ProviderPreset, customAIProviderPreset) {
-		settings.CustomKeySourceEndpoint = ""
-		_ = saveAISettings(settings)
-	}
 	return AIKeyStatus{HasKey: false, StorageMode: "none"}
 }
 
