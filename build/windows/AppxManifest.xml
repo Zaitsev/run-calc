@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppxManifest.xml for Run-Calc Windows Store / MSIX package.
+
+  Before submitting to Partner Center:
+    1. Replace PUBLISHER_IDENTITY_PLACEHOLDER with the Publisher string from your
+       Partner Center account dashboard (Settings > Account info > Publisher ID),
+       e.g.  CN=12345678-ABCD-EFGH-IJKL-000000000000
+    2. Replace PACKAGE_NAME_PLACEHOLDER with the Package/Identity Name reserved in
+       Partner Center (e.g. YourCompany.RunCalc).
+    3. Replace STORE_APP_ID_PLACEHOLDER in the StoreId attribute with the Store ID
+       shown on the App identity page in Partner Center.
+    4. Run:  python process_icons.py --store-assets
+       to populate build/windows/store-assets/ from hare-calc.jpg.
+    5. Build:  wails build -clean
+       then package:  makeappx pack /d <staging-dir> /p Run-Calc.msix /nv
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="PACKAGE_NAME_PLACEHOLDER"
+    Publisher="PUBLISHER_IDENTITY_PLACEHOLDER"
+    Version="0.5.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Run-Calc</DisplayName>
+    <PublisherDisplayName>vladzaitsev</PublisherDisplayName>
+    <Logo>store-assets\StoreLogo\StoreLogo.scale-100.png</Logo>
+    <Description>Run-Calc is a notepad-style calculator — type expressions, press Enter, see results inline.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="RunCalc" Executable="Run-Calc.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Run-Calc"
+        Description="Notepad-style calculator"
+        BackgroundColor="transparent"
+        Square150x150Logo="store-assets\Square150x150Logo\Square150x150Logo.scale-100.png"
+        Square44x44Logo="store-assets\Square44x44Logo\Square44x44Logo.scale-100.png">
+        <uap:DefaultTile
+          Wide310x150Logo="store-assets\Wide310x150Logo\Wide310x150Logo.scale-100.png"
+          Square310x310Logo="store-assets\Square310x310Logo\Square310x310Logo.scale-100.png"
+          ShortName="Run-Calc" />
+        <uap:SplashScreen Image="store-assets\Square150x150Logo\Square150x150Logo.scale-200.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="run-calc" />
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      runFullTrust is required for all Win32 / desktop-bridge apps and allows
+      access to the system tray, credential manager, and other Win32 APIs.
+    -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- internetClient is needed for AI features that call external APIs. -->
+    <Capability Name="internetClient" />
+  </Capabilities>
+
+</Package>

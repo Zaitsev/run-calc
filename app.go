@@ -40,7 +40,8 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.minimiseToTrayOnClose.Store(true)
-	a.restoreShortcutOn.Store(true)
+	// Global hotkeys are blocked by the AppContainer sandbox when running as MSIX.
+	a.restoreShortcutOn.Store(!isRunningAsMSIX())
 	a.startTray()
 	a.ensureRestoreHotkeyRegistration()
 	a.ShowWindow()
@@ -142,8 +143,17 @@ func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
 }
 
 func (a *App) SetRestoreShortcutEnabled(enabled bool) {
+	if isRunningAsMSIX() {
+		return // hotkeys unavailable in AppContainer sandbox
+	}
 	a.restoreShortcutOn.Store(enabled)
 	a.ensureRestoreHotkeyRegistration()
+}
+
+// IsRunningAsMSIX reports whether the app is running inside an MSIX package.
+// When true, global hotkeys are unavailable due to AppContainer sandbox restrictions.
+func (a *App) IsRunningAsMSIX() bool {
+	return isRunningAsMSIX()
 }
 
 func (a *App) ensureRestoreHotkeyRegistration() {

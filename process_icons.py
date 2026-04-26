@@ -75,6 +75,20 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_SIZES,
         help="Square PNG sizes to generate.",
     )
+    parser.add_argument(
+        "--store-assets",
+        action="store_true",
+        default=False,
+        help=(
+            "Also generate Windows Store icon assets into "
+            "build/windows/store-assets/ (required for MSIX / Partner Center)."
+        ),
+    )
+    parser.add_argument(
+        "--store-assets-dir",
+        default="build/windows/store-assets",
+        help="Directory where Store icon assets are written.",
+    )
     return parser.parse_args()
 
 
@@ -148,6 +162,83 @@ def pick_required_size(outputs: dict[int, Path], required_size: int) -> Path:
     )
 
 
+def run_ffmpeg_wide(
+    ffmpeg_path: str, source: Path, output: Path, width: int, height: int
+) -> None:
+    """Generate a wide tile by centering the square logo on a white canvas."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # Scale the source so its height matches the tile height, then pad width.
+    command = [
+        ffmpeg_path,
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        str(source),
+        "-vf",
+        (
+            f"scale=-1:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:0:white"
+        ),
+        "-frames:v",
+        "1",
+        str(output),
+    ]
+    subprocess.run(command, check=True)
+
+
+# Windows Store scale suffixes and their multipliers relative to the base size.
+# scale-100 = 1×, scale-125 = 1.25×, scale-150 = 1.5×, scale-200 = 2×, scale-400 = 4×
+_STORE_SCALES: list[tuple[str, float]] = [
+    ("scale-100", 1.0),
+    ("scale-125", 1.25),
+    ("scale-150", 1.5),
+    ("scale-200", 2.0),
+    ("scale-400", 4.0),
+]
+
+# (asset_folder, base_px, include_400_scale)
+_STORE_SQUARE_ASSETS: list[tuple[str, int, bool]] = [
+    ("Square44x44Logo", 44, False),
+    ("Square150x150Logo", 150, False),
+    ("Square310x310Logo", 310, False),
+    ("StoreLogo", 50, False),
+]
+
+# (asset_folder, base_width, base_height)
+_STORE_WIDE_ASSETS: list[tuple[str, int, int]] = [
+    ("Wide310x150Logo", 310, 150),
+]
+
+
+def generate_store_assets(ffmpeg_path: str, source: Path, store_dir: Path) -> int:
+    """Generate all Windows Store / MSIX icon assets under *store_dir*.
+
+    Returns the count of files written.
+    """
+    count = 0
+
+    # Square tiles
+    for folder, base_px, include_400 in _STORE_SQUARE_ASSETS:
+        scales = _STORE_SCALES if include_400 else _STORE_SCALES[:-1]
+        for suffix, multiplier in scales:
+            size = round(base_px * multiplier)
+            out = store_dir / folder / f"{folder}.{suffix}.png"
+            run_ffmpeg(ffmpeg_path, source, out, size)
+            count += 1
+
+    # Wide tiles
+    for folder, base_w, base_h in _STORE_WIDE_ASSETS:
+        for suffix, multiplier in _STORE_SCALES[:-1]:  # skip scale-400 for wide
+            w = round(base_w * multiplier)
+            h = round(base_h * multiplier)
+            out = store_dir / folder / f"{folder}.{suffix}.png"
+            run_ffmpeg_wide(ffmpeg_path, source, out, w, h)
+            count += 1
+
+    return count
+
+
 def main() -> int:
     args = parse_args()
     source = Path(args.source)
@@ -175,6 +266,12 @@ def main() -> int:
     print(f"Wails app icon: {appicon_path}")
     print(f"Frontend favicon: {favicon_path}")
     print(f"Windows icon: {ico_path}")
+
+    if args.store_assets:
+        store_dir = Path(args.store_assets_dir)
+        n = generate_store_assets(ffmpeg_path, source, store_dir)
+        print(f"Store assets ({n} files): {store_dir}")
+
     return 0
 
 

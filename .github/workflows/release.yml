@@ -283,12 +283,102 @@ jobs:
           path: release/*-windows-installer.zip
           if-no-files-found: error
 
+  build-msix:
+    name: Package MSIX
+    runs-on: windows-latest
+    # Skip when a macOS-only workflow_dispatch is requested (no Windows exe was built).
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' || inputs.build_target == 'windows' }}
+    needs:
+      - prepare
+      - build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download Windows standalone artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: release-windows-standalone
+          path: release-windows-dl
+
+      - name: Extract executable
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem "release-windows-dl" -Filter "*-windows-standalone.zip" | Select-Object -First 1
+          if ($null -eq $zip) { throw "Windows standalone zip not found." }
+          Expand-Archive -Path $zip.FullName -DestinationPath "release-windows-dl\extracted"
+          $exe = Get-ChildItem "release-windows-dl\extracted" -Recurse -Filter "*.exe" | Select-Object -First 1
+          if ($null -eq $exe) { throw "Executable not found inside standalone zip." }
+          New-Item -ItemType Directory -Path "build\bin" -Force | Out-Null
+          Copy-Item $exe.FullName "build\bin\$($env:APP_NAME).exe" -Force
+
+      - name: Resolve version quad for MSIX
+        id: ver
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $raw = $env:VERSION -replace '^v', ''
+          # Keep only numeric dot-separated parts (handles manual-123, pre-release, etc.)
+          $parts = ($raw -split '\.' | Where-Object { $_ -match '^\d+$' })
+          while ($parts.Count -lt 4) { $parts += '0' }
+          $quad = ($parts[0..3]) -join '.'
+          "quad=$quad" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Assemble MSIX staging directory
+        shell: pwsh
+        env:
+          VERSION_QUAD: ${{ steps.ver.outputs.quad }}
+        run: |
+          $staging = "msix-staging"
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+
+          # Executable
+          Copy-Item "build\bin\$($env:APP_NAME).exe" "$staging\$($env:APP_NAME).exe"
+
+          # Manifest — substitute version placeholder
+          $manifest = Get-Content "build\windows\AppxManifest.xml" -Raw
+          $manifest = $manifest -replace 'Version="0\.5\.1\.0"', "Version=`"$($env:VERSION_QUAD)`""
+          [System.IO.File]::WriteAllText("$staging\AppxManifest.xml", $manifest, [System.Text.Encoding]::UTF8)
+
+          # Store assets
+          Copy-Item -Recurse "build\windows\store-assets" "$staging\store-assets"
+
+      - name: Locate makeappx.exe
+        id: makeappx
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'x64' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if ($null -eq $exe) { throw "makeappx.exe not found in Windows SDK." }
+          "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Pack MSIX
+        shell: pwsh
+        env:
+          MAKEAPPX: ${{ steps.makeappx.outputs.path }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $out = "build\bin\$($env:APP_NAME)-$($env:VERSION)-windows.msix"
+          & $env:MAKEAPPX pack /d msix-staging /p $out /nv
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed (exit $LASTEXITCODE)." }
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-msix
+          path: build/bin/*-windows.msix
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
     needs:
       - prepare
       - build
+      - build-msix
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -18,6 +18,10 @@ export function GetAISettings() {
   return window['go']['main']['App']['GetAISettings']();
 }
 
+export function IsRunningAsMSIX() {
+  return window['go']['main']['App']['IsRunningAsMSIX']();
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
