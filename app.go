@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -123,11 +124,13 @@ func (a *App) ShowWindow() {
 	wruntime.WindowUnminimise(a.ctx)
 
 	// Toggle always-on-top briefly to reliably bring restored tray windows to front on Windows.
-	wruntime.WindowSetAlwaysOnTop(a.ctx, true)
-	go func(ctx context.Context) {
-		time.Sleep(120 * time.Millisecond)
-		wruntime.WindowSetAlwaysOnTop(ctx, false)
-	}(a.ctx)
+	if runtime.GOOS == "windows" {
+		wruntime.WindowSetAlwaysOnTop(a.ctx, true)
+		go func(ctx context.Context) {
+			time.Sleep(120 * time.Millisecond)
+			wruntime.WindowSetAlwaysOnTop(ctx, false)
+		}(a.ctx)
+	}
 }
 
 func (a *App) onSecondInstanceLaunch(_ options.SecondInstanceData) {
