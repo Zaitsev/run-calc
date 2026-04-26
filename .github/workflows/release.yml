@@ -261,7 +261,7 @@ jobs:
 
       - name: Upload packaged artifacts (non-Windows)
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: release/*
@@ -269,7 +269,7 @@ jobs:
 
       - name: Upload Windows standalone artifact
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-standalone
           path: release/*-windows-standalone.zip
@@ -277,7 +277,7 @@ jobs:
 
       - name: Upload Windows installer artifact
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-installer
           path: release/*-windows-installer.zip
@@ -294,14 +294,14 @@ jobs:
       contents: write
     steps:
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: release
           merge-multiple: true
 
       - name: Publish release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
