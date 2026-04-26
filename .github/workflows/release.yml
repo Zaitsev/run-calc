@@ -261,7 +261,7 @@ jobs:
 
       - name: Upload packaged artifacts (non-Windows)
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: release/*
@@ -269,7 +269,7 @@ jobs:
 
       - name: Upload Windows standalone artifact
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-standalone
           path: release/*-windows-standalone.zip
@@ -277,7 +277,7 @@ jobs:
 
       - name: Upload Windows installer artifact
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-installer
           path: release/*-windows-installer.zip
