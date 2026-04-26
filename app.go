@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 )
@@ -40,6 +43,7 @@ func (a *App) startup(ctx context.Context) {
 	a.restoreShortcutOn.Store(true)
 	a.startTray()
 	a.ensureRestoreHotkeyRegistration()
+	a.ShowWindow()
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -118,6 +122,19 @@ func (a *App) ShowWindow() {
 
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
+
+	// Toggle always-on-top briefly to reliably bring restored tray windows to front on Windows.
+	if runtime.GOOS == "windows" {
+		wruntime.WindowSetAlwaysOnTop(a.ctx, true)
+		go func(ctx context.Context) {
+			time.Sleep(120 * time.Millisecond)
+			wruntime.WindowSetAlwaysOnTop(ctx, false)
+		}(a.ctx)
+	}
+}
+
+func (a *App) onSecondInstanceLaunch(_ options.SecondInstanceData) {
+	a.ShowWindow()
 }
 
 func (a *App) SetMinimiseToTrayOnClose(enabled bool) {

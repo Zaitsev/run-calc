@@ -3123,7 +3123,7 @@ function App() {
                                 className="status-menu-item status-menu-item--danger"
                                 onClick={() => runBurgerAction(() => Quit())}
                             >
-                                Quit
+                                Quit (your work is saved)
                             </button>
                         </div>
                     )}

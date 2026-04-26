@@ -187,7 +187,7 @@ func showTrayMenu(hwnd win.HWND) {
 	defer win.DestroyMenu(menu)
 
 	showText, _ := syscall.UTF16PtrFromString("Show Run-Calc")
-	quitText, _ := syscall.UTF16PtrFromString("Quit")
+	quitText, _ := syscall.UTF16PtrFromString("Quit (your work is saved)")
 
 	showItem := win.MENUITEMINFO{
 		CbSize:     uint32(unsafe.Sizeof(win.MENUITEMINFO{})),

@@ -64,6 +64,13 @@ Use arithmetic-focused expression support:
 - `wails dev` already handles frontend rebuild/reload, so you do not need to run `npm run build` after each change.
 - Use `npm run build` (frontend) and `wails build` only for release verification/package builds.
 
+### Go Test Working Directory (Windows)
+- If terminal cwd is `frontend` and you run `go test ./...`, you may get: `go: warning: "./..." matched no packages`.
+- Cause: Go packages are in the repository root/module, not in `frontend`.
+- Correct approach on Windows PowerShell when currently in `frontend`:
+  - `Set-Location ..; go test ./...`
+- Preferred habit: run Go commands (`go test`, `go build`, `wails dev`) from the project root.
+
 ## CI Package Manager Rule (Important)
 - For this repository, do not use `npm ci` in CI/frontend build steps.
 - Use `npm install --no-fund` (and then `npm run build` when needed).
