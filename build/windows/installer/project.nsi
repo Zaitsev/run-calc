@@ -91,6 +91,7 @@ Function EnsureAppCanBeUpdated
 retry_check:
     nsExec::ExecToStack 'cmd /C tasklist /FI "IMAGENAME eq ${PRODUCT_EXECUTABLE}" /NH /FO CSV | findstr /I /B /C:"\"${PRODUCT_EXECUTABLE}\"," >nul'
     Pop $0
+    Pop $1
 
     StrCmp $0 "0" app_running
     Goto done
