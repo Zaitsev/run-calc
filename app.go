@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 )
@@ -118,6 +119,10 @@ func (a *App) ShowWindow() {
 
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
+}
+
+func (a *App) onSecondInstanceLaunch(_ options.SecondInstanceData) {
+	a.ShowWindow()
 }
 
 func (a *App) SetMinimiseToTrayOnClose(enabled bool) {

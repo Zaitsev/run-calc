@@ -77,6 +77,53 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
 InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}" # Per-user install folder so the installer does not require elevation.
 ShowInstDetails show # This will always show the installation details.
 
+Function EnsureAppCanBeUpdated
+    SetDetailsPrint both
+    DetailPrint "Checking whether ${INFO_PRODUCTNAME} is running"
+    SetDetailsPrint listonly
+
+retry_check:
+    nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq ${PRODUCT_EXECUTABLE}" /NH /FO CSV'
+    Pop $0
+    Pop $1
+
+    StrCpy $2 $1 5
+    StrCmp $2 "INFO:" done
+    StrCmp $1 "" done
+
+    IfSilent silent_running 0
+    MessageBox MB_YESNOCANCEL|MB_ICONEXCLAMATION "${INFO_PRODUCTNAME} is currently running.$\r$\n$\r$\nYes: Close app now$\r$\nNo: I already closed it, retry check$\r$\nCancel: Exit installer" IDYES close_app IDNO retry_check
+    Goto cancel_install
+
+close_app:
+    SetDetailsPrint both
+    DetailPrint "Attempting to close ${INFO_PRODUCTNAME}"
+    SetDetailsPrint listonly
+
+    nsExec::ExecToLog 'taskkill /IM "${PRODUCT_EXECUTABLE}" /T'
+    Pop $0
+
+    nsExec::ExecToLog 'taskkill /F /IM "${PRODUCT_EXECUTABLE}" /T'
+    Pop $0
+    Goto retry_check
+
+silent_running:
+    SetDetailsPrint both
+    DetailPrint "${INFO_PRODUCTNAME} is running. Silent install cannot continue."
+    SetDetailsPrint listonly
+    SetErrorLevel 73
+    Abort
+
+cancel_install:
+    SetDetailsPrint both
+    DetailPrint "Installation cancelled by user because ${INFO_PRODUCTNAME} is still running."
+    SetDetailsPrint listonly
+    SetErrorLevel 74
+    Quit
+
+done:
+FunctionEnd
+
 Function .onInit
     !insertmacro wails.checkArchitecture
     InitPluginsDir
@@ -87,6 +134,8 @@ FunctionEnd
 
 Section
     !insertmacro wails.setShellContext
+
+    Call EnsureAppCanBeUpdated
 
     !insertmacro wails.webview2runtime
 
