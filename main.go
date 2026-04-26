@@ -27,7 +27,7 @@ func applicationMenu(app *App) *menu.Menu {
 		app.clearWorksheet()
 	})
 	fileMenu.AddSeparator()
-	fileMenu.AddText("Quit (work is saved)", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+	fileMenu.AddText("Quit (your work is saved)", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		app.quit()
 	})
 

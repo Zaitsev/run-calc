@@ -92,7 +92,7 @@ export function HelpPanel() {
                         <li>Tab: Accept the top variable/function/constant suggestion when shown.</li>
                         <li>( [ {'{'}: With text selected, wraps the selection in the matching bracket pair.</li>
                         <li>Ctrl/Cmd + R: Reload app window.</li>
-                        <li>Ctrl/Cmd + Q: Quit app (your work is saved).</li>
+                        <li>Ctrl/Cmd + Q: Quit (your work is saved).</li>
                         <li>Press Escape twice quickly: Hide app window.</li>
                     </ul>
                 )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 
 export type ThemeType = 'light' | 'dark' | 'system' | 'custom';
 
@@ -259,7 +259,7 @@ export function useTheme() {
         }
     });
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         applyTheme(theme);
         localStorage.setItem(THEME_KEY, JSON.stringify(theme));
 

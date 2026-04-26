@@ -56,6 +56,8 @@ ManifestDPIAware true
 !define MUI_UNICON "..\icon.ico"
 # !define MUI_WELCOMEFINISHPAGE_BITMAP "resources\leftimage.bmp" #Include this to add a bitmap on the left side of the Welcome Page. Must be a size of 164x314
 !define MUI_FINISHPAGE_NOAUTOCLOSE # Wait on the INSTFILES page so the user can take a look into the details of the installation steps
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
+!define MUI_FINISHPAGE_RUN_TEXT "Run ${INFO_PRODUCTNAME} now"
 !define MUI_ABORTWARNING # This will warn the user if they exit from the installer.
 
 !insertmacro MUI_PAGE_WELCOME # Welcome to the installer page.
@@ -77,27 +79,32 @@ OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the inst
 InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}" # Per-user install folder so the installer does not require elevation.
 ShowInstDetails show # This will always show the installation details.
 
+!define CLOSE_APP_MAX_RETRIES 15
+!define CLOSE_APP_RECHECK_DELAY_MS 1000
+
 Function EnsureAppCanBeUpdated
     SetDetailsPrint both
     DetailPrint "Checking whether ${INFO_PRODUCTNAME} is running"
     SetDetailsPrint listonly
+    StrCpy $3 0
 
 retry_check:
-    nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq ${PRODUCT_EXECUTABLE}" /NH /FO CSV'
+    nsExec::ExecToStack 'cmd /C tasklist /FI "IMAGENAME eq ${PRODUCT_EXECUTABLE}" /NH /FO CSV | findstr /I /B /C:"\"${PRODUCT_EXECUTABLE}\"," >nul'
     Pop $0
-    Pop $1
 
-    StrCpy $2 $1 5
-    StrCmp $2 "INFO:" done
-    StrCmp $1 "" done
+    StrCmp $0 "0" app_running
+    Goto done
+
+app_running:
 
     IfSilent silent_running 0
     MessageBox MB_YESNOCANCEL|MB_ICONEXCLAMATION "${INFO_PRODUCTNAME} is currently running.$\r$\n$\r$\nYes: Close app now$\r$\nNo: I already closed it, retry check$\r$\nCancel: Exit installer" IDYES close_app IDNO retry_check
     Goto cancel_install
 
 close_app:
+    IntOp $3 $3 + 1
     SetDetailsPrint both
-    DetailPrint "Attempting to close ${INFO_PRODUCTNAME}"
+    DetailPrint "Attempt $3/${CLOSE_APP_MAX_RETRIES}: attempting to close ${INFO_PRODUCTNAME}"
     SetDetailsPrint listonly
 
     nsExec::ExecToLog 'taskkill /IM "${PRODUCT_EXECUTABLE}" /T'
@@ -105,7 +112,24 @@ close_app:
 
     nsExec::ExecToLog 'taskkill /F /IM "${PRODUCT_EXECUTABLE}" /T'
     Pop $0
+    Sleep ${CLOSE_APP_RECHECK_DELAY_MS}
+
+    IntCmp $3 ${CLOSE_APP_MAX_RETRIES} close_retry close_failed close_failed
+
+close_retry:
     Goto retry_check
+
+close_failed:
+    IfSilent close_failed_silent 0
+    MessageBox MB_RETRYCANCEL|MB_ICONSTOP "${INFO_PRODUCTNAME} could not be closed automatically after ${CLOSE_APP_MAX_RETRIES} attempts.$\r$\n$\r$\nClose it manually, then click Retry.$\r$\nClick Cancel to exit installer." IDRETRY retry_check
+    Goto cancel_install
+
+close_failed_silent:
+    SetDetailsPrint both
+    DetailPrint "${INFO_PRODUCTNAME} could not be closed automatically after ${CLOSE_APP_MAX_RETRIES} attempts."
+    SetDetailsPrint listonly
+    SetErrorLevel 75
+    Abort
 
 silent_running:
     SetDetailsPrint both
