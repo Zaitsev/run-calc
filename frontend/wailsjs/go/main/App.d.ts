@@ -14,6 +14,8 @@ export function Greet(arg1:string):Promise<string>;
 
 export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
 
+export function IsRunningAsMSIX():Promise<boolean>;
+
 export function OpenThemeStore():Promise<void>;
 
 export function RunAIQuery(arg1:main.AIRunRequest):Promise<main.AIRunResponse>;

@@ -20,6 +20,16 @@ on:
           - all
           - windows
           - macos
+      enable_msix:
+        description: 'Build Windows MSIX artifact'
+        type: boolean
+        required: false
+        default: false
+      submit_windows_store:
+        description: 'Submit package to Microsoft Store (requires separate credentials flow)'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -283,12 +293,77 @@ jobs:
           path: release/*-windows-installer.zip
           if-no-files-found: error
 
-  release:
-    name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
+  build-msix:
+    name: Package MSIX
+    runs-on: windows-latest
+    # Optional flow: disabled by default and only enabled on manual runs.
+    # Also skip when a macOS-only build target is selected.
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.enable_msix || inputs.submit_windows_store) && (inputs.build_target == 'all' || inputs.build_target == 'windows') }}
     needs:
       - prepare
       - build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download Windows standalone artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: release-windows-standalone
+          path: release-windows-dl
+
+      - name: Extract executable
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem "release-windows-dl" -Filter "*-windows-standalone.zip" | Select-Object -First 1
+          if ($null -eq $zip) { throw "Windows standalone zip not found." }
+          Expand-Archive -Path $zip.FullName -DestinationPath "release-windows-dl\extracted"
+          $exe = Get-ChildItem "release-windows-dl\extracted" -Recurse -Filter "*.exe" | Select-Object -First 1
+          if ($null -eq $exe) { throw "Executable not found inside standalone zip." }
+          New-Item -ItemType Directory -Path "build\bin" -Force | Out-Null
+          Copy-Item $exe.FullName "build\bin\$($env:APP_NAME).exe" -Force
+
+      - name: Resolve version quad for MSIX
+        id: ver
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          $raw = $env:VERSION -replace '^v', ''
+          # Keep only numeric dot-separated parts (handles manual-123, pre-release, etc.)
+          $parts = ($raw -split '\.' | Where-Object { $_ -match '^\d+$' })
+          while ($parts.Count -lt 4) { $parts += '0' }
+          $quad = ($parts[0..3]) -join '.'
+          "quad=$quad" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Pack MSIX
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION_QUAD: ${{ steps.ver.outputs.quad }}
+        run: |
+          .\scripts\pack-msix.ps1 -Version $env:VERSION_QUAD -SkipBuild
+          $packed = "build\bin\$($env:APP_NAME)-$($env:VERSION_QUAD)-windows.msix"
+          if (-not (Test-Path $packed)) {
+            throw "Expected MSIX not found at $packed"
+          }
+          $out = "build\bin\$($env:APP_NAME)-$($env:VERSION)-windows.msix"
+          Move-Item -Path $packed -Destination $out -Force
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-msix
+          path: build/bin/*-windows.msix
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.build-msix.result == 'success' || needs.build-msix.result == 'skipped') }}
+    needs:
+      - prepare
+      - build
+      - build-msix
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -35,7 +35,7 @@ import {
 } from './appInteractionLogic';
 import {useTheme, type ThemeState} from './useTheme';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
-import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
+import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, IsRunningAsMSIX, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
@@ -497,6 +497,7 @@ function App() {
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [caretPos, setCaretPos] = useState(0);
     const [runtimePlatform, setRuntimePlatform] = useState('');
+    const [isMSIX, setIsMSIX] = useState(false);
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
     const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
@@ -597,10 +598,10 @@ function App() {
 
     useEffect(() => {
         localStorage.setItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY, String(restoreShortcutEnabled));
-        SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
+        if (!isMSIX) SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
             // Keep settings responsive even if backend sync fails.
         });
-    }, [restoreShortcutEnabled]);
+    }, [restoreShortcutEnabled, isMSIX]);
 
     useEffect(() => {
         localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
@@ -623,6 +624,12 @@ function App() {
         return () => {
             cancelled = true;
         };
+    }, []);
+
+    useEffect(() => {
+        IsRunningAsMSIX()
+            .then((v) => setIsMSIX(v))
+            .catch(() => {/* non-Windows dev server — leave false */});
     }, []);
 
     const getSettingsDrawerMaxWidth = () => {
@@ -3114,9 +3121,16 @@ function App() {
                             <button
                                 type="button"
                                 className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://wails.io/docs'))}
+                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://github.com/Zaitsev/run-calc'))}
                             >
-                                Wails docs
+                                GitHub
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'))}
+                            >
+                                About
                             </button>
                             <button
                                 type="button"
@@ -3538,15 +3552,18 @@ function App() {
                                 <div className="settings-row-info">
                                     <div className="settings-row-title">Restore shortcut</div>
                                     <div className="settings-row-desc">
-                                        {runtimePlatform === 'darwin'
-                                            ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
-                                            : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
+                                        {isMSIX
+                                            ? 'Not available in the Store version (Windows sandbox restriction)'
+                                            : runtimePlatform === 'darwin'
+                                                ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
+                                                : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
                                     </div>
                                 </div>
                                 <label className="settings-toggle" aria-label="Toggle restore shortcut">
                                     <input
                                         type="checkbox"
                                         checked={restoreShortcutEnabled}
+                                        disabled={isMSIX}
                                         onChange={(e) => setRestoreShortcutEnabled(e.target.checked)}
                                     />
                                     <span className="settings-toggle-track" />
