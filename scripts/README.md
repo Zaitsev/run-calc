@@ -1,6 +1,6 @@
 # Scripts
 
-All scripts run from the repo root (`d:\vlz\calc`), or can be invoked from any directory — they resolve paths relative to their own location.
+All scripts can be run from the repo root or from any directory — they resolve paths relative to their own location.
 
 ---
 
