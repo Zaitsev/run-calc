@@ -56,9 +56,6 @@ func applicationMenu(app *App) *menu.Menu {
 	helpMenu.AddText("About Run-Calc", nil, func(_ *menu.CallbackData) {
 		app.showAbout()
 	})
-	helpMenu.AddText("Wails Docs", nil, func(_ *menu.CallbackData) {
-		app.openDocs()
-	})
 
 	if goruntime.GOOS == "darwin" {
 		appMenu.Append(menu.EditMenu())

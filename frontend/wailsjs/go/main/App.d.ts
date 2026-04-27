@@ -10,11 +10,11 @@ export function GetAIKeyStatusForSettings(arg1:main.AISettings):Promise<main.AIK
 
 export function GetAISettings():Promise<main.AISettingsResponse>;
 
-export function IsRunningAsMSIX():Promise<boolean>;
-
 export function Greet(arg1:string):Promise<string>;
 
 export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
+
+export function IsRunningAsMSIX():Promise<boolean>;
 
 export function OpenThemeStore():Promise<void>;
 

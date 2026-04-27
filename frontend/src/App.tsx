@@ -3121,9 +3121,16 @@ function App() {
                             <button
                                 type="button"
                                 className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://wails.io/docs'))}
+                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://github.com/Zaitsev/run-calc'))}
                             >
-                                Wails docs
+                                GitHub
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'))}
+                            >
+                                About
                             </button>
                             <button
                                 type="button"

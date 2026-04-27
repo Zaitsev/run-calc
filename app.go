@@ -81,10 +81,6 @@ func (a *App) resetFontSize() {
 	wruntime.EventsEmit(a.ctx, "menu:view:reset-font-size")
 }
 
-func (a *App) openDocs() {
-	wruntime.BrowserOpenURL(a.ctx, "https://wails.io/docs")
-}
-
 func (a *App) showAbout() {
 	_, _ = wruntime.MessageDialog(a.ctx, wruntime.MessageDialogOptions{
 		Type:    wruntime.InfoDialog,

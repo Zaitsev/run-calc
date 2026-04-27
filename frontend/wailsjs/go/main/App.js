@@ -18,16 +18,16 @@ export function GetAISettings() {
   return window['go']['main']['App']['GetAISettings']();
 }
 
-export function IsRunningAsMSIX() {
-  return window['go']['main']['App']['IsRunningAsMSIX']();
-}
-
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
 export function InstallTheme(arg1, arg2) {
   return window['go']['main']['App']['InstallTheme'](arg1, arg2);
+}
+
+export function IsRunningAsMSIX() {
+  return window['go']['main']['App']['IsRunningAsMSIX']();
 }
 
 export function OpenThemeStore() {

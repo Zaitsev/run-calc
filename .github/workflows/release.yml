@@ -20,6 +20,16 @@ on:
           - all
           - windows
           - macos
+      enable_msix:
+        description: 'Build Windows MSIX artifact'
+        type: boolean
+        required: false
+        default: false
+      submit_windows_store:
+        description: 'Submit package to Microsoft Store (requires separate credentials flow)'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -286,8 +296,9 @@ jobs:
   build-msix:
     name: Package MSIX
     runs-on: windows-latest
-    # Skip when a macOS-only workflow_dispatch is requested (no Windows exe was built).
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' || inputs.build_target == 'windows' }}
+    # Optional flow: disabled by default and only enabled on manual runs.
+    # Also skip when a macOS-only build target is selected.
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.enable_msix || inputs.submit_windows_store) && (inputs.build_target == 'all' || inputs.build_target == 'windows') }}
     needs:
       - prepare
       - build
@@ -325,45 +336,19 @@ jobs:
           $quad = ($parts[0..3]) -join '.'
           "quad=$quad" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Assemble MSIX staging directory
-        shell: pwsh
-        env:
-          VERSION_QUAD: ${{ steps.ver.outputs.quad }}
-        run: |
-          $staging = "msix-staging"
-          New-Item -ItemType Directory -Path $staging -Force | Out-Null
-
-          # Executable
-          Copy-Item "build\bin\$($env:APP_NAME).exe" "$staging\$($env:APP_NAME).exe"
-
-          # Manifest — substitute version placeholder
-          $manifest = Get-Content "build\windows\AppxManifest.xml" -Raw
-          $manifest = $manifest -replace 'Version="0\.5\.1\.0"', "Version=`"$($env:VERSION_QUAD)`""
-          [System.IO.File]::WriteAllText("$staging\AppxManifest.xml", $manifest, [System.Text.Encoding]::UTF8)
-
-          # Store assets
-          Copy-Item -Recurse "build\windows\store-assets" "$staging\store-assets"
-
-      - name: Locate makeappx.exe
-        id: makeappx
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match 'x64' } |
-            Sort-Object FullName -Descending |
-            Select-Object -First 1
-          if ($null -eq $exe) { throw "makeappx.exe not found in Windows SDK." }
-          "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
       - name: Pack MSIX
         shell: pwsh
         env:
-          MAKEAPPX: ${{ steps.makeappx.outputs.path }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION_QUAD: ${{ steps.ver.outputs.quad }}
         run: |
+          .\scripts\pack-msix.ps1 -Version $env:VERSION_QUAD -SkipBuild
+          $packed = "build\bin\$($env:APP_NAME)-$($env:VERSION_QUAD)-windows.msix"
+          if (-not (Test-Path $packed)) {
+            throw "Expected MSIX not found at $packed"
+          }
           $out = "build\bin\$($env:APP_NAME)-$($env:VERSION)-windows.msix"
-          & $env:MAKEAPPX pack /d msix-staging /p $out /nv
-          if ($LASTEXITCODE -ne 0) { throw "makeappx failed (exit $LASTEXITCODE)." }
+          Move-Item -Path $packed -Destination $out -Force
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v7
@@ -374,7 +359,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') && needs.prepare.result == 'success' && needs.build.result == 'success' && (needs.build-msix.result == 'success' || needs.build-msix.result == 'skipped') }}
     needs:
       - prepare
       - build
