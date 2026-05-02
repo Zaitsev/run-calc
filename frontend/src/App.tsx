@@ -71,7 +71,7 @@ const MATH_CONSTANT_NAMES = new Set([
     'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
 ]);
 const IS_DEV = import.meta.env.DEV;
-const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3000' : 'https://run-calc.taalgem.nl/help');
+const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3001' : 'https://run-calc.taalgem.nl/help');
 const WINDOW_STATE_KEY = 'calc.window.state';
 const WINDOW_STATE_SAVE_DEBOUNCE_MS = 200;
 const WINDOW_STATE_SAVE_INTERVAL_MS = 1500;
@@ -3725,7 +3725,7 @@ function App() {
                         </div>
                     </div>
                     <div className="settings-body">
-                        <HelpPanel />
+                        <HelpPanel helpSiteUrl={HELP_SITE_URL} />
                     </div>
                 </div>
             )}

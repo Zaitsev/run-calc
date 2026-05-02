@@ -1,16 +1,29 @@
 import { useState } from 'react';
+import { BrowserOpenURL } from '../wailsjs/runtime/runtime';
 import { helpContent } from '@site/content/helpContent';
 
 export type HelpPage = 'operations' | 'shortcuts' | 'new';
 
-export function HelpPanel() {
+interface HelpPanelProps {
+    helpSiteUrl: string;
+}
+
+export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
     const [activeHelpPage, setActiveHelpPage] = useState<HelpPage>('operations');
 
     return (
         <div className="settings-card">
             <div className="settings-card-header">
                 <div className="settings-card-title">In-app help</div>
-                <div className="settings-card-desc">Reference pages for operations, shortcuts, and latest changes</div>
+                <div className="settings-card-desc">
+                    <button
+                        type="button"
+                        className="help-site-link"
+                        onClick={() => BrowserOpenURL(helpSiteUrl)}
+                    >
+                        Full documentation site
+                    </button>
+                </div>
             </div>
             <div className="settings-help-tabs" role="tablist" aria-label="Help pages">
                 <button

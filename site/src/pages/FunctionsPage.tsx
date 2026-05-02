@@ -12,7 +12,7 @@ export function FunctionsPage() {
     return (
         <HelpLayout
             title="Function Reference"
-            subtitle="All function groups exposed by Run-Calc, aligned with Expr language definition and app-level additions."
+            subtitle="Functions currently exposed by the Run-Calc evaluator."
         >
             <div className="reference-layout">
                 <aside className="panel reference-sidebar" aria-label="Function reference navigation">
@@ -49,8 +49,8 @@ export function FunctionsPage() {
                         <h2>How to use this page</h2>
                         <ul>
                             <li>Use the left sidebar to jump to a function group.</li>
-                            <li>Examples are valid Expr snippets you can paste into Run-Calc lines.</li>
-                            <li>For operators, literals, and language rules, see the language definition section.</li>
+                            <li>Examples are evaluator-ready snippets you can paste into Run-Calc lines.</li>
+                            <li>For operators and expression syntax, see the language definition section.</li>
                         </ul>
                     </section>
 

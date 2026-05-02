@@ -201,6 +201,10 @@ code {
 .reference-sidebar {
     position: sticky;
     top: 14px;
+    max-height: calc(100vh - 28px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .reference-sidebar h2 {
@@ -210,11 +214,20 @@ code {
 .reference-sidebar-nav {
     display: flex;
     flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    flex: 1 1 auto;
     gap: 8px;
     margin-top: 10px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
 }
 
 .reference-nav-group {
+    flex: 0 0 auto;
+    width: 100%;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: #f8fbff;
@@ -288,7 +301,8 @@ code {
     list-style: none;
     margin: 12px 0 0;
     padding: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
 }
 
@@ -395,17 +409,49 @@ code {
 }
 
 .byok-card h3 {
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     font-size: 1.08rem;
+}
+
+.byok-tag {
+    margin: 0 0 10px;
+    font-size: 0.88rem;
+    color: #205a96;
+    background: #eaf3ff;
+    border: 1px solid #c3daf8;
+    border-radius: 999px;
+    display: inline-block;
+    padding: 3px 10px;
 }
 
 .byok-card p {
     margin: 0 0 8px;
 }
 
+.byok-card ol {
+    padding-left: 20px;
+    margin: 0 0 10px;
+}
+
+.byok-card ol li {
+    margin: 5px 0;
+    line-height: 1.5;
+}
+
+.byok-steps {
+    padding-left: 22px;
+    margin: 10px 0 0;
+}
+
+.byok-steps li {
+    margin: 7px 0;
+    line-height: 1.55;
+}
+
 .byok-note {
     color: var(--muted);
     font-size: 0.94rem;
+    margin-top: 6px;
 }
 
 .byok-callout {
@@ -442,10 +488,15 @@ code {
 
     .reference-sidebar {
         position: static;
+        max-height: none;
+        display: block;
     }
 
     .reference-sidebar-nav {
         flex-direction: column;
+        overflow-y: visible;
+        min-height: auto;
+        padding-right: 0;
     }
 
     .operations-step-grid {

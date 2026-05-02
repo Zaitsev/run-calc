@@ -546,7 +546,6 @@ func TestEvaluateExprProgram_PreventsInternalNameReassignment(t *testing.T) {
 		"each = 1",
 		"item = 1",
 		"findIndex = 1",
-		"groupBy = 1",
 		"sortBy = 1",
 		"true = 1",
 	}
@@ -755,6 +754,26 @@ func TestEvaluateExprProgram_EnrichedErrors(t *testing.T) {
 				t.Fatalf("expected %q in error, got: %v", tc.wantMsg, err)
 			}
 		})
+	}
+}
+
+func TestEvaluateExprProgram_GroupByNotAvailable(t *testing.T) {
+	scope := map[string]interface{}{}
+
+	_, err := evaluateExprProgram("groupBy([1, 2, 3], #)", scope)
+	if err == nil {
+		t.Fatalf("expected groupBy(...) to be rejected")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "groupby") || !strings.Contains(strings.ToLower(err.Error()), "not available") {
+		t.Fatalf("expected not-available groupBy error, got %v", err)
+	}
+
+	_, stageErr := evaluateExprProgram("[1, 2, 3] | groupBy", scope)
+	if stageErr == nil {
+		t.Fatalf("expected pipeline stage groupBy to be rejected")
+	}
+	if !strings.Contains(strings.ToLower(stageErr.Error()), "unsupported pipeline stage") {
+		t.Fatalf("expected unsupported pipeline stage error, got %v", stageErr)
 	}
 }
 

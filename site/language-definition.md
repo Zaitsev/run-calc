@@ -691,14 +691,6 @@ Finds the index of the last element in an array that satisfies the [predicate](#
 findLastIndex([1, 2, 3, 4], # > 2) == 3
 ```
 
-### groupBy(array, predicate) {#groupBy}
-
-Groups the elements of an array by the result of the [predicate](#predicate).
-
-```expr
-groupBy(users, .Age)
-```
-
 ### count(array[, predicate]) {#count}
 
 Returns the number of elements what satisfies the [predicate](#predicate).
