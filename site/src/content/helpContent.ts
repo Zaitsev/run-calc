@@ -59,7 +59,7 @@ export const operationsVisualGuide: OperationVisualStep[] = [
         title: 'Step 2: Store values in variables',
         summary: 'Name important numbers once, then reuse them in later lines.',
         example: 'subtotal = 89.5',
-        image: '/images/operations/02-variables-placeholder.gif',
+        image: '/images/operations/02-variables-placeholder.mp4',
         alt: 'Placeholder screenshot for variable assignment and reuse.',
         notes: [
             'Use plain names like taxRate or monthlyRent for readability.',
@@ -71,7 +71,7 @@ export const operationsVisualGuide: OperationVisualStep[] = [
         title: 'Step 3: Process lists with pipelines',
         summary: 'Use | to build readable steps like filter, map, and sum.',
         example: 'bills | filter(# > 20) | sum',
-        image: '/images/operations/03-pipeline-placeholder.svg',
+        image: '/images/operations/03-pipeline-placeholder.mp4',
         alt: 'Placeholder screenshot for a list pipeline with filter and sum.',
         notes: [
             'Think of | as "then do this" for data.',

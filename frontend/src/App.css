@@ -995,9 +995,13 @@
 }
 
 @media (max-width: 720px) {
-    .settings-panel,
+    .settings-panel:not(.settings-panel--bottom),
     .settings-panel--main {
         width: min(320px, calc(100vw - 16px));
+    }
+
+    .settings-panel--bottom {
+        width: auto;
     }
 
     .settings-panel--theme-store {
