@@ -3682,7 +3682,13 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'left' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to left"
                                 title="Move help panel to left"
-                                onClick={() => setHelpPanelPosition('left')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'left') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('left');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--left" aria-hidden="true" />
                             </button>
@@ -3691,7 +3697,13 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'right' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to right"
                                 title="Move help panel to right"
-                                onClick={() => setHelpPanelPosition('right')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'right') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('right');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--right" aria-hidden="true" />
                             </button>
@@ -3700,7 +3712,13 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'bottom' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to bottom"
                                 title="Move help panel to bottom"
-                                onClick={() => setHelpPanelPosition('bottom')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'bottom') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('bottom');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--bottom" aria-hidden="true" />
                             </button>

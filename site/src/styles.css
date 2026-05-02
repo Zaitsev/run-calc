@@ -380,6 +380,38 @@ code {
     margin: 0;
 }
 
+.byok-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.byok-card {
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff, #f7fbff);
+}
+
+.byok-card h3 {
+    margin: 0 0 8px;
+    font-size: 1.08rem;
+}
+
+.byok-card p {
+    margin: 0 0 8px;
+}
+
+.byok-note {
+    color: var(--muted);
+    font-size: 0.94rem;
+}
+
+.byok-callout {
+    background: linear-gradient(180deg, #ffffff, #f2fbf7);
+}
+
 @media (max-width: 640px) {
     .container {
         width: calc(100% - 20px);
@@ -417,6 +449,10 @@ code {
     }
 
     .operations-step-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .byok-grid {
         grid-template-columns: 1fr;
     }
 }

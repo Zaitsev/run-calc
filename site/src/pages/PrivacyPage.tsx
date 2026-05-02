@@ -7,7 +7,7 @@ export function PrivacyPage() {
                 <h2>Privacy Summary</h2>
                 <ul>
                     <li>Run-Calc stores worksheet and settings data locally on your machine.</li>
-                    <li>AI mode is opt-in and BYOK only. Your requests are sent to the provider you configure.</li>
+                    <li>AI mode is opt-in and BYOK (Bring your own key) only. Your requests are sent to the provider you configure.</li>
                     <li>No bundled paid AI subscription or hidden backend proxy is included.</li>
                 </ul>
             </section>

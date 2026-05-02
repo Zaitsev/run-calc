@@ -18,6 +18,7 @@ export function OverviewPage() {
                     <Link className="hero-btn hero-btn--primary" to="/operations">See how it works</Link>
                     <Link className="hero-btn hero-btn--secondary" to="/shortcuts">View shortcuts</Link>
                     <Link className="hero-btn hero-btn--secondary" to="/functions">Browse functions</Link>
+                    <Link className="hero-btn hero-btn--secondary" to="/byok">Set up BYOK</Link>
                 </div>
             </section>
 
@@ -58,6 +59,7 @@ export function OverviewPage() {
                     <li><strong>Operations</strong>: expression syntax, variables, comments, functions, and AI flow.</li>
                     <li><strong>Shortcuts</strong>: keyboard commands to work faster with less friction.</li>
                     <li><strong>Functions</strong>: grouped reference for all functions exposed in Run-Calc.</li>
+                    <li><strong>AI key Setup</strong>: where to create API keys for each provider and what to paste into Run-Calc.</li>
                     <li><strong>What's New</strong>: latest improvements and behavior updates.</li>
                     <li><strong>Privacy</strong>: data handling summary, policy, and legal links.</li>
                 </ul>
