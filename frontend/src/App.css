@@ -1627,6 +1627,12 @@ html[data-theme="dark"] .settings-provider-icon--invert {
     padding-top: 10px;
 }
 
+.settings-subaction--presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
 .settings-link-btn {
     background: none;
     border: none;

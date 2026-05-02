@@ -1,6 +1,14 @@
 import { splitLineComment } from './lineExpression';
 
 type DecimalDelimiter = '.' | ',';
+type PrecisionMode = 'auto' | 'full' | number;
+
+type FormatNumberFn = (
+    value: number,
+    decimalDelimiter: DecimalDelimiter,
+    precision: PrecisionMode,
+    useScientific: boolean,
+) => string;
 
 export function shouldSkipEvaluation(lineText: string): boolean {
     const trimmed = lineText.trim();
@@ -42,6 +50,39 @@ export function buildEvaluationExpression(
     }
 
     return `${formatNumber(lastResult, decimalDelimiter)}${trimmedLine}`;
+}
+
+export function reformatComputedLineResult(
+    lineText: string,
+    decimalDelimiter: DecimalDelimiter,
+    precision: PrecisionMode,
+    useScientific: boolean,
+    formatNumber: FormatNumberFn,
+): string {
+    const {body, comment} = splitLineComment(lineText);
+    const equalsIndex = body.lastIndexOf(' = ');
+    if (equalsIndex === -1) {
+        return lineText;
+    }
+
+    const resultText = body.slice(equalsIndex + 3).trim();
+    if (resultText.length === 0 || resultText === 'error') {
+        return lineText;
+    }
+
+    const numericResult = Number(resultText.replace(',', '.'));
+    if (!Number.isFinite(numericResult)) {
+        return lineText;
+    }
+
+    const formattedResult = formatNumber(numericResult, decimalDelimiter, precision, useScientific);
+    const nextBody = `${body.slice(0, equalsIndex + 3)}${formattedResult}`;
+    if (!comment) {
+        return nextBody;
+    }
+
+    const trimmedBody = nextBody.trimEnd();
+    return trimmedBody.length > 0 ? `${trimmedBody} ${comment}` : comment;
 }
 
 export function stripMarkdownCodeFences(text: string): string {

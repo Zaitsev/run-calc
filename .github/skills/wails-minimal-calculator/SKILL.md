@@ -22,6 +22,10 @@ Help documentation is mandatory in this scope:
 - Maintain in-app Help pages (or equivalent visible Help views) for Operations, Shortcuts, and New.
 - ALWAYS update Help content when functionality is added, changed, or removed.
 - Keep existing New sections in Help; append entries instead of deleting prior release notes.
+- For this repository, keep `site/src/content/helpContent.ts` as the single source of truth for Operations/Shortcuts/New content.
+- Keep `frontend/src/HelpPanel.tsx` rendering from the shared `@site/content/helpContent` import instead of hardcoded arrays.
+- Keep in-app Help simple and friendly for non-experienced users.
+- Put advanced and deep-dive explanations on the site help pages.
 
 Use arithmetic-focused expression support:
 - `+`, `-`, `*`, `/`
@@ -58,6 +62,7 @@ Use arithmetic-focused expression support:
   - Reflect the new/updated behavior in Operations and/or Shortcuts.
   - Add an entry to Help: New summarizing the change.
   - Preserve prior New entries unless explicitly asked to prune historical notes.
+  - In this repo, make these updates in `site/src/content/helpContent.ts` and verify both the site and in-app Help reflect them.
 
 ## Dev Mode Guidance
 - During active development, run `wails dev` from the project root.
