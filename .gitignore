@@ -1,7 +1,10 @@
 build/bin
 node_modules
 frontend/dist
+site/dist
 __pycache__
 .vscode
 build/certs/*
 !build/certs/.gitkeep
+calc.exe
+.firebase.json

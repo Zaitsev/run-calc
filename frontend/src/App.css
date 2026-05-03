@@ -995,9 +995,13 @@
 }
 
 @media (max-width: 720px) {
-    .settings-panel,
+    .settings-panel:not(.settings-panel--bottom),
     .settings-panel--main {
         width: min(320px, calc(100vw - 16px));
+    }
+
+    .settings-panel--bottom {
+        width: auto;
     }
 
     .settings-panel--theme-store {
@@ -1248,6 +1252,19 @@
 .settings-card-desc {
     font-size: 11.5px;
     color: var(--descriptionForeground);
+}
+
+.help-site-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: var(--linkForeground, #3794ff);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.help-site-link:hover {
+    color: var(--linkActiveForeground, #3794ff);
 }
 
 /* ── Radio option rows ── */
@@ -1625,6 +1642,12 @@ html[data-theme="dark"] .settings-provider-icon--invert {
     padding: 0 16px 12px;
     border-top: 1px solid var(--sideBar-border);
     padding-top: 10px;
+}
+
+.settings-subaction--presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .settings-link-btn {

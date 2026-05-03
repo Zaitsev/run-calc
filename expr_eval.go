@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -120,7 +121,6 @@ var (
 		"findindex":     {},
 		"findlast":      {},
 		"findlastindex": {},
-		"groupby":       {},
 		"concat":        {},
 		"flatten":       {},
 		"uniq":          {},
@@ -165,7 +165,6 @@ var (
 		reserved["findindex"] = struct{}{}
 		reserved["findlast"] = struct{}{}
 		reserved["findlastindex"] = struct{}{}
-		reserved["groupby"] = struct{}{}
 		reserved["concat"] = struct{}{}
 		reserved["flatten"] = struct{}{}
 		reserved["uniq"] = struct{}{}
@@ -182,6 +181,9 @@ var (
 
 		return reserved
 	}()
+	disallowedExprFunctionCalls = map[string]string{
+		"groupby": "function \"groupBy\" is not available in Run-Calc",
+	}
 )
 
 func (a *App) EvaluateExprProgram(input string, variables map[string]interface{}) ExprEvalResponse {
@@ -195,7 +197,6 @@ func (a *App) EvaluateExprProgram(input string, variables map[string]interface{}
 			Variables: scope,
 		}
 	}
-
 	response := ExprEvalResponse{
 		OK:        true,
 		Value:     value,
@@ -486,6 +487,10 @@ func hasPipeInsideParens(expression string) bool {
 }
 
 func evaluateExprExpression(expression string, scope map[string]interface{}, extra map[string]interface{}) (interface{}, error) {
+	if err := rejectDisallowedFunctionCalls(expression); err != nil {
+		return nil, err
+	}
+
 	prepared := preprocessExpr(expression)
 	env := buildExprEnv(scope, extra)
 
@@ -500,6 +505,55 @@ func evaluateExprExpression(expression string, scope map[string]interface{}, ext
 	}
 
 	return value, nil
+}
+
+func rejectDisallowedFunctionCalls(expression string) error {
+	inQuote := rune(0)
+	for i := 0; i < len(expression); i++ {
+		ch := rune(expression[i])
+
+		if inQuote != 0 {
+			if ch == '\\' {
+				i++
+				continue
+			}
+			if ch == inQuote {
+				inQuote = 0
+			}
+			continue
+		}
+
+		if ch == '\'' || ch == '"' || ch == '`' {
+			inQuote = ch
+			continue
+		}
+
+		if !isIdentifierStart(ch) {
+			continue
+		}
+
+		start := i
+		end := i + 1
+		for end < len(expression) && isIdentifierPart(rune(expression[end])) {
+			end++
+		}
+
+		name := strings.ToLower(expression[start:end])
+		next := end
+		for next < len(expression) && isSpaceByte(expression[next]) {
+			next++
+		}
+
+		if next < len(expression) && expression[next] == '(' {
+			if message, blocked := disallowedExprFunctionCalls[name]; blocked {
+				return errors.New(message)
+			}
+		}
+
+		i = end - 1
+	}
+
+	return nil
 }
 
 func preprocessExpr(expression string) string {

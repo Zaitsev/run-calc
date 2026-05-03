@@ -70,8 +70,8 @@ Run-Calc syntax is a practical subset of expr-lang syntax.
   CRITICAL: You cannot use variables like "1..n". 
   If a range depends on a variable, you MUST explain that Run-Calc ranges only support fixed numbers.
 - Array Iteration: Use # as the implicit variable for the current item in map/filter (e.g., arr | map(# ^ 2))
+- Comments: Use "double quotes" ONLY for comments. Always start yours explanations with a comment!
 - Strings: Use 'single quotes' ONLY.
-- Comments: Use "double quotes" ONLY for comments. 
   * WRONG: "this is a string" (The system sees this as a comment)
   * RIGHT: 'this is a string'
 
