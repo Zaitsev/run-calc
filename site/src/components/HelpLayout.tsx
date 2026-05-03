@@ -28,6 +28,9 @@ export function HelpLayout({ title, subtitle, children }: HelpLayoutProps) {
                     <NavLink to="/byok" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                         AI key Setup
                     </NavLink>
+                    <NavLink to="/themes" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                        Themes
+                    </NavLink>
                     <NavLink to="/whats-new" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                         What's New
                     </NavLink>

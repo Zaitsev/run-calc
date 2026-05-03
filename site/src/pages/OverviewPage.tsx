@@ -8,8 +8,9 @@ export function OverviewPage() {
             subtitle="A fast desktop calculator that feels like a notepad, not a form."
         >
             <section className="panel hero-panel">
-                <p className="hero-badge">Desktop app for everyday math, planning, and quick analysis</p>
                 <h2 className="hero-title">Type naturally. Press Enter. Get instant answers inline.</h2>
+                <p className="hero-badge">Desktop app for everyday math, planning,   and quick analysis</p>
+                <p><img src="/images/im0.png" alt="Description of image" /></p>
                 <p className="hero-subtitle">
                     Run-Calc lets you calculate the way you think. Write one line after another, keep your notes,
                     and see results exactly where you typed the expression.

@@ -16,18 +16,14 @@ export function OperationsPage() {
 
             <section className="panel">
                 <h2>Visual Walkthrough</h2>
-                <p className="operations-intro-note">
-                    Replace the placeholder images with real screenshots in site/public/images/operations.
-                </p>
                 <div className="operations-step-grid">
                     {operationsVisualGuide.map((step, index) => (
                         <article key={step.id} className="operations-step-card">
-                            <p className="operations-step-index">Step {index + 1}</p>
                             <h3>{step.title}</h3>
                             <p>{step.summary}</p>
                             <p className="operations-step-example">Example: <code>{step.example}</code></p>
                             <figure className="operations-step-figure">
-                                <video autoPlay loop muted playsInline>
+                                <video controls muted playsInline>
                                     <source src={step.image} type="video/mp4" />
                                     Your browser does not support the video tag.
                                 </video>

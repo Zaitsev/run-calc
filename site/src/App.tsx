@@ -6,6 +6,7 @@ import { FunctionsPage } from './pages/FunctionsPage';
 import { BYOKPage } from './pages/BYOKPage';
 import { WhatsNewPage } from './pages/WhatsNewPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { ThemesPage } from './pages/ThemesPage';
 
 export default function App() {
     return (
@@ -16,6 +17,7 @@ export default function App() {
             <Route path="/functions" element={<FunctionsPage />} />
             <Route path="/byok" element={<BYOKPage />} />
             <Route path="/whats-new" element={<WhatsNewPage />} />
+            <Route path="/themes" element={<ThemesPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

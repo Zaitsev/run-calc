@@ -44,7 +44,7 @@ export const helpContent: HelpContentMap = {
 export const operationsVisualGuide: OperationVisualStep[] = [
     {
         id: 'type-and-run',
-        title: 'Step 1: Type and press Enter',
+        title: 'Type and press Enter',
         summary: 'Write a simple expression and press Enter to get an instant inline result.',
         example: '2 + 2 * 4 = 10',
         image: '/images/operations/01-type-and-enter-placeholder.mp4',
@@ -56,7 +56,7 @@ export const operationsVisualGuide: OperationVisualStep[] = [
     },
     {
         id: 'store-and-reuse',
-        title: 'Step 2: Store values in variables',
+        title: 'Store values in variables',
         summary: 'Name important numbers once, then reuse them in later lines.',
         example: 'subtotal = 89.5',
         image: '/images/operations/02-variables-placeholder.mp4',
@@ -68,7 +68,7 @@ export const operationsVisualGuide: OperationVisualStep[] = [
     },
     {
         id: 'pipeline-lists',
-        title: 'Step 3: Process lists with pipelines',
+        title: 'Process lists with pipelines',
         summary: 'Use | to build readable steps like filter, map, and sum.',
         example: 'bills | filter(# > 20) | sum',
         image: '/images/operations/03-pipeline-placeholder.mp4',
@@ -80,8 +80,8 @@ export const operationsVisualGuide: OperationVisualStep[] = [
     },
     {
         id: 'ask-ai',
-        title: 'Step 4: Ask AI when stuck',
-        summary: 'Start with ? for natural-language help, conversion tasks, or formula suggestions.',
+        title: 'Ask AI for help',
+        summary: 'Start with ? to ask a question (like "What is 20% of 150?") , use   ?? for a detailed explanation. IMPORTANT: you need to setup AI key before using this feature.',
         example: '? Convert 6.5 feet to centimeters and show formula',
         image: '/images/operations/04-ai-placeholder.mp4',
         alt: 'Placeholder screenshot for AI prompt line and result.',

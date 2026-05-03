@@ -50,7 +50,6 @@ export function FunctionsPage() {
                         <ul>
                             <li>Use the left sidebar to jump to a function group.</li>
                             <li>Examples are evaluator-ready snippets you can paste into Run-Calc lines.</li>
-                            <li>For operators and expression syntax, see the language definition section.</li>
                         </ul>
                     </section>
 
