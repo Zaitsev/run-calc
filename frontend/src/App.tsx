@@ -29,13 +29,14 @@ import {
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
     isAITriggerSourceLine,
+    reformatComputedLineResult,
     stripMarkdownCodeFences,
     shouldSkipEvaluationAtCaret,
     shouldSkipEvaluation,
 } from './appInteractionLogic';
 import {useTheme, type ThemeState} from './useTheme';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
-import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
+import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, IsRunningAsMSIX, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
 import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
 
@@ -70,6 +71,7 @@ const MATH_CONSTANT_NAMES = new Set([
     'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
 ]);
 const IS_DEV = import.meta.env.DEV;
+const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3001' : 'https://run-calc.taalgem.nl/');
 const WINDOW_STATE_KEY = 'calc.window.state';
 const WINDOW_STATE_SAVE_DEBOUNCE_MS = 200;
 const WINDOW_STATE_SAVE_INTERVAL_MS = 1500;
@@ -107,6 +109,8 @@ const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
 
 const PRECISION_MIN = 0;
 const PRECISION_MAX = 15;
+const FINANCIAL_PRECISION = 2;
+const FOUR_POINT_PRECISION = 4;
 
 type SavedThemeEntry = AcceptedThemeEntry;
 type DecimalDelimiter = '.' | ',';
@@ -229,12 +233,8 @@ function formatNumber(
     precision: PrecisionMode = 'auto',
     useScientific = false,
 ): string {
-    if (Number.isInteger(value)) {
-        return String(value);
-    }
-
     const absVal = Math.abs(value);
-    if (useScientific && value !== 0 && (absVal >= 1e15 || absVal < 1e-6)) {
+    if (useScientific && value !== 0 && (absVal >= 1e7 || absVal < 1e-7)) {
         let expStr: string;
         if (precision === 'full') {
             expStr = value.toExponential();
@@ -244,6 +244,10 @@ function formatNumber(
             expStr = mantissa.replace(/\.?0+$/, '') + 'e' + exponent;
         }
         return decimalDelimiter === ',' ? expStr.replace('.', ',') : expStr;
+    }
+
+    if (Number.isInteger(value)) {
+        return String(value);
     }
 
     let str: string;
@@ -258,6 +262,17 @@ function formatNumber(
     }
 
     return decimalDelimiter === ',' ? str.replace('.', ',') : str;
+}
+
+function getPrecisionScale(precision: PrecisionMode): number {
+    if (precision === 'full') {
+        return Number.POSITIVE_INFINITY;
+    }
+    if (precision === 'auto') {
+        return 10;
+    }
+
+    return precision;
 }
 
 function parseHexColor(hexColor: string): [number, number, number] | null {
@@ -497,11 +512,13 @@ function App() {
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [caretPos, setCaretPos] = useState(0);
     const [runtimePlatform, setRuntimePlatform] = useState('');
+    const [isMSIX, setIsMSIX] = useState(false);
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
     const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
     const [showClearWorksheetConfirm, setShowClearWorksheetConfirm] = useState(false);
     const [isReevaluatingAll, setIsReevaluatingAll] = useState(false);
+    const previousPrecisionRef = useRef<PrecisionMode>(precision);
     const intelligenceShowTimerRef = useRef<number | null>(null);
     const intelligenceHideTimerRef = useRef<number | null>(null);
 
@@ -521,6 +538,18 @@ function App() {
     }, [precision]);
 
     useEffect(() => {
+        const previousPrecision = previousPrecisionRef.current;
+        const precisionIncreased = getPrecisionScale(precision) > getPrecisionScale(previousPrecision);
+        previousPrecisionRef.current = precision;
+
+        if (!precisionIncreased) {
+            return;
+        }
+
+        void reevaluateAllExpressions();
+    }, [precision]);
+
+    useEffect(() => {
         localStorage.setItem(SCIENTIFIC_NOTATION_STORAGE_KEY, String(scientificNotation));
     }, [scientificNotation]);
 
@@ -534,20 +563,13 @@ function App() {
             const lines = currentContent.split('\n');
             let changed = false;
             const newLines = lines.map((line) => {
-                const eqIdx = line.lastIndexOf(' = ');
-                if (eqIdx === -1) return line;
-                const afterEq = line.slice(eqIdx + 3).trim();
-                if (afterEq === 'error' || afterEq.length === 0) {
-                    return line;
-                }
-
-                const numericCandidate = Number(afterEq.replace(',', '.'));
-                if (!Number.isFinite(numericCandidate)) {
-                    return line;
-                }
-
-                const formatted = formatNumber(numericCandidate, decimalDelimiter, precision, scientificNotation);
-                const newLine = `${line.slice(0, eqIdx + 3)}${formatted}`;
+                const newLine = reformatComputedLineResult(
+                    line,
+                    decimalDelimiter,
+                    precision,
+                    scientificNotation,
+                    formatNumber,
+                );
                 if (newLine !== line) {
                     changed = true;
                     return newLine;
@@ -597,10 +619,10 @@ function App() {
 
     useEffect(() => {
         localStorage.setItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY, String(restoreShortcutEnabled));
-        SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
+        if (!isMSIX) SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
             // Keep settings responsive even if backend sync fails.
         });
-    }, [restoreShortcutEnabled]);
+    }, [restoreShortcutEnabled, isMSIX]);
 
     useEffect(() => {
         localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
@@ -623,6 +645,12 @@ function App() {
         return () => {
             cancelled = true;
         };
+    }, []);
+
+    useEffect(() => {
+        IsRunningAsMSIX()
+            .then((v) => setIsMSIX(v))
+            .catch(() => {/* non-Windows dev server — leave false */});
     }, []);
 
     const getSettingsDrawerMaxWidth = () => {
@@ -1162,6 +1190,14 @@ function App() {
 
     const resetPrecision = () => {
         setPrecision('auto');
+    };
+
+    const applyFinancialPrecision = () => {
+        setPrecision(FINANCIAL_PRECISION);
+    };
+
+    const applyFourPointPrecision = () => {
+        setPrecision(FOUR_POINT_PRECISION);
     };
 
     const resetWindowLayout = () => {
@@ -3047,6 +3083,24 @@ function App() {
                                     type="button"
                                     className="precision-popover-link"
                                     onMouseDown={(e) => e.preventDefault()}
+                                    onClick={applyFinancialPrecision}
+                                    disabled={precision === FINANCIAL_PRECISION}
+                                >
+                                    Financial (2)
+                                </button>
+                                <button
+                                    type="button"
+                                    className="precision-popover-link"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={applyFourPointPrecision}
+                                    disabled={precision === FOUR_POINT_PRECISION}
+                                >
+                                    Intermediate (4)
+                                </button>
+                                <button
+                                    type="button"
+                                    className="precision-popover-link"
+                                    onMouseDown={(e) => e.preventDefault()}
                                     onClick={resetPrecision}
                                     disabled={precision === 'auto'}
                                 >
@@ -3107,6 +3161,13 @@ function App() {
                             <button
                                 type="button"
                                 className="status-menu-item"
+                                onClick={() => runBurgerAction(() => BrowserOpenURL(HELP_SITE_URL))}
+                            >
+                                Open Full Help Site
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
                                 onClick={() => runBurgerAction(() => setShowAIDebug(true))}
                             >
                                 AI Debug Log{aiDebugLog.length > 0 ? ` (${aiDebugLog.length})` : ''}
@@ -3114,16 +3175,23 @@ function App() {
                             <button
                                 type="button"
                                 className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://wails.io/docs'))}
+                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://github.com/Zaitsev/run-calc'))}
                             >
-                                Wails docs
+                                GitHub
+                            </button>
+                            <button
+                                type="button"
+                                className="status-menu-item"
+                                onClick={() => runBurgerAction(() => alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'))}
+                            >
+                                About
                             </button>
                             <button
                                 type="button"
                                 className="status-menu-item status-menu-item--danger"
                                 onClick={() => runBurgerAction(() => Quit())}
                             >
-                                Quit
+                                Quit (your work is saved)
                             </button>
                         </div>
                     )}
@@ -3466,8 +3534,26 @@ function App() {
                                     </button>
                                 </div>
                             </div>
-                            {precision !== 'auto' && (
-                                <div className="settings-subaction">
+                            <div className="settings-subaction settings-subaction--presets">
+                                <button
+                                    type="button"
+                                    className="settings-link-btn"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={applyFinancialPrecision}
+                                    disabled={precision === FINANCIAL_PRECISION}
+                                >
+                                    Financial (2)
+                                </button>
+                                <button
+                                    type="button"
+                                    className="settings-link-btn"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={applyFourPointPrecision}
+                                    disabled={precision === FOUR_POINT_PRECISION}
+                                >
+                                    Intermediate (4)
+                                </button>
+                                {precision !== 'auto' && (
                                     <button
                                         type="button"
                                         className="settings-link-btn"
@@ -3476,8 +3562,8 @@ function App() {
                                     >
                                         Reset to default
                                     </button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
 
                         <div className="settings-card">
@@ -3538,15 +3624,18 @@ function App() {
                                 <div className="settings-row-info">
                                     <div className="settings-row-title">Restore shortcut</div>
                                     <div className="settings-row-desc">
-                                        {runtimePlatform === 'darwin'
-                                            ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
-                                            : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
+                                        {isMSIX
+                                            ? 'Not available in the Store version (Windows sandbox restriction)'
+                                            : runtimePlatform === 'darwin'
+                                                ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
+                                                : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
                                     </div>
                                 </div>
                                 <label className="settings-toggle" aria-label="Toggle restore shortcut">
                                     <input
                                         type="checkbox"
                                         checked={restoreShortcutEnabled}
+                                        disabled={isMSIX}
                                         onChange={(e) => setRestoreShortcutEnabled(e.target.checked)}
                                     />
                                     <span className="settings-toggle-track" />
@@ -3593,7 +3682,13 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'left' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to left"
                                 title="Move help panel to left"
-                                onClick={() => setHelpPanelPosition('left')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'left') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('left');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--left" aria-hidden="true" />
                             </button>
@@ -3602,7 +3697,13 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'right' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to right"
                                 title="Move help panel to right"
-                                onClick={() => setHelpPanelPosition('right')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'right') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('right');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--right" aria-hidden="true" />
                             </button>
@@ -3611,14 +3712,20 @@ function App() {
                                 className={`settings-pos-btn${helpPanelPosition === 'bottom' ? ' settings-pos-btn--active' : ''}`}
                                 aria-label="Move help panel to bottom"
                                 title="Move help panel to bottom"
-                                onClick={() => setHelpPanelPosition('bottom')}
+                                onClick={() => {
+                                    if (helpPanelPosition === 'bottom') {
+                                        setShowHelp(false);
+                                        return;
+                                    }
+                                    setHelpPanelPosition('bottom');
+                                }}
                             >
                                 <span className="settings-pos-icon settings-pos-icon--bottom" aria-hidden="true" />
                             </button>
                         </div>
                     </div>
                     <div className="settings-body">
-                        <HelpPanel />
+                        <HelpPanel helpSiteUrl={HELP_SITE_URL} />
                     </div>
                 </div>
             )}

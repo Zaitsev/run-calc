@@ -16,13 +16,20 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@site/*": [
+        "../site/src/*"
+      ]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx"
   },
   "include": [
-    "src"
+    "src",
+    "../site/src/content/helpContent.ts"
   ],
   "references": [
     {

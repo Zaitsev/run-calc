@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AppxManifest.xml for Run-Calc Windows Store / MSIX package.
+
+  Before submitting to Partner Center:
+    1. Replace PUBLISHER_IDENTITY_PLACEHOLDER with the Publisher string from your
+       Partner Center account dashboard (Settings > Account info > Publisher ID),
+       e.g.  CN=12345678-ABCD-EFGH-IJKL-000000000000
+    2. Replace PACKAGE_NAME_PLACEHOLDER with the Package/Identity Name reserved in
+       Partner Center (e.g. YourCompany.RunCalc).
+    3. Run:  python process_icons.py -store-assets
+       to populate build/windows/store-assets/ from hare-calc.jpg.
+    4. Build:  wails build -clean
+       then package:  makeappx pack /d <staging-dir> /p Run-Calc.msix /nv
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="VladZaitsev.Run-Calc"
+    Publisher="CN=9B7E30DB-5D4F-41F4-9A64-A0FE774F4A33"
+    Version="0.5.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Run-Calc</DisplayName>
+    <PublisherDisplayName>Vlad Zaitsev</PublisherDisplayName>
+    <Logo>store-assets\StoreLogo\StoreLogo.scale-200.png</Logo>
+    <Description>Run-Calc is a modern mult-line calculator with AI features — type expressions, press Enter, see results inline.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="RunCalc" Executable="Run-Calc.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Run-Calc"
+        Description="Modern mult-line calculator with AI features"
+        BackgroundColor="#FFFFFF"
+        Square150x150Logo="store-assets\Square150x150Logo\Square150x150Logo.scale-100.png"
+        Square44x44Logo="store-assets\Square44x44Logo\Square44x44Logo.scale-100.png">
+        <uap:DefaultTile
+          Wide310x150Logo="store-assets\Wide310x150Logo\Wide310x150Logo.scale-100.png"
+          Square310x310Logo="store-assets\Square310x310Logo\Square310x310Logo.scale-100.png"
+          ShortName="Run-Calc" />
+        <uap:SplashScreen Image="store-assets\Square150x150Logo\Square150x150Logo.scale-200.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="run-calc" />
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      runFullTrust (restricted capability) is required because:
+      - Run-Calc is a Wails desktop application that requires Win32 APIs
+      - System tray integration for quick access from taskbar
+      - Direct window and UI event handling via Win32
+      This is standard for desktop-bridge calculator applications.
+    -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- internetClient: needed for AI query features and downloading custom themes from the theme store -->
+    <Capability Name="internetClient" />
+  </Capabilities>
+
+</Package>

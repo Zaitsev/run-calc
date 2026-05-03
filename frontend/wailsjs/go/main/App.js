@@ -26,6 +26,10 @@ export function InstallTheme(arg1, arg2) {
   return window['go']['main']['App']['InstallTheme'](arg1, arg2);
 }
 
+export function IsRunningAsMSIX() {
+  return window['go']['main']['App']['IsRunningAsMSIX']();
+}
+
 export function OpenThemeStore() {
   return window['go']['main']['App']['OpenThemeStore']();
 }

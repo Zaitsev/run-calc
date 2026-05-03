@@ -27,7 +27,7 @@ func applicationMenu(app *App) *menu.Menu {
 		app.clearWorksheet()
 	})
 	fileMenu.AddSeparator()
-	fileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+	fileMenu.AddText("Quit (your work is saved)", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		app.quit()
 	})
 
@@ -55,9 +55,6 @@ func applicationMenu(app *App) *menu.Menu {
 	helpMenu.AddSeparator()
 	helpMenu.AddText("About Run-Calc", nil, func(_ *menu.CallbackData) {
 		app.showAbout()
-	})
-	helpMenu.AddText("Wails Docs", nil, func(_ *menu.CallbackData) {
-		app.openDocs()
 	})
 
 	if goruntime.GOOS == "darwin" {
@@ -95,6 +92,10 @@ func main() {
 		OnStartup:     app.startup,
 		OnShutdown:    app.shutdown,
 		OnBeforeClose: app.beforeClose,
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               "19878879-f3de-4597-8575-567d72f4f74a",
+			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
+		},
 		Bind: []interface{}{
 			app,
 		},

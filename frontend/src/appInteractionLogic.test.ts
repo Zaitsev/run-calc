@@ -4,6 +4,7 @@ import {
     buildStaleLineDetails,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
+    reformatComputedLineResult,
     shouldSkipEvaluationAtCaret,
     stripMarkdownCodeFences,
     shouldSkipEvaluation,
@@ -67,5 +68,28 @@ describe('app interaction helpers', () => {
         expect(stripMarkdownCodeFences('```\na = 1..10\nmean_a = a | avg\n```')).toBe('a = 1..10\nmean_a = a | avg');
         expect(stripMarkdownCodeFences('```calc\na = 1..10\nmean_a = a | avg\n```')).toBe('a = 1..10\nmean_a = a | avg');
         expect(stripMarkdownCodeFences('a = 1..10\nmean_a = a | avg')).toBe('a = 1..10\nmean_a = a | avg');
+    });
+
+    it('reformats computed numeric suffixes while preserving quote comments', () => {
+        const format = (value: number, delimiter: '.' | ',', precision: 'auto' | 'full' | number) => {
+            if (precision === 'auto') {
+                return String(Number(value.toFixed(10)));
+            }
+            if (precision === 'full') {
+                return String(value);
+            }
+
+            const fixed = value.toFixed(precision).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            return delimiter === ',' ? fixed.replace('.', ',') : fixed;
+        };
+
+        expect(reformatComputedLineResult('2/3 = 0.6666666667 " note', '.', 2, false, format)).toBe('2/3 = 0.67 " note');
+    });
+
+    it('reformats declaration result suffixes based on last equals marker', () => {
+        const format = (value: number) => value.toFixed(2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+
+        expect(reformatComputedLineResult('v = 2/3 = 0.6666666667', '.', 2, false, format)).toBe('v = 2/3 = 0.67');
+        expect(reformatComputedLineResult('v = 2/3 " keep', '.', 2, false, format)).toBe('v = 2/3 " keep');
     });
 });

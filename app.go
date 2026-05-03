@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/options"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 )
@@ -37,9 +40,11 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.minimiseToTrayOnClose.Store(true)
-	a.restoreShortcutOn.Store(true)
+	// Global hotkeys are blocked by the AppContainer sandbox when running as MSIX.
+	a.restoreShortcutOn.Store(!isRunningAsMSIX())
 	a.startTray()
 	a.ensureRestoreHotkeyRegistration()
+	a.ShowWindow()
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -74,10 +79,6 @@ func (a *App) resetWindowLayout() {
 
 func (a *App) resetFontSize() {
 	wruntime.EventsEmit(a.ctx, "menu:view:reset-font-size")
-}
-
-func (a *App) openDocs() {
-	wruntime.BrowserOpenURL(a.ctx, "https://wails.io/docs")
 }
 
 func (a *App) showAbout() {
@@ -118,6 +119,19 @@ func (a *App) ShowWindow() {
 
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
+
+	// Toggle always-on-top briefly to reliably bring restored tray windows to front on Windows.
+	if runtime.GOOS == "windows" {
+		wruntime.WindowSetAlwaysOnTop(a.ctx, true)
+		go func(ctx context.Context) {
+			time.Sleep(120 * time.Millisecond)
+			wruntime.WindowSetAlwaysOnTop(ctx, false)
+		}(a.ctx)
+	}
+}
+
+func (a *App) onSecondInstanceLaunch(_ options.SecondInstanceData) {
+	a.ShowWindow()
 }
 
 func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
@@ -125,8 +139,17 @@ func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
 }
 
 func (a *App) SetRestoreShortcutEnabled(enabled bool) {
+	if isRunningAsMSIX() {
+		return // hotkeys unavailable in AppContainer sandbox
+	}
 	a.restoreShortcutOn.Store(enabled)
 	a.ensureRestoreHotkeyRegistration()
+}
+
+// IsRunningAsMSIX reports whether the app is running inside an MSIX package.
+// When true, global hotkeys are unavailable due to AppContainer sandbox restrictions.
+func (a *App) IsRunningAsMSIX() bool {
+	return isRunningAsMSIX()
 }
 
 func (a *App) ensureRestoreHotkeyRegistration() {

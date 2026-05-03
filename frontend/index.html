@@ -7,9 +7,31 @@
     <title>Run-Calc</title>
     <script>
         (function () {
-            var t = localStorage.getItem('calc.theme') || 'system';
-            var r = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
-            document.documentElement.setAttribute('data-theme', r);
+            var raw = localStorage.getItem('calc.theme');
+            var theme = { type: 'system' };
+
+            if (raw) {
+                try {
+                    var parsed = JSON.parse(raw);
+                    theme = (parsed && typeof parsed === 'object') ? parsed : { type: parsed };
+                } catch {
+                    theme = { type: raw };
+                }
+            }
+
+            var resolved = theme.type === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : theme.type;
+
+            if (resolved === 'custom') {
+                resolved = theme.customThemeBase || 'dark';
+            }
+
+            if (resolved !== 'dark' && resolved !== 'light') {
+                resolved = 'dark';
+            }
+
+            document.documentElement.setAttribute('data-theme', resolved);
         })();
     </script>
 </head>
