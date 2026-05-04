@@ -442,7 +442,7 @@ function App() {
         return {};
     });
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
-    const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
+    const [_, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
