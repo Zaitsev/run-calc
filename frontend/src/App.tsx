@@ -2142,7 +2142,6 @@ function App() {
 
         const trimmed = editableLine.trim();
 
-        const declaration = parseDeclaredVariable(splitLineComment(editableLine).body.trimEnd());
         const expression = buildEvaluationExpression(
             editableLine,
             trimmed,
