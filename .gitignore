@@ -8,3 +8,4 @@ build/certs/*
 !build/certs/.gitkeep
 calc.exe
 .firebase.json
+.firebase
