@@ -22,6 +22,9 @@ import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
 import { AISettingsPanel, type AIContextMode, type AIKeyStatusState, type AISettingsState } from './AISettings';
 import { AIDebugDrawer, type AIDebugEntry } from './AIDebugDrawer';
 import { HelpPanel } from './HelpPanel';
+import { StaleBanner } from './components/StaleBanner';
+import { ClearWorksheetModal } from './components/ClearWorksheetModal';
+import { HelpPanelContainer } from './components/HelpPanelContainer';
 import {extractExpressionDependencies, getAITriggerPrompt, getExpressionSource, isAITriggerLine, splitLineComment} from './lineExpression';
 import {
     buildEvaluationExpression,
@@ -38,306 +41,72 @@ import {useTheme, type ThemeState} from './useTheme';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, IsRunningAsMSIX, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
 
-import { ThemeStore, type AcceptedThemeEntry } from './ThemeStore';
+import { ThemeStore } from './ThemeStore';
+import type {
+    SavedThemeEntry,
+    DecimalDelimiterMode,
+    PrecisionMode,
+    HelpPanelPosition,
+    SuggestionKind,
+    SuggestionItem,
+    IdentifierContext,
+    StoredWindowState,
+    AIModelOutput,
+    AIRunResponse,
+    AISettingsResponse,
+    AIProgressEvent,
+} from './types/app';
+import { defaultAISettingsState, defaultAIKeyStatusState, areAISettingsEqual } from './types/app';
+import {
+    OPERATOR_KEY_RE,
+    IS_DEV,
+    HELP_SITE_URL,
+    WINDOW_STATE_KEY,
+    WINDOW_STATE_SAVE_DEBOUNCE_MS,
+    WINDOW_STATE_SAVE_INTERVAL_MS,
+    DEFAULT_WINDOW_WIDTH,
+    DEFAULT_WINDOW_HEIGHT,
+    FONT_SCALE_STORAGE_KEY,
+    FONT_SCALE_STEP,
+    FONT_SCALE_MIN,
+    FONT_SCALE_MAX,
+    DEFAULT_FONT_SCALE,
+    EDITOR_SIDE_PADDING_PX,
+    EDITOR_TOP_PADDING_PX,
+    EDITOR_BOTTOM_PADDING_PX,
+    MARKED_LINES_STORAGE_KEY,
+    DECIMAL_DELIMITER_STORAGE_KEY,
+    PRECISION_STORAGE_KEY,
+    SCIENTIFIC_NOTATION_STORAGE_KEY,
+    WORD_WRAP_STORAGE_KEY,
+    WORKSHEET_CONTENT_STORAGE_KEY,
+    LAST_RESULT_STORAGE_KEY,
+    VARIABLE_VALUES_STORAGE_KEY,
+    ACCEPTED_THEMES_STORAGE_KEY,
+    SETTINGS_DRAWER_WIDTH_STORAGE_KEY,
+    MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY,
+    RESTORE_SHORTCUT_ENABLED_STORAGE_KEY,
+    HELP_PANEL_POSITION_STORAGE_KEY,
+    DOUBLE_ESCAPE_HIDE_WINDOW_MS,
+    INTELLIGENCE_HINT_SHOW_DELAY_MS,
+    INTELLIGENCE_HINT_HIDE_IDLE_MS,
+    DEFAULT_SETTINGS_DRAWER_WIDTH,
+    SETTINGS_DRAWER_MIN_WIDTH,
+    SETTINGS_DRAWER_MAX_WIDTH,
+    SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
+    SETTINGS_DRAWER_MIN_WINDOW_WIDTH,
+    PRECISION_MIN,
+    PRECISION_MAX,
+    FINANCIAL_PRECISION,
+    FOUR_POINT_PRECISION,
+} from './constants';
+import { formatNumber, getPrecisionScale, getSystemDecimalDelimiter, resolveDecimalDelimiter } from './utils/formatting';
+import { inferCustomThemeMode } from './utils/colorUtils';
+import { MATH_FUNCTION_NAMES, MATH_CONSTANT_NAMES, isIdentifierStartChar, isIdentifierPartChar, usePrefersDark } from './utils/identifierUtils';
+import { buildEvaluationHooks } from './hooks/useEvaluation';
 
-const OPERATOR_KEY_RE = /^[+\-*/]$/;
-const MATH_FUNCTION_NAMES = new Set([
-    'ABS', 'ACOS', 'ACOSH', 'ASIN', 'ASINH', 'ALL', 'ANY', 'ATAN', 'ATAN2', 'ATANH',
-    'AVG', 'CBRT', 'CEIL', 'COS', 'COSH', 'COUNT', 'EACH', 'EXP', 'FILTER', 'FIND', 'FIRST', 'FLATTEN', 'FLOOR',
-    'HYPOT', 'LEN', 'LAST', 'LOG', 'LOG10', 'LOG2', 'MAP', 'MAX', 'MEAN', 'MEDIAN', 'MIN', 'NONE', 'ONE', 'POW',
-    'REDUCE', 'REVERSE', 'ROUND', 'SIGN', 'SIN', 'SINH', 'SORT', 'SQRT', 'SUM', 'TAN', 'TANH', 'TAKE', 'TRUNC', 'UNIQ',
-]);
 
-function usePrefersDark(): boolean {
-    const [prefersDark, setPrefersDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = (event: MediaQueryListEvent) => {
-            setPrefersDark(event.matches);
-        };
-
-        setPrefersDark(mediaQuery.matches);
-        mediaQuery.addEventListener('change', handleChange);
-
-        return () => {
-            mediaQuery.removeEventListener('change', handleChange);
-        };
-    }, []);
-
-    return prefersDark;
-}
-const MATH_CONSTANT_NAMES = new Set([
-    'E', 'PI', 'TAU', 'PHI', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT1_2', 'SQRT2', 'SQRTE', 'SQRTPI', 'SQRTPHI',
-]);
-const IS_DEV = import.meta.env.DEV;
-const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3001' : 'https://run-calc.taalgem.nl/');
-const WINDOW_STATE_KEY = 'calc.window.state';
-const WINDOW_STATE_SAVE_DEBOUNCE_MS = 200;
-const WINDOW_STATE_SAVE_INTERVAL_MS = 1500;
-const DEFAULT_WINDOW_WIDTH = 1100;
-const DEFAULT_WINDOW_HEIGHT = 760;
-const FONT_SCALE_STORAGE_KEY = 'calc.editor.fontScale';
-const FONT_SCALE_STEP = 0.1;
-const FONT_SCALE_MIN = 0.7;
-const FONT_SCALE_MAX = 2.2;
-const DEFAULT_FONT_SCALE = 1;
-const EDITOR_SIDE_PADDING_PX = 20;
-const MARKED_LINES_STORAGE_KEY = 'calc.editor.markedLines';
-const DECIMAL_DELIMITER_STORAGE_KEY = 'calc.editor.decimalDelimiter';
-const PRECISION_STORAGE_KEY = 'calc.editor.precision';
-const SCIENTIFIC_NOTATION_STORAGE_KEY = 'calc.editor.scientificNotation';
-const WORD_WRAP_STORAGE_KEY = 'calc.editor.wordWrap';
-const WORKSHEET_CONTENT_STORAGE_KEY = 'calc.editor.content';
-const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
-const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
-const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
-const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
-const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
-const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
-const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
-const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;
-const INTELLIGENCE_HINT_SHOW_DELAY_MS = 300;
-const INTELLIGENCE_HINT_HIDE_IDLE_MS = 3000;
-const EDITOR_TOP_PADDING_PX = 42;
-const EDITOR_BOTTOM_PADDING_PX = 18;
-const DEFAULT_SETTINGS_DRAWER_WIDTH = 420;
-const SETTINGS_DRAWER_MIN_WIDTH = 360;
-const SETTINGS_DRAWER_MAX_WIDTH = 1520;
-const SETTINGS_DRAWER_MIN_EDITOR_WIDTH = 380;
-const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
-
-const PRECISION_MIN = 0;
-const PRECISION_MAX = 15;
-const FINANCIAL_PRECISION = 2;
-const FOUR_POINT_PRECISION = 4;
-
-type SavedThemeEntry = AcceptedThemeEntry;
-type DecimalDelimiter = '.' | ',';
-
-type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
-type PrecisionMode = 'auto' | 'full' | number;
-type HelpPanelPosition = 'left' | 'right' | 'bottom';
-type SuggestionKind = 'variable' | 'function' | 'constant';
-
-type SuggestionItem = {
-    label: string;
-    kind: SuggestionKind;
-    matchText: string;
-};
-
-type IdentifierContext = {
-    start: number;
-    end: number;
-    token: string;
-    baseToken: string;
-    wantsAtPrefix: boolean;
-    lineStart: number;
-    startInLine: number;
-};
-
-type StoredWindowState = {
-    w: number;
-    h: number;
-    x: number;
-    y: number;
-};
-
-type AIModelOutput = {
-    answer?: string;
-    answerNumber?: number;
-    comment?: string;
-    code?: string;
-};
-
-type AIRunResponse = {
-    ok: boolean;
-    error?: string;
-    output: AIModelOutput;
-    preview: {
-        systemPrompt: string;
-        userPrompt: string;
-        contextMode: string;
-        contextLineCount: number;
-        endpoint?: string;
-        modelId?: string;
-        rawContextText?: string;
-        rawLinesAbove?: string[];
-        rawFullContent?: string;
-        rawInitialPayload?: string;
-        rawExchangeLog?: string;
-        rawFinalMessage?: string;
-        rawFinalContent?: string;
-    };
-};
-
-type AISettingsResponse = {
-    settings: AISettingsState;
-    keyStatus: AIKeyStatusState;
-};
-
-type AIProgressEvent = {
-    message?: string;
-};
-
-function defaultAISettingsState(): AISettingsState {
-    return {
-        providerPreset: 'openai',
-        endpoint: 'https://api.openai.com/v1/chat/completions',
-        modelId: 'gpt-4o-mini',
-        defaultContextMode: 'above',
-        allowInsecureKeyFallback: false,
-        allowCustomEndpointKeyReuse: false,
-        customKeySourceEndpoint: '',
-        requestTimeoutSeconds: 45,
-    };
-}
-
-function defaultAIKeyStatusState(): AIKeyStatusState {
-    return {
-        hasKey: false,
-        storageMode: 'none',
-    };
-}
-
-function areAISettingsEqual(left: AISettingsState, right: AISettingsState): boolean {
-    return left.providerPreset === right.providerPreset &&
-        left.endpoint === right.endpoint &&
-        left.modelId === right.modelId &&
-        left.defaultContextMode === right.defaultContextMode &&
-        left.allowInsecureKeyFallback === right.allowInsecureKeyFallback &&
-    left.allowCustomEndpointKeyReuse === right.allowCustomEndpointKeyReuse &&
-        left.requestTimeoutSeconds === right.requestTimeoutSeconds;
-}
-
-function getSystemDecimalDelimiter(): '.' | ',' {
-    const parts = new Intl.NumberFormat().formatToParts(1.1);
-    const decimalPart = parts.find((part) => part.type === 'decimal')?.value;
-    return decimalPart === ',' ? ',' : '.';
-}
-
-function resolveDecimalDelimiter(mode: DecimalDelimiterMode): DecimalDelimiter {
-    if (mode === 'dot') {
-        return '.';
-    }
-    if (mode === 'comma') {
-        return ',';
-    }
-
-    return getSystemDecimalDelimiter();
-}
-
-function formatNumber(
-    value: number,
-    decimalDelimiter: '.' | ',',
-    precision: PrecisionMode = 'auto',
-    useScientific = false,
-): string {
-    const absVal = Math.abs(value);
-    if (useScientific && value !== 0 && (absVal >= 1e7 || absVal < 1e-7)) {
-        let expStr: string;
-        if (precision === 'full') {
-            expStr = value.toExponential();
-        } else {
-            const decPlaces = precision === 'auto' ? 10 : precision;
-            const [mantissa, exponent] = value.toExponential(decPlaces).split('e');
-            expStr = mantissa.replace(/\.?0+$/, '') + 'e' + exponent;
-        }
-        return decimalDelimiter === ',' ? expStr.replace('.', ',') : expStr;
-    }
-
-    if (Number.isInteger(value)) {
-        return String(value);
-    }
-
-    let str: string;
-    if (precision === 'full') {
-        str = String(value);
-    } else if (precision === 'auto') {
-        const rounded = Number(value.toFixed(10));
-        str = String(rounded);
-    } else {
-        str = value.toFixed(precision);
-        str = str.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
-    }
-
-    return decimalDelimiter === ',' ? str.replace('.', ',') : str;
-}
-
-function getPrecisionScale(precision: PrecisionMode): number {
-    if (precision === 'full') {
-        return Number.POSITIVE_INFINITY;
-    }
-    if (precision === 'auto') {
-        return 10;
-    }
-
-    return precision;
-}
-
-function parseHexColor(hexColor: string): [number, number, number] | null {
-    const hex = hexColor.trim();
-    if (!hex.startsWith('#')) {
-        return null;
-    }
-
-    const value = hex.slice(1);
-    if (value.length === 3 || value.length === 4) {
-        const r = parseInt(value[0] + value[0], 16);
-        const g = parseInt(value[1] + value[1], 16);
-        const b = parseInt(value[2] + value[2], 16);
-        return Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b) ? null : [r, g, b];
-    }
-
-    if (value.length === 6 || value.length === 8) {
-        const r = parseInt(value.slice(0, 2), 16);
-        const g = parseInt(value.slice(2, 4), 16);
-        const b = parseInt(value.slice(4, 6), 16);
-        return Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b) ? null : [r, g, b];
-    }
-
-    return null;
-}
-
-function parseRgbColor(rgbColor: string): [number, number, number] | null {
-    const match = rgbColor.trim().match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (!match) {
-        return null;
-    }
-
-    const r = Number(match[1]);
-    const g = Number(match[2]);
-    const b = Number(match[3]);
-    if (![r, g, b].every((v) => Number.isFinite(v) && v >= 0 && v <= 255)) {
-        return null;
-    }
-
-    return [r, g, b];
-}
-
-function inferCustomThemeMode(customColors?: Record<string, string>): 'light' | 'dark' {
-    const bg = customColors?.['editor.background'] || customColors?.['sideBar.background'];
-    if (!bg) {
-        return 'dark';
-    }
-
-    const rgb = parseHexColor(bg) || parseRgbColor(bg);
-    if (!rgb) {
-        return 'dark';
-    }
-
-    const [r, g, b] = rgb;
-    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    return luminance > 0.58 ? 'light' : 'dark';
-}
-
-function isIdentifierStartChar(ch: string): boolean {
-    return /^[a-zA-Z_]$/.test(ch);
-}
-
-function isIdentifierPartChar(ch: string): boolean {
-    return /^[a-zA-Z0-9_]$/.test(ch);
-}
 
 function App() {
     const [content, setContent] = useState(() => {
@@ -442,7 +211,7 @@ function App() {
         return {};
     });
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
-    const [_, setLineDependencies] = useState<Record<number, string[]>>({});
+    const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
     const {theme, setTheme} = useTheme();
@@ -1906,437 +1675,19 @@ function App() {
         });
     };
 
-    const evaluateCurrentLine = async () => {
-        const editor = editorRef.current;
-        if (!editor) {
-            return;
-        }
-
-        const caretPos = editor.selectionStart;
-        const bounds = getLineBounds(content, caretPos);
-        const lineStart = bounds.lineStart;
-        const lineEnd = bounds.lineEnd;
-        const lineText = content.slice(lineStart, lineEnd);
-        const editableLine = getExpressionSource(lineText);
-
-        const lineIndex = lineIndexAtPosition(content, lineStart);
-        const caretOffsetInLine = Math.min(Math.max(caretPos - lineStart, 0), lineText.length);
-
-        if (shouldSkipEvaluationAtCaret(lineText, caretOffsetInLine)) {
-            setStatusText('Ready');
-            setIsStatusError(false);
-            setDevError('');
-            if (lineEnd === content.length) {
-                const nextContent = content + '\n';
-                const nextCaret = nextContent.length;
-                setContentAndCaret(nextContent, nextCaret);
-                return;
-            }
-            const nextLineStart = lineEnd < content.length ? lineEnd + 1 : lineEnd;
-            if (nextLineStart !== caretPos) {
-                setCaretPos(nextLineStart);
-                requestAnimationFrame(() => {
-                    if (!editorRef.current) {
-                        return;
-                    }
-                    editorRef.current.selectionStart = nextLineStart;
-                    editorRef.current.selectionEnd = nextLineStart;
-                });
-            }
-            return;
-        }
-
-        if (isAITriggerLine(editableLine)) {
-            const prompt = getAITriggerPrompt(editableLine);
-            if (!prompt) {
-                insertAtSelection('\n');
-                setStatusText('AI prompt is empty. Add text after ? and press Enter.');
-                setIsStatusError(true);
-                setDevError('AI prompt is empty');
-                return;
-            }
-
-            if (isAIQueryPending) {
-                setStatusText('AI request already in progress...');
-                setIsStatusError(false);
-                setDevError('');
-                return;
-            }
-
-            let aiStart = 0;
-            try {
-                const lines = content.split('\n');
-                const linesAbove = lines.slice(0, lineIndex).map((line) => getExpressionSource(line));
-                aiStart = Date.now();
-                setAIPendingLineIndex(lineIndex);
-                setIsAIQueryPending(true);
-                setAIProgressMessage('preparing request');
-                setStatusText('AI request sent... waiting for response');
-                setIsStatusError(false);
-                setDevError('');
-                const aiResult = await RunAIQuery({
-                    prompt,
-                    contextMode: aiContextMode,
-                    linesAbove,
-                    fullContent: content,
-                    settingsOverride: aiSettings,
-                } as any) as AIRunResponse;
-
-                if (!aiResult.ok) {
-                    const errorMessage = aiResult.error || 'AI request failed';
-                    setLastResult(null);
-                    clearLineEvaluationMetadata(lineIndex);
-                    setIsStatusError(true);
-                    setStatusText(`AI mode failed: ${errorMessage}`);
-                    setDevError(errorMessage);
-
-                    setAIDebugLog((prev) => {
-                        const id = ++aiDebugIdRef.current;
-                        const entry: AIDebugEntry = {
-                            id,
-                            timestamp: new Date(),
-                            prompt,
-                            model: aiResult.preview?.modelId ?? '',
-                            endpoint: aiResult.preview?.endpoint ?? '',
-                            systemPrompt: aiResult.preview?.systemPrompt || '',
-                            userPrompt: aiResult.preview?.userPrompt || '',
-                            contextMode: aiResult.preview?.contextMode || aiContextMode,
-                            contextLineCount: aiResult.preview?.contextLineCount ?? linesAbove.length,
-                            status: 'error',
-                            error: errorMessage,
-                            durationMs: Date.now() - aiStart,
-                            raw: {
-                                frontendRequest: {
-                                    prompt,
-                                    contextMode: aiContextMode,
-                                    linesAbove,
-                                    fullContent: content,
-                                },
-                                backendPreview: aiResult.preview,
-                                backendResponse: aiResult,
-                            },
-                        };
-                        return [...prev, entry];
-                    });
-                    return;
-                }
-
-                const output = aiResult.output || {};
-                const insertionLines: string[] = [];
-                const answerNumber = output.answerNumber;
-                const hasNumericAnswer = typeof answerNumber === 'number' && Number.isFinite(answerNumber);
-                const normalizedComment = (output.comment || '').trim();
-                if (hasNumericAnswer) {
-                    let answerLine = `ai0 = ${formatNumber(answerNumber, decimalDelimiter, precision, scientificNotation)}`;
-                    if (normalizedComment.length > 0) {
-                        answerLine = `${answerLine} " ${normalizedComment}`;
-                    }
-                    insertionLines.push(answerLine);
-                } else {
-                    const normalizedAnswer = (output.answer || '').trim();
-                    if (normalizedAnswer.length > 0) {
-                        insertionLines.push(`" ${normalizedAnswer}`);
-                    }
-                    if (normalizedComment.length > 0) {
-                        insertionLines.push(`" ${normalizedComment}`);
-                    }
-                }
-
-                const normalizedCode = stripMarkdownCodeFences(output.code || '');
-                const codeLines = normalizedCode.length > 0
-                    ? normalizedCode.split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.length > 0)
-                    : [];
-                if (codeLines.length > 0) {
-                    insertionLines.push(...codeLines);
-                }
-
-                const before = content.slice(0, lineEnd);
-                const after = content.slice(lineEnd);
-                const insertionBlock = `\n${insertionLines.join('\n')}`;
-                const nextContent = before + insertionBlock + after + (lineEnd === content.length ? '\n' : '');
-                const nextCaret = before.length + insertionBlock.length;
-
-                setContentAndCaret(nextContent, nextCaret);
-                clearLineEvaluationMetadata(lineIndex);
-                setLastResult(null);
-                setStatusText('AI response inserted');
-                setIsStatusError(false);
-                setDevError('');
-
-                setAIDebugLog((prev) => {
-                    const id = ++aiDebugIdRef.current;
-                    const entry: AIDebugEntry = {
-                        id,
-                        timestamp: new Date(),
-                        prompt,
-                        model: aiResult.preview.modelId ?? '',
-                        endpoint: aiResult.preview.endpoint ?? '',
-                        systemPrompt: aiResult.preview.systemPrompt,
-                        userPrompt: aiResult.preview.userPrompt,
-                        contextMode: aiResult.preview.contextMode,
-                        contextLineCount: aiResult.preview.contextLineCount,
-                        status: 'ok',
-                        output: aiResult.output,
-                        durationMs: Date.now() - aiStart,
-                        raw: {
-                            frontendRequest: {
-                                prompt,
-                                contextMode: aiContextMode,
-                                linesAbove,
-                                fullContent: content,
-                            },
-                            backendPreview: aiResult.preview,
-                            backendResponse: aiResult,
-                        },
-                    };
-                    return [...prev, entry];
-                });
-
-                if (codeLines.length > 0) {
-                    const contentForReeval = nextContent;
-                    requestAnimationFrame(() => {
-                        void reevaluateAllExpressions(contentForReeval);
-                    });
-                }
-            } catch (error) {
-                setLastResult(null);
-                clearLineEvaluationMetadata(lineIndex);
-                setIsStatusError(true);
-                const errorMessage = error instanceof Error ? error.message : 'Unknown AI error';
-                setStatusText(`AI mode failed: ${errorMessage}`);
-                setDevError(errorMessage);
-
-                setAIDebugLog((prev) => {
-                    const id = ++aiDebugIdRef.current;
-                    const entry: AIDebugEntry = {
-                        id,
-                        timestamp: new Date(),
-                        prompt,
-                        model: '',
-                        endpoint: '',
-                        systemPrompt: '',
-                        userPrompt: '',
-                        contextMode: aiContextMode,
-                        contextLineCount: 0,
-                        status: 'error',
-                        error: errorMessage,
-                        durationMs: Date.now() - aiStart,
-                        raw: {
-                            frontendRequest: {
-                                prompt,
-                                contextMode: aiContextMode,
-                                fullContent: content,
-                            },
-                            thrownError: error,
-                        },
-                    };
-                    return [...prev, entry];
-                });
-            } finally {
-                setIsAIQueryPending(false);
-                setAIPendingLineIndex(null);
-                setAIProgressMessage('');
-            }
-            return;
-        }
-
-        const trimmed = editableLine.trim();
-
-        const expression = buildEvaluationExpression(
-            editableLine,
-            trimmed,
-            lastResult,
-            decimalDelimiter,
-            (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
-        );
-
-        try {
-            const evalResult = await EvaluateExprProgram(expression, variableValues as Record<string, any>);
-            if (!evalResult.ok) {
-                throw new Error(evalResult.error || 'Evaluation failed');
-            }
-
-            const numberValue = evalResult.numberValue ?? 0;
-            const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue);
-            const replacement = formatEvaluatedLine(editableLine, formatted);
-            const before = content.slice(0, lineStart);
-            const after = content.slice(lineEnd);
-            const nextContent = before + replacement + after + (lineEnd === content.length ? '\n' : '');
-            const nextCaret = lineEnd === content.length
-                ? (before + replacement + '\n').length
-                : before.length + replacement.length + 1;
-
-            setContentAndCaret(nextContent, nextCaret);
-            setLastResult(evalResult.isNumber ? numberValue : null);
-            const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
-
-            const changedVariableKeys = new Set<string>();
-            const previousVariableKeys = new Set(Object.keys(variableValues));
-            const nextVariableKeys = new Set(Object.keys(nextVariables));
-            const allVariableKeys = new Set<string>([...previousVariableKeys, ...nextVariableKeys]);
-            allVariableKeys.forEach((key) => {
-                const normalizedKey = key.toLowerCase();
-                const previousValue = variableValues[normalizedKey];
-                const nextValue = nextVariables[normalizedKey];
-                if (!areValuesEquivalent(previousValue, nextValue)) {
-                    changedVariableKeys.add(normalizedKey);
-                }
-            });
-
-            const nextVariableVersions = {...variableVersions};
-            changedVariableKeys.forEach((key) => {
-                nextVariableVersions[key] = (nextVariableVersions[key] ?? 0) + 1;
-            });
-
-            const dependencies = extractExpressionDependencies(editableLine);
-            const dependencySnapshot: Record<string, number> = {};
-            dependencies.forEach((name) => {
-                dependencySnapshot[name] = nextVariableVersions[name] ?? 0;
-            });
-
-            setVariableValues(nextVariables);
-            setVariableVersions(nextVariableVersions);
-            setLineDependencies((prev) => ({
-                ...prev,
-                [lineIndex]: dependencies,
-            }));
-            setLineDependencyVersions((prev) => ({
-                ...prev,
-                [lineIndex]: dependencySnapshot,
-            }));
-            setStatusText('Calculated');
-            setIsStatusError(false);
-            setDevError('');
-        } catch (error) {
-            const replacement = formatEvaluatedLine(editableLine, 'error');
-            const before = content.slice(0, lineStart);
-            const after = content.slice(lineEnd);
-            const nextContent = before + replacement + after;
-            const nextCaret = before.length + getPreservedCaretOffset(caretOffsetInLine, replacement.length);
-            setContentAndCaret(nextContent, nextCaret);
-            setLastResult(null);
-            clearLineEvaluationMetadata(lineIndex);
-            setIsStatusError(true);
-
-            const errorMessage = error instanceof Error ? error.message : 'Unknown evaluation error';
-            setStatusText(getFriendlyEvalErrorMessage(errorMessage));
-            setDevError(errorMessage);
-        }
-    };
-
-    const reevaluateAllExpressions = async (contentOverride?: string) => {
-        if (isReevaluatingAll) {
-            return;
-        }
-
-        setIsReevaluatingAll(true);
-        try {
-            const sourceLines = (contentOverride ?? content).split('\n');
-            const nextLines = [...sourceLines];
-            let workingVariables: Record<string, unknown> = {};
-            let workingVariableVersions: Record<string, number> = {};
-            const nextLineDependencies: Record<number, string[]> = {};
-            const nextLineDependencyVersions: Record<number, Record<string, number>> = {};
-            let nextLastResult: number | null = null;
-            let calculatedCount = 0;
-            let failedCount = 0;
-
-            for (let i = 0; i < sourceLines.length; i++) {
-                const originalLine = sourceLines[i];
-                const editableLine = getExpressionSource(originalLine);
-                if (shouldSkipEvaluation(editableLine)) {
-                    continue;
-                }
-
-                if (isAITriggerSourceLine(editableLine)) {
-                    continue;
-                }
-
-                const declaration = parseDeclaredVariable(splitLineComment(editableLine).body.trimEnd());
-                try {
-                    const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
-                    if (!evalResult.ok) {
-                        throw new Error(evalResult.error || 'Evaluation failed');
-                    }
-
-                    const numberValue = evalResult.numberValue ?? 0;
-                    const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue);
-                    nextLines[i] = formatEvaluatedLine(editableLine, formatted);
-
-                    const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
-                    const changedVariableKeys = new Set<string>();
-                    const allVariableKeys = new Set<string>([
-                        ...Object.keys(workingVariables),
-                        ...Object.keys(nextVariables),
-                    ]);
-                    allVariableKeys.forEach((key) => {
-                        const normalizedKey = key.toLowerCase();
-                        const previousValue = workingVariables[normalizedKey];
-                        const nextValue = nextVariables[normalizedKey];
-                        if (!areValuesEquivalent(previousValue, nextValue)) {
-                            changedVariableKeys.add(normalizedKey);
-                        }
-                    });
-
-                    changedVariableKeys.forEach((key) => {
-                        workingVariableVersions[key] = (workingVariableVersions[key] ?? 0) + 1;
-                    });
-
-                    const dependencies = extractExpressionDependencies(editableLine);
-                    const dependencySnapshot: Record<string, number> = {};
-                    dependencies.forEach((name) => {
-                        dependencySnapshot[name] = workingVariableVersions[name] ?? 0;
-                    });
-
-                    nextLineDependencies[i] = dependencies;
-                    nextLineDependencyVersions[i] = dependencySnapshot;
-                    workingVariables = nextVariables;
-                    nextLastResult = evalResult.isNumber ? numberValue : null;
-                    calculatedCount++;
-                } catch {
-                    nextLines[i] = formatEvaluatedLine(editableLine, 'error');
-                    failedCount++;
-                    nextLastResult = null;
-                }
-            }
-
-            const nextContent = nextLines.join('\n');
-            setContent(nextContent);
-            setVariableValues(workingVariables);
-            setVariableVersions(workingVariableVersions);
-            setLineDependencies(nextLineDependencies);
-            setLineDependencyVersions(nextLineDependencyVersions);
-            setLastResult(nextLastResult);
-            setIsStatusError(failedCount > 0);
-            setDevError('');
-            setStatusText(
-                failedCount > 0
-                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}, ${failedCount} failed`
-                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}`
-            );
-
-            requestAnimationFrame(() => {
-                if (!editorRef.current) {
-                    return;
-                }
-
-                const nextCaret = Math.min(editorRef.current.selectionStart, nextContent.length);
-                editorRef.current.selectionStart = nextCaret;
-                editorRef.current.selectionEnd = nextCaret;
-                setCaretPos(nextCaret);
-            });
-        } finally {
-            setIsReevaluatingAll(false);
-        }
-    };
-
-    const clearStaleStates = () => {
-        setLineDependencies({});
-        setLineDependencyVersions({});
-        setStatusText('Cleared stale markers');
-        setIsStatusError(false);
-        setDevError('');
-    };
+    const { evaluateCurrentLine, reevaluateAllExpressions, clearStaleStates } = buildEvaluationHooks({
+        content, lastResult, variableValues, variableVersions, lineDependencies, lineDependencyVersions,
+        isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
+        decimalDelimiter, precision, scientificNotation,
+        setContent, setCaretPos, setLastResult,
+        setVariableValues,
+        setVariableVersions,
+        setLineDependencies,
+        setLineDependencyVersions,
+        setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
+        setAIDebugLog, setStatusText, setIsStatusError, setDevError,
+        clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
+    });
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
@@ -2808,31 +2159,12 @@ function App() {
                     </div>
                 </div>
                 <div className="editor-area">
-                    {staleLineDetails.size > 0 && (
-                        <div className="stale-banner" role="status" aria-live="polite">
-                            <span className="stale-banner-text">
-                                {`Stale results detected on ${staleLineDetails.size} line${staleLineDetails.size === 1 ? '' : 's'}.`}
-                            </span>
-                            <div className="stale-banner-actions">
-                                <button
-                                    type="button"
-                                    className="stale-banner-btn"
-                                    onClick={() => void reevaluateAllExpressions()}
-                                    disabled={isReevaluatingAll}
-                                >
-                                    {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="stale-banner-btn stale-banner-btn--ghost"
-                                    onClick={clearStaleStates}
-                                    disabled={isReevaluatingAll}
-                                >
-                                    Clear Stale
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <StaleBanner
+                        staleCount={staleLineDetails.size}
+                        isReevaluatingAll={isReevaluatingAll}
+                        onReevaluateAll={() => void reevaluateAllExpressions()}
+                        onClearStale={clearStaleStates}
+                    />
                     <textarea
                         ref={editorRef}
                         className={`editor${wordWrap ? ' editor--wrap' : ''}`}
@@ -3660,92 +2992,14 @@ function App() {
             </div>
 
             {showHelp && (
-                <div
-                    className={`settings-panel settings-panel--open${helpPanelPosition === 'left' ? ' settings-panel--left' : ''}${helpPanelPosition === 'bottom' ? ' settings-panel--bottom' : ''}`}
-                    role="dialog"
-                    aria-label="Help"
-                >
-                    <div className="settings-header">
-                        <button
-                            type="button"
-                            className="settings-back"
-                            onClick={() => setShowHelp(false)}
-                            aria-label="Back"
-                        >
-                            &#8594;
-                        </button>
-                        <span className="settings-title">Help</span>
-                        <div className="settings-header-actions" role="group" aria-label="Help panel position">
-                            <button
-                                type="button"
-                                className={`settings-pos-btn${helpPanelPosition === 'left' ? ' settings-pos-btn--active' : ''}`}
-                                aria-label="Move help panel to left"
-                                title="Move help panel to left"
-                                onClick={() => {
-                                    if (helpPanelPosition === 'left') {
-                                        setShowHelp(false);
-                                        return;
-                                    }
-                                    setHelpPanelPosition('left');
-                                }}
-                            >
-                                <span className="settings-pos-icon settings-pos-icon--left" aria-hidden="true" />
-                            </button>
-                            <button
-                                type="button"
-                                className={`settings-pos-btn${helpPanelPosition === 'right' ? ' settings-pos-btn--active' : ''}`}
-                                aria-label="Move help panel to right"
-                                title="Move help panel to right"
-                                onClick={() => {
-                                    if (helpPanelPosition === 'right') {
-                                        setShowHelp(false);
-                                        return;
-                                    }
-                                    setHelpPanelPosition('right');
-                                }}
-                            >
-                                <span className="settings-pos-icon settings-pos-icon--right" aria-hidden="true" />
-                            </button>
-                            <button
-                                type="button"
-                                className={`settings-pos-btn${helpPanelPosition === 'bottom' ? ' settings-pos-btn--active' : ''}`}
-                                aria-label="Move help panel to bottom"
-                                title="Move help panel to bottom"
-                                onClick={() => {
-                                    if (helpPanelPosition === 'bottom') {
-                                        setShowHelp(false);
-                                        return;
-                                    }
-                                    setHelpPanelPosition('bottom');
-                                }}
-                            >
-                                <span className="settings-pos-icon settings-pos-icon--bottom" aria-hidden="true" />
-                            </button>
-                        </div>
-                    </div>
-                    <div className="settings-body">
-                        <HelpPanel helpSiteUrl={HELP_SITE_URL} />
-                    </div>
-                </div>
+                <HelpPanelContainer
+                    helpPanelPosition={helpPanelPosition}
+                    setHelpPanelPosition={setHelpPanelPosition}
+                    onClose={() => setShowHelp(false)}
+                />
             )}
             {showClearWorksheetConfirm && (
-                <div
-                    className="recalc-modal-overlay"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="clear-worksheet-title"
-                    aria-describedby="clear-worksheet-message"
-                    onMouseDown={cancelClearWorksheet}
-                >
-                    <div className="recalc-modal" onMouseDown={(event) => event.stopPropagation()}>
-                        <h3 id="clear-worksheet-title">Confirm Clear Worksheet</h3>
-                        <p id="clear-worksheet-message">Clear worksheet and remove all expressions?</p>
-                        <div className="recalc-modal-actions">
-                            <button type="button" className="recalc-btn-no" onClick={cancelClearWorksheet}>Cancel</button>
-                            <button type="button" className="recalc-btn-yes" onClick={confirmClearWorksheet}>Clear</button>
-                        </div>
-                    </div>
-                </div>
+                <ClearWorksheetModal onConfirm={confirmClearWorksheet} onCancel={cancelClearWorksheet} />
             )}
         </div>
     );
