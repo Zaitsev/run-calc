@@ -10,7 +10,7 @@ export function HelpLayout({ title, subtitle, children }: HelpLayoutProps) {
     return (
         <main className="container">
             <header>
-                <h1>{title}</h1>
+                <h1><img src="/hare-calc-128.png" alt="" width={64} height={64} style={{ verticalAlign: 'middle', marginRight: '0.4em' }} />{title}</h1>
                 <p className="subtitle">{subtitle}</p>
                 <nav aria-label="Main help pages">
                     <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
@@ -37,6 +37,14 @@ export function HelpLayout({ title, subtitle, children }: HelpLayoutProps) {
                     <NavLink to="/privacy" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                         Privacy
                     </NavLink>
+                    <a
+                        href="https://github.com/Zaitsev/run-calc/releases"
+                        className="nav-link"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        Download App
+                    </a>
                 </nav>
             </header>
             {children}

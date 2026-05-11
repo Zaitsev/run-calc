@@ -1,12 +1,14 @@
 import { HelpLayout } from '../components/HelpLayout';
 import { Link } from 'react-router-dom';
+import { ThumbsUp, BookOpen, GraduationCap, Zap, Map, Code2 } from 'lucide-react';
+import { GitHubIcon } from '../components/GitHubIcon';
 
 export function OverviewPage() {
     return (
         <HelpLayout
             title="Run-Calc"
-            subtitle="A fast desktop calculator that feels like a notepad, not a form."
-        >
+            subtitle="A fast desktop calculator that feels like a notepad, not a form. Windows and Mac. Local-first, with optional AI."
+            >
             <section className="panel hero-panel">
                 <h2 className="hero-title">Type naturally. Press Enter. Get instant answers inline.</h2>
                 <p className="hero-badge">Desktop app for everyday math, planning,   and quick analysis</p>
@@ -24,7 +26,7 @@ export function OverviewPage() {
             </section>
 
             <section className="panel">
-                <h2>Why people like Run-Calc</h2>
+                <h2 className="icon-heading"><ThumbsUp size={20} />Why people like Run-Calc</h2>
                 <ul>
                     <li>No button hunting: just type expressions like <code>2+3*4</code> and press <code>Enter</code>.</li>
                     <li>Keep momentum: start next line with <code>+</code>, <code>-</code>, <code>*</code>, or <code>/</code> to continue from the last result.</li>
@@ -35,19 +37,19 @@ export function OverviewPage() {
 
             <section className="stat-grid" aria-label="Run-Calc value highlights">
                 <article className="panel stat-card">
-                    <h2>Readable by design</h2>
+                    <h2 className="icon-heading"><BookOpen size={18} />Readable by design</h2>
                     <p>
                         Calculations stay in plain text, so your work is easy to scan, revisit, and share as notes.
                     </p>
                 </article>
                 <article className="panel stat-card">
-                    <h2>Beginner-friendly</h2>
+                    <h2 className="icon-heading"><GraduationCap size={18} />Beginner-friendly</h2>
                     <p>
                         In-app help stays short and clear. Deeper guides and details live on this site when you need more.
                     </p>
                 </article>
                 <article className="panel stat-card">
-                    <h2>Powerful when needed</h2>
+                    <h2 className="icon-heading"><Zap size={18} />Powerful when needed</h2>
                     <p>
                         Variables, pipelines, math functions, themes, and precision controls are ready as your work grows.
                     </p>
@@ -55,26 +57,31 @@ export function OverviewPage() {
             </section>
 
             <section className="panel">
-                <h2>Explore the docs</h2>
+                <h2 className="icon-heading"><Map size={20} />Explore the docs</h2>
                 <ul>
-                    <li><strong>Operations</strong>: expression syntax, variables, comments, functions, and AI flow.</li>
-                    <li><strong>Shortcuts</strong>: keyboard commands to work faster with less friction.</li>
-                    <li><strong>Functions</strong>: grouped reference for all functions exposed in Run-Calc.</li>
-                    <li><strong>AI key Setup</strong>: where to create API keys for each provider and what to paste into Run-Calc.</li>
-                    <li><strong>What's New</strong>: latest improvements and behavior updates.</li>
-                    <li><strong>Privacy</strong>: data handling summary, policy, and legal links.</li>
+                    <li><Link to="/operations"><strong>Operations</strong></Link>: expression syntax, variables, comments, functions, and AI flow.</li>
+                    <li><Link to="/shortcuts"><strong>Shortcuts</strong></Link>: keyboard commands to work faster with less friction.</li>
+                    <li><Link to="/functions"><strong>Functions</strong></Link>: grouped reference for all functions exposed in Run-Calc.</li>
+                    <li><Link to="/byok"><strong>AI key Setup</strong></Link>: where to create API keys for each provider and what to paste into Run-Calc.</li>
+                    <li><Link to="/whats-new"><strong>What's New</strong></Link>: latest improvements and behavior updates.</li>
+                    <li><Link to="/privacy"><strong>Privacy</strong></Link>: data handling summary, policy, and legal links.</li>
                 </ul>
             </section>
 
             <section className="panel">
-                <h2>Expression Engine</h2>
+                <h2 className="icon-heading"><Code2 size={20} />Expression Engine</h2>
                 <p>
                     Run-Calc expression parsing and evaluation are powered by{' '}
                     <a href="https://github.com/expr-lang/expr">Expr language</a>.
                 </p>
             </section>
 
-            <p className="footer">Run-Calc help site powered by React + Vite.</p>
+            <section className="panel">
+                <h2 className="icon-heading"><GitHubIcon size={20} />GitHub</h2>
+                <p>
+                    <a href="https://github.com/Zaitsev/run-calc" target="_blank" rel="noopener noreferrer">Run-Calc on GitHub</a> — source code, releases, and issue tracker.
+                </p>
+            </section>
         </HelpLayout>
     );
 }
