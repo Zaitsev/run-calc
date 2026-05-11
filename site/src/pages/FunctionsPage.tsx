@@ -1,5 +1,6 @@
 import { HelpLayout } from '../components/HelpLayout';
 import { functionReferenceGroups } from '../content/functionReference';
+import { Layers, Info } from 'lucide-react';
 
 function getFunctionAnchorId(groupId: string, functionName: string): string {
     const normalizedName = functionName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -16,7 +17,7 @@ export function FunctionsPage() {
         >
             <div className="reference-layout">
                 <aside className="panel reference-sidebar" aria-label="Function reference navigation">
-                    <h2>Function Groups</h2>
+                    <h2 className="icon-heading"><Layers size={20} />Function Groups</h2>
                     <p className="reference-summary-text">
                         {totalFunctions} documented functions across {functionReferenceGroups.length} groups.
                     </p>
@@ -46,7 +47,7 @@ export function FunctionsPage() {
 
                 <div className="reference-content">
                     <section className="panel">
-                        <h2>How to use this page</h2>
+                        <h2 className="icon-heading"><Info size={18} />How to use this page</h2>
                         <ul>
                             <li>Use the left sidebar to jump to a function group.</li>
                             <li>Examples are evaluator-ready snippets you can paste into Run-Calc lines.</li>

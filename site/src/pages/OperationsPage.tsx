@@ -1,6 +1,7 @@
 import { HelpLayout } from '../components/HelpLayout';
 import { HelpList } from '../components/HelpList';
 import { helpContent, operationsVisualGuide } from '../content/helpContent';
+import { PlayCircle, BookOpen } from 'lucide-react';
 
 export function OperationsPage() {
     return (
@@ -15,7 +16,7 @@ export function OperationsPage() {
             </section>
 
             <section className="panel">
-                <h2>Visual Walkthrough</h2>
+                <h2 className="icon-heading"><PlayCircle size={20} />Visual Walkthrough</h2>
                 <div className="operations-step-grid">
                     {operationsVisualGuide.map((step, index) => (
                         <article key={step.id} className="operations-step-card">
@@ -39,7 +40,7 @@ export function OperationsPage() {
             </section>
 
             <section className="panel">
-                <h2>Operations Reference</h2>
+                <h2 className="icon-heading"><BookOpen size={20} />Operations Reference</h2>
                 <HelpList items={helpContent.operations} />
             </section>
         </HelpLayout>
