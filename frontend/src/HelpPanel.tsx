@@ -8,6 +8,8 @@ interface HelpPanelProps {
     helpSiteUrl: string;
 }
 
+const APP_DOWNLOAD_URL = 'https://github.com/Zaitsev/run-calc/releases';
+
 export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
     const [activeHelpPage, setActiveHelpPage] = useState<HelpPage>('operations');
 
@@ -22,6 +24,14 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                         onClick={() => BrowserOpenURL(helpSiteUrl)}
                     >
                         Full documentation site
+                    </button>
+                    {' | '}
+                    <button
+                        type="button"
+                        className="help-site-link"
+                        onClick={() => BrowserOpenURL(APP_DOWNLOAD_URL)}
+                    >
+                        Download app
                     </button>
                 </div>
             </div>

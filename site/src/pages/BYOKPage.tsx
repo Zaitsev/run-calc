@@ -1,4 +1,5 @@
 import { HelpLayout } from '../components/HelpLayout';
+import { HelpCircle, Bot, Star, Network, Brain } from 'lucide-react';
 
 const ext = { target: '_blank', rel: 'noopener noreferrer' };
 
@@ -6,7 +7,7 @@ export function BYOKPage() {
     return (
         <HelpLayout title="AI Key Setup" subtitle="Connect AI in a few simple steps, even if you are not technical.">
             <section className="panel">
-                <h2>How it works</h2>
+                <h2 className="icon-heading"><HelpCircle size={20} />How it works</h2>
                 <p>
                     Run-Calc does not have a built-in AI subscription. Instead you connect your own account
                     from one of the providers below — this is called <strong>BYOK</strong> (Bring Your Own Key).
@@ -24,7 +25,7 @@ export function BYOKPage() {
             <section className="panel byok-grid" aria-label="Provider key setup steps">
 
                 <article className="byok-card">
-                    <h3>OpenAI</h3>
+                    <h3 className="icon-heading"><Bot size={18} />OpenAI</h3>
                     <p className="byok-tag">Best if you already use ChatGPT or have an OpenAI account</p>
                     <ol>
                         <li><a href="https://platform.openai.com/signup" {...ext}>Create a free OpenAI account</a> (skip if you have one).</li>
@@ -37,7 +38,7 @@ export function BYOKPage() {
                 </article>
 
                 <article className="byok-card">
-                    <h3>Gemini</h3>
+                    <h3 className="icon-heading"><Star size={18} />Gemini</h3>
                     <p className="byok-tag">Good choice if you have a Google account — has a free tier</p>
                     <ol>
                         <li>Go to <a href="https://aistudio.google.com/app/apikey" {...ext}>Google AI Studio</a> and sign in with your Google account.</li>
@@ -49,7 +50,7 @@ export function BYOKPage() {
                 </article>
 
                 <article className="byok-card">
-                    <h3>OpenRouter</h3>
+                    <h3 className="icon-heading"><Network size={18} />OpenRouter</h3>
                     <p className="byok-tag">Great for trying many AI models from one account</p>
                     <ol>
                         <li><a href="https://openrouter.ai/sign-up" {...ext}>Create a free OpenRouter account</a> (or sign in).</li>
@@ -62,7 +63,7 @@ export function BYOKPage() {
                 </article>
 
                 <article className="byok-card">
-                    <h3>Anthropic (Claude)</h3>
+                    <h3 className="icon-heading"><Brain size={18} />Anthropic (Claude)</h3>
                     <p className="byok-tag">The Anthropic preset in Run-Calc routes through OpenRouter — use an OpenRouter key</p>
                     <ol>
                         <li><a href="https://openrouter.ai/sign-up" {...ext}>Create a free OpenRouter account</a> (or sign in).</li>

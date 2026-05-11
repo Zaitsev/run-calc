@@ -191,6 +191,30 @@ code {
     font-size: 0.95rem;
 }
 
+.footer-github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.footer-github-link:hover {
+    color: var(--text);
+}
+
+.icon-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon-heading svg {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
 .reference-layout {
     display: grid;
     gap: 16px;
