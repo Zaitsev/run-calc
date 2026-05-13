@@ -134,12 +134,17 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             saveTimer = window.setTimeout(() => { saveTimer = null; void persistWindowState(); }, WINDOW_STATE_SAVE_DEBOUNCE_MS);
         };
 
+        const handleBeforeUnload = () => {
+            void persistWindowState();
+        };
+
         window.addEventListener('resize', schedulePersist);
-        window.addEventListener('beforeunload', () => void persistWindowState());
+        window.addEventListener('beforeunload', handleBeforeUnload);
         periodicSaveTimer = window.setInterval(() => void persistWindowState(), WINDOW_STATE_SAVE_INTERVAL_MS);
 
         return () => {
             window.removeEventListener('resize', schedulePersist);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
             if (saveTimer !== null) window.clearTimeout(saveTimer);
             if (periodicSaveTimer !== null) window.clearInterval(periodicSaveTimer);
             void persistWindowState();
