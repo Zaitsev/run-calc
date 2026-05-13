@@ -26,7 +26,7 @@ In-app help UX policy:
 5. Keep app-help wording simple and non-experienced-user friendly; move deep-dive content to site pages.
 6. Use `VITE_HELP_SITE_URL` for opening the full help site when set; otherwise default to:
    - Dev mode: `http://localhost:3001`
-   - Production: `https://run-calc.taalgem.nl/help`
+   - Production: `https://run-calc.taalgem.nl/`
 
 ## Workflow
 1. Edit shared content and type definitions if needed.

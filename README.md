@@ -11,6 +11,8 @@ A minimal, notepad-style desktop calculator designed for speed, persistence, and
 ---
 
 ## 📖 User Guide
+ 
+Full usage documentation is available at [run-calc.taalgem.nl](https://run-calc.taalgem.nl), including detailed explanations of operations, shortcuts, and new features. Below is a quick reference for basic usage.
 
 ### Basic Operations
 Run-Calc works like a smart text editor. Type your math, and it solves it inline.
@@ -43,12 +45,6 @@ Run-Calc includes an optional AI assistant to answer questions, generate express
 > **⚠️ Important: Bring Your Own Key (BYOK)**
 > The AI assistant operates strictly on a BYOK basis. Run-Calc does not include built-in API keys or AI subscriptions. To use this feature, you must provide your own API key from a supported provider or connect to a local/self-hosted model (like Ollama).
 
-#### Setup
-Configure your provider in **Settings -> AI**:
-1. Choose a preset: **OpenAI**, **Gemini**, **OpenRouter**, **Anthropic**, or **Custom** (for self-hosted/Ollama).
-2. Enter your personal **API key** for the selected provider. *(For local models, this can usually be left blank or set to a dummy value).*
-3. Adjust the model ID, timeout, and context modes as needed.
-4. Click **Test & Save** to verify the connection before using it in the worksheet.
 
 #### Usage
 | Command | Action | Example |

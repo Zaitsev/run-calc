@@ -21,15 +21,17 @@ React + Vite help app for Firebase Hosting.
 
 1. Install Firebase CLI if needed:
    - `npm install -g firebase-tools`
-2. Set your project id in `.firebaserc`:
-   - replace `YOUR_FIREBASE_PROJECT_ID`
+2. Verify your project id in `site/.firebaserc`:
+   - set `projects.default` to your Firebase project id
 3. Login:
    - `firebase login`
 4. Build and deploy:
-   - `cd site && npm run build`
-   - `firebase deploy --only hosting`
+   - `cd site`
+   - `npm run deploy`
+
+Deployment runs `npm run build` automatically via `predeploy` in `site/firebase.json`.
 
 ## Notes
 
-- Hosting root is configured as `site/dist` in `firebase.json`.
+- Hosting root is configured as `dist` in `site/firebase.json`.
 - Core help content lives in `site/src/content/helpContent.ts` and is reused by in-app Help.
