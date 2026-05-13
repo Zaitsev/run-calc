@@ -213,10 +213,28 @@ type openAIMessage struct {
 type openAIToolCall struct {
 	ID       string `json:"id"`
 	Type     string `json:"type"`
+	ExtraContent *openAIToolCallExtraContent `json:"extra_content,omitempty"`
+	// Some providers include thought signature at tool-call level.
+	ThoughtSignature string `json:"thought_signature,omitempty"`
+	// Gemini-native naming variant seen in some compatibility layers.
+	ThoughtSignatureAlt string `json:"thoughtSignature,omitempty"`
 	Function struct {
-		Name      string `json:"name"`
-		Arguments string `json:"arguments"`
+		Name             string `json:"name"`
+		Arguments        string `json:"arguments"`
+		// OpenAI-compatible Gemini thought signature key.
+		ThoughtSignature string `json:"thought_signature,omitempty"`
+		// Gemini-native naming variant seen in some compatibility layers.
+		ThoughtSignatureAlt string `json:"thoughtSignature,omitempty"`
 	} `json:"function"`
+}
+
+type openAIToolCallExtraContent struct {
+	Google *openAIToolCallExtraGoogle `json:"google,omitempty"`
+}
+
+type openAIToolCallExtraGoogle struct {
+	ThoughtSignature string `json:"thought_signature,omitempty"`
+	ThoughtSignatureAlt string `json:"thoughtSignature,omitempty"`
 }
 
 type openAITool struct {
@@ -1048,6 +1066,26 @@ func shouldUseJSONResponseFormat(settings AISettings) bool {
 	return host == "api.openai.com"
 }
 
+func isGeminiOpenAICompatibleEndpoint(settings AISettings) bool {
+	preset := strings.ToLower(strings.TrimSpace(settings.ProviderPreset))
+	if preset == geminiAIProviderPreset {
+		return true
+	}
+
+	endpoint := strings.TrimSpace(settings.Endpoint)
+	if endpoint == "" {
+		return false
+	}
+
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	return host == "generativelanguage.googleapis.com"
+}
+
 func normalizedSDKBaseURL(rawEndpoint string) (string, error) {
 	return normalizedSDKBaseURLFor(rawEndpoint, false)
 }
@@ -1106,6 +1144,49 @@ func toSDKMessages(messages []openAIMessage) []openai.ChatCompletionMessageParam
 		}
 	}
 	return result
+}
+
+func normalizeToolCallThoughtSignatures(msg *openAIMessage) {
+	if msg == nil || len(msg.ToolCalls) == 0 {
+		return
+	}
+
+	for i := range msg.ToolCalls {
+		tc := &msg.ToolCalls[i]
+		sig := strings.TrimSpace(tc.Function.ThoughtSignature)
+		if sig == "" {
+			sig = strings.TrimSpace(tc.Function.ThoughtSignatureAlt)
+		}
+		if sig == "" && tc.ExtraContent != nil && tc.ExtraContent.Google != nil {
+			sig = strings.TrimSpace(tc.ExtraContent.Google.ThoughtSignature)
+			if sig == "" {
+				sig = strings.TrimSpace(tc.ExtraContent.Google.ThoughtSignatureAlt)
+			}
+		}
+		if sig == "" {
+			sig = strings.TrimSpace(tc.ThoughtSignature)
+		}
+		if sig == "" {
+			sig = strings.TrimSpace(tc.ThoughtSignatureAlt)
+		}
+		if sig == "" {
+			continue
+		}
+
+		// Mirror to all known aliases so whichever key the provider expects is present.
+		tc.Function.ThoughtSignature = sig
+		tc.Function.ThoughtSignatureAlt = sig
+		tc.ThoughtSignature = sig
+		tc.ThoughtSignatureAlt = sig
+		if tc.ExtraContent == nil {
+			tc.ExtraContent = &openAIToolCallExtraContent{}
+		}
+		if tc.ExtraContent.Google == nil {
+			tc.ExtraContent.Google = &openAIToolCallExtraGoogle{}
+		}
+		tc.ExtraContent.Google.ThoughtSignature = sig
+		tc.ExtraContent.Google.ThoughtSignatureAlt = sig
+	}
 }
 
 func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
@@ -1179,6 +1260,7 @@ func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, p
 	}
 
 	msg := decoded.Choices[0].Message
+	normalizeToolCallThoughtSignatures(&msg)
 	// Trim content when it is a final text response (no tool calls).
 	if len(msg.ToolCalls) == 0 {
 		msg.Content = strings.TrimSpace(msg.Content)
@@ -1187,6 +1269,18 @@ func callOpenAICompatibleChatMessageLegacy(settings AISettings, apiKey string, p
 }
 
 func callOpenAICompatibleChatMessage(settings AISettings, apiKey string, payload openAIChatRequest) (openAIMessage, string, error) {
+	for i := range payload.Messages {
+		if strings.EqualFold(strings.TrimSpace(payload.Messages[i].Role), "assistant") {
+			normalizeToolCallThoughtSignatures(&payload.Messages[i])
+		}
+	}
+
+	// Gemini's OpenAI-compatible tool-calling can require thought_signature
+	// metadata to be round-tripped exactly between turns.
+	if isGeminiOpenAICompatibleEndpoint(settings) {
+		return callOpenAICompatibleChatMessageLegacy(settings, apiKey, payload)
+	}
+
 	sdkBaseURL, err := normalizedSDKBaseURLFor(settings.Endpoint, isCustomPreset(settings.ProviderPreset))
 	if err != nil {
 		return openAIMessage{}, "", err

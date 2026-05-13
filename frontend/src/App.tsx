@@ -1,219 +1,197 @@
-import {type CSSProperties, KeyboardEvent, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import { KeyboardEvent, WheelEvent as ReactWheelEvent, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import {
     BrowserOpenURL,
-    Environment,
     EventsOn,
     Quit,
-    ScreenGetAll,
-    WindowReload,
-    WindowCenter,
-    WindowSetDarkTheme,
-    WindowSetLightTheme,
-    WindowSetSystemDefaultTheme,
-    WindowGetPosition,
     WindowGetSize,
     WindowHide,
-    WindowSetPosition,
+    WindowReload,
     WindowSetSize
 } from '../wailsjs/runtime/runtime';
+import { AIDebugDrawer } from './AIDebugDrawer';
+import { AISettingsPanel } from './AISettings';
 import './App.css';
-import appLogo from './assets/images/icons/hare-calc-1024.png';
+import {
+    buildStaleLineDetails,
+    isAITriggerSourceLine,
+    reformatComputedLineResult
+} from './appInteractionLogic';
 import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
-import { AISettingsPanel, type AIContextMode, type AIKeyStatusState, type AISettingsState } from './AISettings';
-import { AIDebugDrawer, type AIDebugEntry } from './AIDebugDrawer';
-import { HelpPanel } from './HelpPanel';
-import { StaleBanner } from './components/StaleBanner';
+import appLogo from './assets/images/icons/hare-calc-1024.png';
 import { ClearWorksheetModal } from './components/ClearWorksheetModal';
 import { HelpPanelContainer } from './components/HelpPanelContainer';
-import {extractExpressionDependencies, getAITriggerPrompt, getExpressionSource, isAITriggerLine, splitLineComment} from './lineExpression';
-import {
-    buildEvaluationExpression,
-    buildStaleLineDetails,
-    getPreservedCaretOffset,
-    getFriendlyEvalErrorMessage,
-    isAITriggerSourceLine,
-    reformatComputedLineResult,
-    stripMarkdownCodeFences,
-    shouldSkipEvaluationAtCaret,
-    shouldSkipEvaluation,
-} from './appInteractionLogic';
-import {useTheme, type ThemeState} from './useTheme';
+import { StaleBanner } from './components/StaleBanner';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
-import { ClearAIAPIKey, EvaluateExprProgram, GetAIKeyStatusForSettings, GetAISettings, IsRunningAsMSIX, RunAIQuery, SaveAISettings, SetAIAPIKey, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../wailsjs/go/main/App';
+import { getExpressionSource, splitLineComment } from './lineExpression';
+import { useTheme } from './useTheme';
 
 import { ThemeStore } from './ThemeStore';
-import type {
-    SavedThemeEntry,
-    DecimalDelimiterMode,
-    PrecisionMode,
-    HelpPanelPosition,
-    SuggestionKind,
-    SuggestionItem,
-    IdentifierContext,
-    StoredWindowState,
-    AIModelOutput,
-    AIRunResponse,
-    AISettingsResponse,
-    AIProgressEvent,
-} from './types/app';
-import { defaultAISettingsState, defaultAIKeyStatusState, areAISettingsEqual } from './types/app';
 import {
-    OPERATOR_KEY_RE,
-    IS_DEV,
-    HELP_SITE_URL,
-    WINDOW_STATE_KEY,
-    WINDOW_STATE_SAVE_DEBOUNCE_MS,
-    WINDOW_STATE_SAVE_INTERVAL_MS,
-    DEFAULT_WINDOW_WIDTH,
-    DEFAULT_WINDOW_HEIGHT,
-    FONT_SCALE_STORAGE_KEY,
-    FONT_SCALE_STEP,
-    FONT_SCALE_MIN,
-    FONT_SCALE_MAX,
     DEFAULT_FONT_SCALE,
+    DEFAULT_SETTINGS_DRAWER_WIDTH,
+    DOUBLE_ESCAPE_HIDE_WINDOW_MS,
+    EDITOR_BOTTOM_PADDING_PX,
     EDITOR_SIDE_PADDING_PX,
     EDITOR_TOP_PADDING_PX,
-    EDITOR_BOTTOM_PADDING_PX,
-    MARKED_LINES_STORAGE_KEY,
-    DECIMAL_DELIMITER_STORAGE_KEY,
-    PRECISION_STORAGE_KEY,
-    SCIENTIFIC_NOTATION_STORAGE_KEY,
-    WORD_WRAP_STORAGE_KEY,
-    WORKSHEET_CONTENT_STORAGE_KEY,
-    LAST_RESULT_STORAGE_KEY,
-    VARIABLE_VALUES_STORAGE_KEY,
-    ACCEPTED_THEMES_STORAGE_KEY,
-    SETTINGS_DRAWER_WIDTH_STORAGE_KEY,
-    MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY,
-    RESTORE_SHORTCUT_ENABLED_STORAGE_KEY,
-    HELP_PANEL_POSITION_STORAGE_KEY,
-    DOUBLE_ESCAPE_HIDE_WINDOW_MS,
-    INTELLIGENCE_HINT_SHOW_DELAY_MS,
+    FINANCIAL_PRECISION,
+    FONT_SCALE_MAX,
+    FONT_SCALE_MIN,
+    FONT_SCALE_STEP,
+    FOUR_POINT_PRECISION,
+    HELP_SITE_URL,
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
-    DEFAULT_SETTINGS_DRAWER_WIDTH,
-    SETTINGS_DRAWER_MIN_WIDTH,
+    INTELLIGENCE_HINT_SHOW_DELAY_MS,
+    IS_DEV,
+    OPERATOR_KEY_RE,
+    PRECISION_MAX,
+    PRECISION_MIN,
     SETTINGS_DRAWER_MAX_WIDTH,
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
-    SETTINGS_DRAWER_MIN_WINDOW_WIDTH,
-    PRECISION_MIN,
-    PRECISION_MAX,
-    FINANCIAL_PRECISION,
-    FOUR_POINT_PRECISION,
+    SETTINGS_DRAWER_MIN_WIDTH,
+    SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
-import { formatNumber, getPrecisionScale, getSystemDecimalDelimiter, resolveDecimalDelimiter } from './utils/formatting';
-import { inferCustomThemeMode } from './utils/colorUtils';
-import { MATH_FUNCTION_NAMES, MATH_CONSTANT_NAMES, isIdentifierStartChar, isIdentifierPartChar, usePrefersDark } from './utils/identifierUtils';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
-
+import type {
+    PrecisionMode,
+    SavedThemeEntry,
+    SuggestionItem,
+} from './types/app';
+import { inferCustomThemeMode } from './utils/colorUtils';
+import { buildIntelligenceSuggestions, buildSuggestionCatalog, collectKnownVariableNames, getIdentifierContextAtPosition } from './utils/editorIntelligence';
+import { formatNumber, getPrecisionScale, getSystemDecimalDelimiter, resolveDecimalDelimiter } from './utils/formatting';
+import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
+import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
 
 
 
 function App() {
-    const [content, setContent] = useState(() => {
-        return localStorage.getItem(WORKSHEET_CONTENT_STORAGE_KEY) ?? '';
-    });
-    const [lastResult, setLastResult] = useState<number | null>(() => {
-        const raw = localStorage.getItem(LAST_RESULT_STORAGE_KEY);
-        if (!raw) {
-            return null;
-        }
-
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [statusText, setStatusText] = useState('Ready');
-    const [isStatusError, setIsStatusError] = useState(false);
-    const [devError, setDevError] = useState('');
-    const [fontScale, setFontScale] = useState(() => {
-        const raw = localStorage.getItem(FONT_SCALE_STORAGE_KEY);
-        if (!raw) {
-            return DEFAULT_FONT_SCALE;
-        }
-
-        const parsed = Number(raw);
-        if (!Number.isFinite(parsed)) {
-            return DEFAULT_FONT_SCALE;
-        }
-
-        return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, parsed));
-    });
-    const [showSettings, setShowSettings] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
-    const [helpPanelPosition, setHelpPanelPosition] = useState<HelpPanelPosition>(() => {
-        const raw = localStorage.getItem(HELP_PANEL_POSITION_STORAGE_KEY);
-        if (raw === 'left' || raw === 'right' || raw === 'bottom') {
-            return raw;
-        }
-        return 'right';
-    });
-    const [showThemeStore, setShowThemeStore] = useState(false);
-    const [settingsDrawerWidth, setSettingsDrawerWidth] = useState(() => {
-        const raw = localStorage.getItem(SETTINGS_DRAWER_WIDTH_STORAGE_KEY);
-        const parsed = Number(raw);
-        if (!Number.isFinite(parsed)) {
-            return DEFAULT_SETTINGS_DRAWER_WIDTH;
-        }
-        return Math.round(Math.min(SETTINGS_DRAWER_MAX_WIDTH, Math.max(SETTINGS_DRAWER_MIN_WIDTH, parsed)));
-    });
-    const [minimiseToTrayOnClose, setMinimiseToTrayOnClose] = useState(() => {
-        return localStorage.getItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY) !== 'false';
-    });
-    const [restoreShortcutEnabled, setRestoreShortcutEnabled] = useState(() => {
-        return localStorage.getItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY) !== 'false';
-    });
-    const [decimalDelimiterMode, setDecimalDelimiterMode] = useState<DecimalDelimiterMode>(() => {
-        const raw = localStorage.getItem(DECIMAL_DELIMITER_STORAGE_KEY);
-        if (raw === 'dot' || raw === 'comma' || raw === 'system') {
-            return raw;
-        }
-
-        return 'dot';
-    });
-    const [precision, setPrecision] = useState<PrecisionMode>(() => {
-        const raw = localStorage.getItem(PRECISION_STORAGE_KEY);
-        if (raw === 'auto') return 'auto';
-        if (raw === 'full') return 'full';
-        const n = Number(raw);
-        if (Number.isInteger(n) && n >= PRECISION_MIN && n <= PRECISION_MAX) return n;
-        return 'auto';
-    });
-    const [scientificNotation, setScientificNotation] = useState(() => {
-        return localStorage.getItem(SCIENTIFIC_NOTATION_STORAGE_KEY) === 'true';
-    });
-    const [wordWrap, setWordWrap] = useState(() => {
-        return localStorage.getItem(WORD_WRAP_STORAGE_KEY) === 'true';
-    });
-    const [aiContextMode, setAIContextMode] = useState<AIContextMode>('above');
-    const [aiSettings, setAISettings] = useState<AISettingsState>(() => defaultAISettingsState());
-    const [aiSettingsDraft, setAISettingsDraft] = useState<AISettingsState>(() => defaultAISettingsState());
-    const [aiSettingsActionFailed, setAISettingsActionFailed] = useState(false);
-    const [aiSettingsApplyError, setAISettingsApplyError] = useState('');
-    const [aiKeyStatus, setAIKeyStatus] = useState<AIKeyStatusState>(() => defaultAIKeyStatusState());
-    const [aiSettingsBusy, setAISettingsBusy] = useState(false);
-    const [aiDebugLog, setAIDebugLog] = useState<AIDebugEntry[]>([]);
-    const [isAIQueryPending, setIsAIQueryPending] = useState(false);
-    const [aiPendingLineIndex, setAIPendingLineIndex] = useState<number | null>(null);
-    const [aiProgressMessage, setAIProgressMessage] = useState('');
-    const aiDebugIdRef = useRef(0);
-    const [showAIDebug, setShowAIDebug] = useState(false);
-    const [isResizingSettingsDrawer, setIsResizingSettingsDrawer] = useState(false);
-    const [variableValues, setVariableValues] = useState<Record<string, unknown>>(() => {
-        const raw = localStorage.getItem(VARIABLE_VALUES_STORAGE_KEY);
-        if (!raw) return {};
-        try {
-            const obj = JSON.parse(raw);
-            if (typeof obj === 'object' && obj !== null) {
-                return obj;
-            }
-        } catch {
-            // ignore
-        }
-        return {};
-    });
-    const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
-    const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
-    const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
-    const [pendingThemePreview, setPendingThemePreview] = useState<SavedThemeEntry | null>(null);
+    const {
+        content,
+        setContent,
+        lastResult,
+        setLastResult,
+        markedLines,
+        setMarkedLines,
+        variableValues,
+        setVariableValues,
+        variableVersions,
+        setVariableVersions,
+        lineDependencies,
+        setLineDependencies,
+        lineDependencyVersions,
+        setLineDependencyVersions,
+        clearWorksheet: clearWorksheetState,
+    } = useWorksheet();
+    const {
+        decimalDelimiterMode,
+        setDecimalDelimiterMode,
+        precision,
+        setPrecision,
+        scientificNotation,
+        setScientificNotation,
+        wordWrap,
+        setWordWrap,
+    } = useDisplaySettings();
+    const {
+        fontScale,
+        setFontScale,
+        editorFontSpec,
+        caretPos,
+        setCaretPos,
+        editorScrollTop,
+        setEditorScrollTop,
+        editorScrollLeft,
+        setEditorScrollLeft,
+        editorScrollbarWidth,
+        syncEditorScrollbarWidth,
+        lineHeightPx,
+        lineRowHeights,
+        editorRef,
+        overlayRef,
+        gutterRef,
+        burgerMenuRef,
+        precisionMenuRef,
+    } = useEditorUI();
+    const {
+        showSettings,
+        setShowSettings,
+        showHelp,
+        setShowHelp,
+        showThemeStore,
+        setShowThemeStore,
+        helpPanelPosition,
+        setHelpPanelPosition,
+        showBurgerMenu,
+        setShowBurgerMenu,
+        showPrecisionMenu,
+        setShowPrecisionMenu,
+        showIntelligenceHint,
+        setShowIntelligenceHint,
+        showClearWorksheetConfirm,
+        setShowClearWorksheetConfirm,
+        isReevaluatingAll,
+        setIsReevaluatingAll,
+        showAIDebug,
+        setShowAIDebug,
+        settingsDrawerWidth,
+        setSettingsDrawerWidth,
+        clampSettingsDrawerWidth,
+        startSettingsDrawerResize,
+        intelligenceShowTimerRef,
+        intelligenceHideTimerRef,
+        lastEscapeKeyAtRef,
+    } = useUIState();
+    const {
+        minimiseToTrayOnClose,
+        setMinimiseToTrayOnClose,
+        restoreShortcutEnabled,
+        setRestoreShortcutEnabled,
+        runtimePlatform,
+        isMSIX,
+        resetWindowLayout: resetWindowLayoutFromContext,
+        themeStoreOriginalSizeRef,
+        settingsDrawerOriginalSizeRef,
+        syncWindowTheme,
+    } = useWindow();
+    const {
+        savedThemes,
+        setSavedThemes,
+        pendingThemePreview,
+        previewRestoreThemeRef,
+        startThemePreview: startThemePreviewInStore,
+        cancelThemePreview: cancelThemePreviewInStore,
+        acceptThemePreview: acceptThemePreviewInStore,
+        deleteSavedTheme: deleteSavedThemeInStore,
+    } = useThemeStore();
+    const { statusText, setStatusText, isStatusError, setIsStatusError, devError, setDevError } = useStatus();
+    const {
+        aiContextMode,
+        setAIContextMode,
+        aiSettings,
+        setAISettings,
+        aiSettingsDraft,
+        setAISettingsDraft,
+        aiSettingsActionFailed,
+        aiSettingsApplyError,
+        aiKeyStatus,
+        aiSettingsBusy,
+        aiDebugLog,
+        setAIDebugLog,
+        isAIQueryPending,
+        setIsAIQueryPending,
+        aiPendingLineIndex,
+        setAIPendingLineIndex,
+        aiProgressMessage,
+        setAIProgressMessage,
+        aiDebugIdRef,
+        aiSettingsHasUnsavedChanges,
+        testAndSaveAISettings,
+        revertAISettingsDraftToSaved,
+        saveAIKeyToBackend,
+        clearAIKeyInBackend,
+        handleAIProgressEvent,
+    } = useAI();
     const {theme, setTheme} = useTheme();
     const prefersDark = usePrefersDark();
     const isDarkTheme =
@@ -221,90 +199,10 @@ function App() {
         (theme.type === 'custom' && (theme.customThemeBase ?? inferCustomThemeMode(theme.customColors)) === 'dark') ||
         (theme.type === 'system' && prefersDark);
     const isContentEmpty = content.trim() === '';
-    const previewRestoreThemeRef = useRef<ThemeState | null>(null);
-    const [savedThemes, setSavedThemes] = useState<SavedThemeEntry[]>(() => {
-        const raw = localStorage.getItem(ACCEPTED_THEMES_STORAGE_KEY);
-        if (!raw) {
-            return [];
-        }
-
-        try {
-            const parsed: unknown = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
-
-            return parsed.filter((item): item is SavedThemeEntry => {
-                if (!item || typeof item !== 'object') {
-                    return false;
-                }
-
-                const maybe = item as SavedThemeEntry;
-                return (
-                    typeof maybe.id === 'string' &&
-                    typeof maybe.name === 'string' &&
-                    !!maybe.colors &&
-                    typeof maybe.colors === 'object'
-                );
-            });
-        } catch {
-            return [];
-        }
-    });
-    const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
-    const settingsDrawerOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
-    const settingsDrawerResizeStartRef = useRef<{ x: number; width: number } | null>(null);
-    const burgerMenuRef = useRef<HTMLDivElement | null>(null);
-    const precisionMenuRef = useRef<HTMLDivElement | null>(null);
-    const editorRef = useRef<HTMLTextAreaElement | null>(null);
-    const gutterRef = useRef<HTMLDivElement | null>(null);
-    const overlayRef = useRef<HTMLDivElement | null>(null);
-    const lastEscapeKeyAtRef = useRef(0);
-    const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(() => {
-        const raw = localStorage.getItem(MARKED_LINES_STORAGE_KEY);
-        if (!raw) return new Set<number>();
-        try {
-            const arr: unknown = JSON.parse(raw);
-            if (Array.isArray(arr)) {
-                return new Set<number>(arr.filter((n): n is number => typeof n === 'number'));
-            }
-        } catch {
-            // ignore
-        }
-        return new Set<number>();
-    });
-    const [lineHeightPx, setLineHeightPx] = useState(22);
-    const [lineRowHeights, setLineRowHeights] = useState<number[]>([]);
-    const [editorFontSpec, setEditorFontSpec] = useState('16px Nunito, Segoe UI, Tahoma, sans-serif');
-    const [editorScrollbarWidth, setEditorScrollbarWidth] = useState(0);
-    const [editorScrollTop, setEditorScrollTop] = useState(0);
-    const [editorScrollLeft, setEditorScrollLeft] = useState(0);
-    const [caretPos, setCaretPos] = useState(0);
-    const [runtimePlatform, setRuntimePlatform] = useState('');
-    const [isMSIX, setIsMSIX] = useState(false);
-    const [showBurgerMenu, setShowBurgerMenu] = useState(false);
-    const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
-    const [showIntelligenceHint, setShowIntelligenceHint] = useState(false);
-    const [showClearWorksheetConfirm, setShowClearWorksheetConfirm] = useState(false);
-    const [isReevaluatingAll, setIsReevaluatingAll] = useState(false);
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
-    const intelligenceShowTimerRef = useRef<number | null>(null);
-    const intelligenceHideTimerRef = useRef<number | null>(null);
 
     const systemDecimalDelimiter = getSystemDecimalDelimiter();
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
-
-    useEffect(() => {
-        localStorage.setItem(FONT_SCALE_STORAGE_KEY, String(fontScale));
-    }, [fontScale]);
-
-    useEffect(() => {
-        localStorage.setItem(DECIMAL_DELIMITER_STORAGE_KEY, decimalDelimiterMode);
-    }, [decimalDelimiterMode]);
-
-    useEffect(() => {
-        localStorage.setItem(PRECISION_STORAGE_KEY, String(precision));
-    }, [precision]);
 
     useEffect(() => {
         const previousPrecision = previousPrecisionRef.current;
@@ -318,13 +216,6 @@ function App() {
         void reevaluateAllExpressions();
     }, [precision]);
 
-    useEffect(() => {
-        localStorage.setItem(SCIENTIFIC_NOTATION_STORAGE_KEY, String(scientificNotation));
-    }, [scientificNotation]);
-
-    useEffect(() => {
-        localStorage.setItem(WORD_WRAP_STORAGE_KEY, String(wordWrap));
-    }, [wordWrap]);
 
     // Re-format already-computed numeric result suffixes when display settings change.
     useEffect(() => {
@@ -351,161 +242,8 @@ function App() {
     }, [precision, scientificNotation, decimalDelimiter]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        localStorage.setItem(MARKED_LINES_STORAGE_KEY, JSON.stringify([...markedLines]));
-    }, [markedLines]);
-
-    useEffect(() => {
-        localStorage.setItem(WORKSHEET_CONTENT_STORAGE_KEY, content);
-    }, [content]);
-
-    useEffect(() => {
-        if (lastResult === null) {
-            localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
-            return;
-        }
-
-        localStorage.setItem(LAST_RESULT_STORAGE_KEY, String(lastResult));
-    }, [lastResult]);
-
-    useEffect(() => {
-        localStorage.setItem(VARIABLE_VALUES_STORAGE_KEY, JSON.stringify(variableValues));
-    }, [variableValues]);
-
-    useEffect(() => {
-        localStorage.setItem(ACCEPTED_THEMES_STORAGE_KEY, JSON.stringify(savedThemes));
-    }, [savedThemes]);
-
-    useEffect(() => {
-        localStorage.setItem(SETTINGS_DRAWER_WIDTH_STORAGE_KEY, String(settingsDrawerWidth));
-    }, [settingsDrawerWidth]);
-
-    useEffect(() => {
-        localStorage.setItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY, String(minimiseToTrayOnClose));
-        SetMinimiseToTrayOnClose(minimiseToTrayOnClose).catch(() => {
-            // Keep settings responsive even if backend sync fails.
-        });
-    }, [minimiseToTrayOnClose]);
-
-    useEffect(() => {
-        localStorage.setItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY, String(restoreShortcutEnabled));
-        if (!isMSIX) SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {
-            // Keep settings responsive even if backend sync fails.
-        });
-    }, [restoreShortcutEnabled, isMSIX]);
-
-    useEffect(() => {
-        localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
-    }, [helpPanelPosition]);
-
-    useEffect(() => {
-        let cancelled = false;
-        Environment()
-            .then((env) => {
-                if (!cancelled) {
-                    setRuntimePlatform(env.platform || '');
-                }
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setRuntimePlatform('');
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        IsRunningAsMSIX()
-            .then((v) => setIsMSIX(v))
-            .catch(() => {/* non-Windows dev server — leave false */});
-    }, []);
-
-    const getSettingsDrawerMaxWidth = () => {
-        const viewportWidth = Math.max(window.innerWidth, SETTINGS_DRAWER_MIN_WIDTH + SETTINGS_DRAWER_MIN_EDITOR_WIDTH);
-        return Math.max(
-            SETTINGS_DRAWER_MIN_WIDTH,
-            Math.min(SETTINGS_DRAWER_MAX_WIDTH, viewportWidth - SETTINGS_DRAWER_MIN_EDITOR_WIDTH),
-        );
-    };
-
-    const clampSettingsDrawerWidth = (width: number) => {
-        const clampedMax = getSettingsDrawerMaxWidth();
-        return Math.round(Math.min(clampedMax, Math.max(SETTINGS_DRAWER_MIN_WIDTH, width)));
-    };
-
-    useEffect(() => {
-        const onWindowResize = () => {
-            setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current));
-        };
-
-        window.addEventListener('resize', onWindowResize);
-        return () => {
-            window.removeEventListener('resize', onWindowResize);
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (!isResizingSettingsDrawer) {
-            return;
-        }
-
-        const onMouseMove = (event: MouseEvent) => {
-            const start = settingsDrawerResizeStartRef.current;
-            if (!start) {
-                return;
-            }
-
-            const delta = start.x - event.clientX;
-            setSettingsDrawerWidth(clampSettingsDrawerWidth(start.width + delta));
-        };
-
-        const stopResize = () => {
-            settingsDrawerResizeStartRef.current = null;
-            setIsResizingSettingsDrawer(false);
-        };
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', stopResize);
-        window.addEventListener('blur', stopResize);
-        document.body.classList.add('is-resizing-settings-drawer');
-
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', stopResize);
-            window.removeEventListener('blur', stopResize);
-            document.body.classList.remove('is-resizing-settings-drawer');
-        };
-    }, [isResizingSettingsDrawer]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        if (runtimePlatform !== 'windows') {
-            return;
-        }
-
-        if (theme.type === 'system') {
-            WindowSetSystemDefaultTheme();
-            return;
-        }
-
-        if (theme.type === 'light') {
-            WindowSetLightTheme();
-            return;
-        }
-
-        if (theme.type === 'dark') {
-            WindowSetDarkTheme();
-            return;
-        }
-
-        const customMode = theme.customThemeBase || inferCustomThemeMode(theme.customColors);
-        if (customMode === 'light') {
-            WindowSetLightTheme();
-        } else {
-            WindowSetDarkTheme();
-        }
-    }, [runtimePlatform, theme]);
+        syncWindowTheme(theme);
+    }, [syncWindowTheme, theme]);
 
     useEffect(() => {
         if (!showBurgerMenu) {
@@ -583,276 +321,26 @@ function App() {
         };
     }, [showPrecisionMenu]);
 
-    useEffect(() => {
-        if (!editorRef.current) return;
-        const cs = getComputedStyle(editorRef.current);
-        const lh = parseFloat(cs.lineHeight);
-        if (Number.isFinite(lh) && lh > 0) setLineHeightPx(lh);
-        setEditorFontSpec(`${cs.fontSize} ${cs.fontFamily}`);
-    }, [fontScale]);
-
-    const syncEditorScrollbarWidth = () => {
-        const editor = editorRef.current;
-        if (!editor) {
-            return;
-        }
-
-        const nextWidth = Math.max(0, editor.offsetWidth - editor.clientWidth);
-        setEditorScrollbarWidth((prev) => (Math.abs(prev - nextWidth) < 0.5 ? prev : nextWidth));
+    const withStatusSetters = {
+        setStatusText,
+        setIsStatusError,
+        setDevError,
     };
 
-    useLayoutEffect(() => {
-        syncEditorScrollbarWidth();
-    }, [content, wordWrap, fontScale]);
-
-    useEffect(() => {
-        const editor = editorRef.current;
-        if (!editor) {
-            return;
-        }
-
-        const ro = new ResizeObserver(() => {
-            syncEditorScrollbarWidth();
-        });
-        ro.observe(editor);
-        return () => ro.disconnect();
-    }, []);
-
-    const measureLineRowHeights = () => {
-        const container = overlayRef.current;
-        if (!container) return;
-        const children = container.children;
-        const heights: number[] = [];
-        for (let i = 0; i < children.length; i++) {
-            const row = children[i] as HTMLElement;
-            const measured = row.getBoundingClientRect().height;
-            heights.push(measured > 0 ? measured : row.offsetHeight);
-        }
-        setLineRowHeights((prev) => {
-            if (
-                prev.length === heights.length
-                && prev.every((h, idx) => Math.abs(h - heights[idx]) < 0.01)
-            ) {
-                return prev;
-            }
-            return heights;
-        });
+    const onRevertAISettingsDraft = () => {
+        revertAISettingsDraftToSaved(withStatusSetters);
     };
 
-    useLayoutEffect(() => {
-        measureLineRowHeights();
-    });
-
-    useEffect(() => {
-        const container = overlayRef.current;
-        if (!container) return;
-        const ro = new ResizeObserver(() => measureLineRowHeights());
-        ro.observe(container);
-        return () => ro.disconnect();
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            if (intelligenceShowTimerRef.current !== null) {
-                window.clearTimeout(intelligenceShowTimerRef.current);
-            }
-            if (intelligenceHideTimerRef.current !== null) {
-                window.clearTimeout(intelligenceHideTimerRef.current);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-        const load = async () => {
-            setAISettingsBusy(true);
-            try {
-                const response = await GetAISettings() as AISettingsResponse;
-                if (cancelled) {
-                    return;
-                }
-                const loadedSettings = response.settings || defaultAISettingsState();
-                setAISettings(loadedSettings);
-                setAISettingsDraft(loadedSettings);
-                setAISettingsActionFailed(false);
-                setAISettingsApplyError('');
-                setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
-                setAIContextMode((loadedSettings.defaultContextMode === 'full' ? 'full' : 'above'));
-            } catch (error) {
-                if (cancelled) {
-                    return;
-                }
-                const message = error instanceof Error ? error.message : 'Unknown AI settings error';
-                setStatusText(`AI settings load failed: ${message}`);
-                setIsStatusError(true);
-                setDevError(message);
-            } finally {
-                if (!cancelled) {
-                    setAISettingsBusy(false);
-                }
-            }
-        };
-
-        void load();
-        return () => {
-            cancelled = true;
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        let cancelled = false;
-        const refreshDraftKeyStatus = async () => {
-            try {
-                const status = await GetAIKeyStatusForSettings(aiSettingsDraft as any) as AIKeyStatusState;
-                if (!cancelled) {
-                    setAIKeyStatus(status || defaultAIKeyStatusState());
-                }
-            } catch {
-                // Keep currently shown status when draft status lookup fails.
-            }
-        };
-
-        void refreshDraftKeyStatus();
-        return () => {
-            cancelled = true;
-        };
-    }, [aiSettingsDraft.providerPreset, aiSettingsDraft.allowInsecureKeyFallback]);
-
-    const aiSettingsHasUnsavedChanges = !areAISettingsEqual(aiSettingsDraft, aiSettings);
-
-    const revertAISettingsDraftToSaved = () => {
-        setAISettingsDraft(aiSettings);
-        setAIContextMode((aiSettings.defaultContextMode === 'full' ? 'full' : 'above'));
-        setAISettingsActionFailed(false);
-        setAISettingsApplyError('');
-        setStatusText('AI settings draft reverted to last saved state.');
-        setIsStatusError(false);
-        setDevError('');
+    const onTestAndSaveAISettings = async () => {
+        await testAndSaveAISettings(withStatusSetters);
     };
 
-    const testAndSaveAISettings = async () => {
-        if (!aiSettingsHasUnsavedChanges) {
-            setStatusText('AI settings are already up to date.');
-            setIsStatusError(false);
-            setAISettingsApplyError('');
-            setDevError('');
-            return;
-        }
-
-        setAISettingsBusy(true);
-        setAISettingsActionFailed(false);
-        setAISettingsApplyError('');
-        try {
-            setStatusText('Testing AI settings...');
-            setIsStatusError(false);
-            setDevError('');
-
-            const health = await RunAIQuery({
-                prompt: 'Health check: respond with answerNumber 1.',
-                contextMode: aiSettingsDraft.defaultContextMode,
-                linesAbove: [],
-                fullContent: '',
-                settingsOverride: aiSettingsDraft,
-            } as any) as AIRunResponse;
-
-            if (!health.ok) {
-                const message = health.error || 'AI settings test failed';
-                setStatusText(`AI settings test failed. Changes were not saved: ${message}`);
-                setIsStatusError(true);
-                setDevError(message);
-                setAISettingsActionFailed(true);
-                setAISettingsApplyError(message);
-                return;
-            }
-
-            const response = await SaveAISettings(aiSettingsDraft as any) as AISettingsResponse;
-            const settingsError = response.keyStatus?.lastError || '';
-            if (settingsError.startsWith('settings validation failed:') || settingsError.startsWith('settings save failed:')) {
-                setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
-                setStatusText(`AI settings save failed. Changes were not saved: ${settingsError}`);
-                setIsStatusError(true);
-                setDevError(settingsError);
-                setAISettingsActionFailed(true);
-                setAISettingsApplyError(settingsError);
-                return;
-            }
-
-            const savedSettings = response.settings || aiSettingsDraft;
-            setAISettings(savedSettings);
-            setAISettingsDraft(savedSettings);
-            setAISettingsActionFailed(false);
-            setAISettingsApplyError('');
-            setAIKeyStatus(response.keyStatus || defaultAIKeyStatusState());
-            setAIContextMode((savedSettings.defaultContextMode === 'full' ? 'full' : 'above'));
-            setStatusText('AI settings test passed and settings were saved.');
-            setIsStatusError(false);
-            setDevError('');
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown AI settings test error';
-            setStatusText(`AI settings test failed. Changes were not saved: ${message}`);
-            setIsStatusError(true);
-            setDevError(message);
-            setAISettingsActionFailed(true);
-            setAISettingsApplyError(message);
-        } finally {
-            setAISettingsBusy(false);
-        }
+    const onSaveAIKeyToBackend = async (apiKey: string) => {
+        await saveAIKeyToBackend(apiKey, withStatusSetters);
     };
 
-    const saveAIKeyToBackend = async (apiKey: string) => {
-        setAISettingsBusy(true);
-        try {
-            const keyStatus = await SetAIAPIKey(apiKey, aiSettingsDraft as any) as AIKeyStatusState;
-            setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
-            if (keyStatus?.hasKey) {
-                setAISettings((current) => {
-                    if (current.providerPreset !== 'custom') {
-                        return current;
-                    }
-                    return { ...current, customKeySourceEndpoint: current.endpoint };
-                });
-                setAISettingsDraft((current) => {
-                    if (current.providerPreset !== 'custom') {
-                        return current;
-                    }
-                    return { ...current, customKeySourceEndpoint: current.endpoint };
-                });
-                setStatusText(`API key saved (${keyStatus.storageMode})`);
-                setIsStatusError(false);
-                setDevError('');
-            } else {
-                setStatusText(`API key save failed: ${keyStatus?.lastError || 'unknown error'}`);
-                setIsStatusError(true);
-                setDevError(keyStatus?.lastError || 'AI key save failed');
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown API key error';
-            setStatusText(`API key save failed: ${message}`);
-            setIsStatusError(true);
-            setDevError(message);
-        } finally {
-            setAISettingsBusy(false);
-        }
-    };
-
-    const clearAIKeyInBackend = async () => {
-        setAISettingsBusy(true);
-        try {
-            const keyStatus = await ClearAIAPIKey(aiSettingsDraft as any) as AIKeyStatusState;
-            setAIKeyStatus(keyStatus || defaultAIKeyStatusState());
-            setAISettings((current) => ({ ...current, customKeySourceEndpoint: '' }));
-            setAISettingsDraft((current) => ({ ...current, customKeySourceEndpoint: '' }));
-            setStatusText('API key cleared');
-            setIsStatusError(false);
-            setDevError('');
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown API key clear error';
-            setStatusText(`API key clear failed: ${message}`);
-            setIsStatusError(true);
-            setDevError(message);
-        } finally {
-            setAISettingsBusy(false);
-        }
+    const onClearAIKeyInBackend = async () => {
+        await clearAIKeyInBackend(withStatusSetters);
     };
 
     // --- Hoisted actions (stable: only use setState callbacks or stable fns) ---
@@ -865,28 +353,20 @@ function App() {
     };
 
     const clearWorksheet = () => {
-        setContent('');
-        setLastResult(null);
+        clearWorksheetState(() => {
+            requestAnimationFrame(() => {
+                if (!editorRef.current) {
+                    return;
+                }
+
+                editorRef.current.focus();
+                editorRef.current.selectionStart = 0;
+                editorRef.current.selectionEnd = 0;
+            });
+        });
         setStatusText('Ready');
         setIsStatusError(false);
         setDevError('');
-        setMarkedLines(new Set());
-        setVariableValues({});
-        setVariableVersions({});
-        setLineDependencies({});
-        setLineDependencyVersions({});
-        localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
-        localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
-
-        requestAnimationFrame(() => {
-            if (!editorRef.current) {
-                return;
-            }
-
-            editorRef.current.focus();
-            editorRef.current.selectionStart = 0;
-            editorRef.current.selectionEnd = 0;
-        });
     };
 
     const requestClearWorksheet = () => {
@@ -920,7 +400,6 @@ function App() {
     };
 
     const resetFontSize = () => {
-        localStorage.removeItem(FONT_SCALE_STORAGE_KEY);
         setFontScale(DEFAULT_FONT_SCALE);
         setStatusText('Font size reset');
         setIsStatusError(false);
@@ -970,130 +449,11 @@ function App() {
     };
 
     const resetWindowLayout = () => {
-        localStorage.removeItem(WINDOW_STATE_KEY);
-        WindowSetSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
-        WindowCenter();
+        resetWindowLayoutFromContext();
         setStatusText('Window layout reset');
         setIsStatusError(false);
         setDevError('');
     };
-
-    // --- Window state persistence ---
-
-    useEffect(() => {
-        const readStoredState = (): StoredWindowState | null => {
-            const raw = localStorage.getItem(WINDOW_STATE_KEY);
-            if (!raw) {
-                return null;
-            }
-
-            try {
-                const parsed: unknown = JSON.parse(raw);
-                if (
-                    typeof parsed === 'object' &&
-                    parsed !== null &&
-                    'w' in parsed &&
-                    'h' in parsed &&
-                    'x' in parsed &&
-                    'y' in parsed &&
-                    typeof (parsed as StoredWindowState).w === 'number' &&
-                    typeof (parsed as StoredWindowState).h === 'number' &&
-                    typeof (parsed as StoredWindowState).x === 'number' &&
-                    typeof (parsed as StoredWindowState).y === 'number'
-                ) {
-                    const width = Math.round((parsed as StoredWindowState).w);
-                    const height = Math.round((parsed as StoredWindowState).h);
-                    const x = Math.round((parsed as StoredWindowState).x);
-                    const y = Math.round((parsed as StoredWindowState).y);
-                    if (width > 0 && height > 0) {
-                        return {w: width, h: height, x, y};
-                    }
-                }
-            } catch {
-                // Ignore malformed saved data.
-            }
-
-            return null;
-        };
-
-        const restoreWindowState = async () => {
-            const storedState = readStoredState();
-            if (!storedState) {
-                return;
-            }
-
-            try {
-                const screens = await ScreenGetAll();
-                const currentScreen = screens.find((screen) => screen.isCurrent)
-                    ?? screens.find((screen) => screen.isPrimary)
-                    ?? null;
-
-                if (!currentScreen) {
-                    WindowSetSize(storedState.w, storedState.h);
-                    WindowSetPosition(storedState.x, storedState.y);
-                    return;
-                }
-
-                const clampedWidth = Math.min(storedState.w, currentScreen.width);
-                const clampedHeight = Math.min(storedState.h, currentScreen.height);
-                const maxX = Math.max(0, currentScreen.width - clampedWidth);
-                const maxY = Math.max(0, currentScreen.height - clampedHeight);
-                const clampedX = Math.min(Math.max(storedState.x, 0), maxX);
-                const clampedY = Math.min(Math.max(storedState.y, 0), maxY);
-
-                WindowSetSize(clampedWidth, clampedHeight);
-                WindowSetPosition(clampedX, clampedY);
-            } catch {
-                // Ignore restore failures to keep startup resilient.
-            }
-        };
-
-        void restoreWindowState();
-
-        let saveTimer: number | null = null;
-        let periodicSaveTimer: number | null = null;
-
-        const persistWindowState = async () => {
-            try {
-                const size = await WindowGetSize();
-                const position = await WindowGetPosition();
-                localStorage.setItem(
-                    WINDOW_STATE_KEY,
-                    JSON.stringify({w: size.w, h: size.h, x: position.x, y: position.y})
-                );
-            } catch {
-                // Ignore persistence failures to keep editing uninterrupted.
-            }
-        };
-
-        const schedulePersistWindowState = () => {
-            if (saveTimer !== null) {
-                window.clearTimeout(saveTimer);
-            }
-
-            saveTimer = window.setTimeout(() => {
-                saveTimer = null;
-                void persistWindowState();
-            }, WINDOW_STATE_SAVE_DEBOUNCE_MS);
-        };
-
-        window.addEventListener('resize', schedulePersistWindowState);
-        window.addEventListener('beforeunload', () => void persistWindowState());
-        periodicSaveTimer = window.setInterval(() => {
-            void persistWindowState();
-        }, WINDOW_STATE_SAVE_INTERVAL_MS);
-
-        return () => {
-            window.removeEventListener('resize', schedulePersistWindowState);
-            if (saveTimer !== null) {
-                window.clearTimeout(saveTimer);
-            }
-            if (periodicSaveTimer !== null) {
-                window.clearInterval(periodicSaveTimer);
-            }
-            void persistWindowState();
-        };
-    }, []);
 
     // --- Menu / keyboard event subscriptions ---
 
@@ -1116,14 +476,7 @@ function App() {
             setShowSettings(false);
             setShowHelp(true);
         });
-        const unsubAIProgress = EventsOn('ai:progress', (payload: AIProgressEvent | string | null | undefined) => {
-            if (typeof payload === 'string') {
-                setAIProgressMessage(payload.trim());
-                return;
-            }
-            const nextMessage = payload?.message?.trim() || '';
-            setAIProgressMessage(nextMessage);
-        });
+        const unsubAIProgress = EventsOn('ai:progress', handleAIProgressEvent);
         return () => {
             unsubThemeStore();
             unsubNew();
@@ -1148,13 +501,6 @@ function App() {
             editorRef.current.selectionStart = caretPos;
             editorRef.current.selectionEnd = caretPos;
         });
-    };
-
-    const getLineBounds = (text: string, pos: number) => {
-        const lineStart = text.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
-        const nextBreak = text.indexOf('\n', pos);
-        const lineEnd = nextBreak === -1 ? text.length : nextBreak;
-        return {lineStart, lineEnd};
     };
 
     const insertAtSelection = (insertText: string) => {
@@ -1216,113 +562,6 @@ function App() {
         }, INTELLIGENCE_HINT_HIDE_IDLE_MS);
     };
 
-    const countLineBreaks = (text: string) => {
-        let count = 0;
-        for (let i = 0; i < text.length; i++) {
-            if (text[i] === '\n') {
-                count++;
-            }
-        }
-        return count;
-    };
-
-    const getLineEditInfo = (beforeText: string, afterText: string) => {
-        let start = 0;
-        const maxStart = Math.min(beforeText.length, afterText.length);
-        while (start < maxStart && beforeText[start] === afterText[start]) {
-            start++;
-        }
-
-        let beforeEnd = beforeText.length;
-        let afterEnd = afterText.length;
-        while (
-            beforeEnd > start &&
-            afterEnd > start &&
-            beforeText[beforeEnd - 1] === afterText[afterEnd - 1]
-        ) {
-            beforeEnd--;
-            afterEnd--;
-        }
-
-        const beforeChanged = beforeText.slice(start, beforeEnd);
-        const afterChanged = afterText.slice(start, afterEnd);
-        const startLine = countLineBreaks(beforeText.slice(0, start));
-        const beforeBreaks = countLineBreaks(beforeChanged);
-        const afterBreaks = countLineBreaks(afterChanged);
-
-        return {
-            startLine,
-            beforeBreaks,
-            afterBreaks,
-            delta: afterBreaks - beforeBreaks,
-        };
-    };
-
-    const remapLineIndex = (lineIndex: number, edit: {startLine: number; beforeBreaks: number; afterBreaks: number; delta: number}) => {
-        const editEndLineBefore = edit.startLine + edit.beforeBreaks;
-        if (lineIndex < edit.startLine) {
-            return lineIndex;
-        }
-
-        if (lineIndex > editEndLineBefore) {
-            return lineIndex + edit.delta;
-        }
-
-        const relative = lineIndex - edit.startLine;
-        if (relative <= edit.afterBreaks) {
-            return edit.startLine + relative;
-        }
-
-        return null;
-    };
-
-    const remapMarkedLinesForEdit = (prevMarked: ReadonlySet<number>, beforeText: string, afterText: string) => {
-        const edit = getLineEditInfo(beforeText, afterText);
-        if (edit.delta === 0) {
-            return prevMarked;
-        }
-
-        const next = new Set<number>();
-        prevMarked.forEach((lineIndex) => {
-            const remapped = remapLineIndex(lineIndex, edit);
-            if (remapped !== null) {
-                next.add(remapped);
-            }
-        });
-
-        return next;
-    };
-
-    const remapLineRecordForEdit = <T,>(
-        prevRecord: Record<number, T>,
-        beforeText: string,
-        afterText: string,
-    ): Record<number, T> => {
-        const edit = getLineEditInfo(beforeText, afterText);
-        if (edit.delta === 0) {
-            return prevRecord;
-        }
-
-        const nextRecord: Record<number, T> = {};
-        Object.entries(prevRecord).forEach(([key, value]) => {
-            const lineIndex = Number(key);
-            if (!Number.isFinite(lineIndex)) {
-                return;
-            }
-
-            const remapped = remapLineIndex(lineIndex, edit);
-            if (remapped !== null) {
-                nextRecord[remapped] = value;
-            }
-        });
-
-        return nextRecord;
-    };
-
-    const lineIndexAtPosition = (text: string, position: number): number => {
-        return countLineBreaks(text.slice(0, position));
-    };
-
     const clearLineEvaluationMetadata = (lineIndex: number) => {
         setLineDependencies((prev) => {
             if (!(lineIndex in prev)) {
@@ -1345,198 +584,25 @@ function App() {
         });
     };
 
-    const parseDeclaredVariable = (lineText: string): {key: string; label: string; expression: string} | null => {
-        const match = lineText.match(/^\s*(@?[a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([\s\S]+)$/);
-        if (!match) {
-            return null;
-        }
+    const knownVariableNames = useMemo(
+        () => collectKnownVariableNames(content, variableValues),
+        [content, variableValues],
+    );
 
-        const label = match[1];
-        const key = (label.startsWith('@') ? label.slice(1) : label).toLowerCase();
+    const suggestionCatalog = useMemo<SuggestionItem[]>(
+        () => buildSuggestionCatalog(knownVariableNames),
+        [knownVariableNames],
+    );
 
-        return {
-            key,
-            label,
-            expression: match[2].trim(),
-        };
-    };
+    const identifierContext = useMemo(
+        () => getIdentifierContextAtPosition(content, caretPos),
+        [content, caretPos],
+    );
 
-    const appendLineComment = (base: string, comment: string): string => {
-        if (!comment) {
-            return base;
-        }
-
-        const trimmedBase = base.trimEnd();
-        return trimmedBase.length > 0 ? `${trimmedBase} ${comment}` : comment;
-    };
-
-    const formatEvaluatedLine = (lineSource: string, resultText: string): string => {
-        const {body, comment} = splitLineComment(lineSource);
-        const bodySource = body.trimEnd();
-        const declaration = parseDeclaredVariable(bodySource);
-        const base = declaration
-            ? `${declaration.label} = ${declaration.expression} = ${resultText}`
-            : `${bodySource} = ${resultText}`;
-
-        return appendLineComment(base, comment);
-    };
-
-    const areValuesEquivalent = (left: unknown, right: unknown): boolean => {
-        if (Object.is(left, right)) {
-            return true;
-        }
-
-        if (typeof left === 'object' && left !== null && typeof right === 'object' && right !== null) {
-            try {
-                return JSON.stringify(left) === JSON.stringify(right);
-            } catch {
-                return false;
-            }
-        }
-
-        return false;
-    };
-
-    const formatExprValue = (value: unknown, isNumber: boolean, numberValue: number): string => {
-        if (isNumber) {
-            return formatNumber(numberValue, decimalDelimiter, precision, scientificNotation);
-        }
-
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (typeof value === 'number') {
-            return formatNumber(value, decimalDelimiter, precision, scientificNotation);
-        }
-
-        if (typeof value === 'boolean' || value === null) {
-            return String(value);
-        }
-
-        try {
-            return JSON.stringify(value);
-        } catch {
-            return String(value);
-        }
-    };
-
-    const knownVariableNames = useMemo(() => {
-        const names = new Set<string>();
-        content.split('\n').forEach((line) => {
-            const declaration = parseDeclaredVariable(getExpressionSource(line));
-            if (declaration) {
-                names.add(declaration.key);
-            }
-        });
-
-        Object.keys(variableValues).forEach((name) => {
-            names.add(name.toLowerCase());
-        });
-
-        return names;
-    }, [content, variableValues]);
-
-    const suggestionCatalog = useMemo<SuggestionItem[]>(() => {
-        const items: SuggestionItem[] = [];
-
-        [...knownVariableNames]
-            .sort((a, b) => a.localeCompare(b))
-            .forEach((name) => {
-                items.push({label: name, kind: 'variable', matchText: name.toLowerCase()});
-            });
-
-        [...MATH_FUNCTION_NAMES]
-            .map((name) => name.toLowerCase())
-            .sort((a, b) => a.localeCompare(b))
-            .forEach((name) => {
-                items.push({label: name, kind: 'function', matchText: name});
-            });
-
-        [...MATH_CONSTANT_NAMES]
-            .sort((a, b) => a.localeCompare(b))
-            .forEach((name) => {
-                items.push({label: name, kind: 'constant', matchText: name.toLowerCase()});
-            });
-
-        return items;
-    }, [knownVariableNames]);
-
-    const getIdentifierContext = (text: string, position: number): IdentifierContext | null => {
-        const {lineStart, lineEnd} = getLineBounds(text, position);
-        const lineText = text.slice(lineStart, lineEnd);
-        const localPos = position - lineStart;
-
-        let start = localPos;
-        while (start > 0 && isIdentifierPartChar(lineText[start - 1])) {
-            start--;
-        }
-        if (start > 0 && lineText[start - 1] === '@') {
-            start--;
-        }
-
-        let end = localPos;
-        while (end < lineText.length && isIdentifierPartChar(lineText[end])) {
-            end++;
-        }
-
-        const token = lineText.slice(start, end);
-        if (!token) {
-            return null;
-        }
-
-        const wantsAtPrefix = token.startsWith('@');
-        const baseToken = wantsAtPrefix ? token.slice(1) : token;
-        if (!baseToken || !isIdentifierStartChar(baseToken[0])) {
-            return null;
-        }
-
-        return {
-            start: lineStart + start,
-            end: lineStart + end,
-            token,
-            baseToken,
-            wantsAtPrefix,
-            lineStart,
-            startInLine: start,
-        };
-    };
-
-    const identifierContext = useMemo(() => getIdentifierContext(content, caretPos), [content, caretPos]);
-
-    const intelligenceSuggestions = useMemo(() => {
-        if (!identifierContext) {
-            return [] as SuggestionItem[];
-        }
-
-        const query = identifierContext.baseToken.toLowerCase();
-        if (query.length === 0) {
-            return [] as SuggestionItem[];
-        }
-
-        const kindWeight: Record<SuggestionKind, number> = {
-            variable: 0,
-            function: 1,
-            constant: 2,
-        };
-
-        return suggestionCatalog
-            .filter((item) => {
-                if (identifierContext.wantsAtPrefix && item.kind !== 'variable') {
-                    return false;
-                }
-                return item.matchText.startsWith(query) && item.matchText !== query;
-            })
-            .sort((a, b) => {
-                const kindDiff = kindWeight[a.kind] - kindWeight[b.kind];
-                if (kindDiff !== 0) {
-                    return kindDiff;
-                }
-                return a.label.localeCompare(b.label);
-            })
-            .slice(0, 5);
-    }, [identifierContext, suggestionCatalog]);
-
+    const intelligenceSuggestions = useMemo(
+        () => buildIntelligenceSuggestions(identifierContext, suggestionCatalog),
+        [identifierContext, suggestionCatalog],
+    );
     const acceptSuggestion = (suggestion: SuggestionItem) => {
         if (!editorRef.current || !identifierContext) {
             return;
@@ -1930,46 +996,19 @@ function App() {
         : 0;
 
     const startThemePreview = (candidate: SavedThemeEntry) => {
-        if (!previewRestoreThemeRef.current) {
-            previewRestoreThemeRef.current = theme;
-        }
-
-        setTheme({
-            type: 'custom',
-            customColors: candidate.colors,
-            customId: candidate.id,
-            customThemeBase: candidate.themeBase,
-        });
-        setPendingThemePreview(candidate);
+        startThemePreviewInStore(candidate, theme, setTheme);
     };
 
     const cancelThemePreview = () => {
-        if (previewRestoreThemeRef.current) {
-            setTheme(previewRestoreThemeRef.current);
-            previewRestoreThemeRef.current = null;
-        }
-        setPendingThemePreview(null);
+        cancelThemePreviewInStore(setTheme);
     };
 
     const acceptThemePreview = (candidate: SavedThemeEntry) => {
-        setSavedThemes((prev) => {
-            const withoutDup = prev.filter((entry) => entry.id !== candidate.id);
-            return [candidate, ...withoutDup];
-        });
-
-        setTheme({
-            type: 'custom',
-            customColors: candidate.colors,
-            customId: candidate.id,
-            customThemeBase: candidate.themeBase,
-        });
-
-        previewRestoreThemeRef.current = null;
-        setPendingThemePreview(null);
+        acceptThemePreviewInStore(candidate, setTheme);
     };
 
     const deleteSavedTheme = (themeId: string) => {
-        setSavedThemes((prev) => prev.filter((entry) => entry.id !== themeId));
+        deleteSavedThemeInStore(themeId);
     };
 
     const expandWindowForThemeStore = async () => {
@@ -2045,19 +1084,6 @@ function App() {
 
         void restoreWindowAfterSettingsDrawer();
     }, [showSettings, showThemeStore]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const startSettingsDrawerResize = (event: ReactMouseEvent<HTMLDivElement>) => {
-        if (event.button !== 0 || showThemeStore) {
-            return;
-        }
-
-        event.preventDefault();
-        settingsDrawerResizeStartRef.current = {
-            x: event.clientX,
-            width: settingsDrawerWidth,
-        };
-        setIsResizingSettingsDrawer(true);
-    };
 
     const openThemeStoreInSidebar = () => {
         void restoreWindowAfterSettingsDrawer();
@@ -2644,10 +1670,10 @@ function App() {
                                 onChange={(next) => {
                                     setAISettingsDraft(next);
                                 }}
-                                onTestAndSave={testAndSaveAISettings}
-                                onRevertChanges={revertAISettingsDraftToSaved}
-                                onSaveKey={saveAIKeyToBackend}
-                                onClearKey={clearAIKeyInBackend}
+                                onTestAndSave={onTestAndSaveAISettings}
+                                onRevertChanges={onRevertAISettingsDraft}
+                                onSaveKey={onSaveAIKeyToBackend}
+                                onClearKey={onClearAIKeyInBackend}
                             />
                         </div>
 

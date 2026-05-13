@@ -17,6 +17,10 @@ This project keeps frontend tests focused on deterministic editor logic, so test
     - operator carry-over behavior from previous result
     - user-facing error message mapping
     - stale variable/version marker computation
+- `src/utils/worksheetEditing.test.ts`
+  - Tests worksheet edit remapping and declaration parsing helpers extracted from App.
+- `src/utils/editorIntelligence.test.ts`
+  - Tests identifier context and suggestion-building helpers extracted from App.
 
 ## Why this structure
 

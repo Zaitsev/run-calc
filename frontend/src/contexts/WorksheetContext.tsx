@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     WORKSHEET_CONTENT_STORAGE_KEY,
@@ -112,6 +112,29 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
     const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            localStorage.setItem(WORKSHEET_CONTENT_STORAGE_KEY, content);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [content]);
+
+    useEffect(() => {
+        if (lastResult === null) {
+            localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
+            return;
+        }
+        localStorage.setItem(LAST_RESULT_STORAGE_KEY, String(lastResult));
+    }, [lastResult]);
+
+    useEffect(() => {
+        localStorage.setItem(MARKED_LINES_STORAGE_KEY, JSON.stringify([...markedLines]));
+    }, [markedLines]);
+
+    useEffect(() => {
+        localStorage.setItem(VARIABLE_VALUES_STORAGE_KEY, JSON.stringify(variableValues));
+    }, [variableValues]);
 
     const setLastResult = (v: number | null) => setLastResultState(v);
 
