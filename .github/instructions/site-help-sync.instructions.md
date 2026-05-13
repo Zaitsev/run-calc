@@ -18,7 +18,7 @@ description: "Use when changing help text or help UI. Keep site/src/content/help
 - Open full help site via frontend env var `VITE_HELP_SITE_URL` when set.
 - Default URL behavior:
   - Dev mode: `http://localhost:3001`
-  - Production: `https://run-calc.taalgem.nl/help`
+  - Production: `https://run-calc.taalgem.nl/`
 
 ## Update workflow
 1. Edit `site/src/content/helpContent.ts` first.

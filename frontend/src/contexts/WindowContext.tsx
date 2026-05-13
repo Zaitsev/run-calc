@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     Environment,
@@ -51,8 +51,8 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         localStorage.getItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY) !== 'false'
     );
 
-    const themeStoreOriginalSizeRef = { current: null as { w: number; h: number } | null };
-    const settingsDrawerOriginalSizeRef = { current: null as { w: number; h: number } | null };
+    const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const settingsDrawerOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
