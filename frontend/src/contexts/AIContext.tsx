@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AIContextMode, AISettingsState, AIKeyStatusState } from '../AISettings';
 import type { AIDebugEntry } from '../AIDebugDrawer';
@@ -82,7 +82,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
     const aiSettingsHasUnsavedChanges = !areAISettingsEqual(aiSettingsDraft, aiSettings);
 
     // Load settings on mount
-    useState(() => {
+    useEffect(() => {
         let cancelled = false;
         const load = async () => {
             setAISettingsBusyState(true);
@@ -104,10 +104,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
         };
         void load();
         return () => { cancelled = true; };
-    });
+    }, []);
 
     // Refresh key status when draft provider changes
-    useState(() => {
+    useEffect(() => {
         let cancelled = false;
         const refresh = async () => {
             try {
@@ -117,7 +117,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
         };
         void refresh();
         return () => { cancelled = true; };
-    });
+    }, [aiSettingsDraft]);
 
     const revertAISettingsDraftToSaved = (opts: { setStatusText: (s: string) => void; setIsStatusError: (v: boolean) => void; setDevError: (v: string) => void }) => {
         setAISettingsDraft(aiSettings);
