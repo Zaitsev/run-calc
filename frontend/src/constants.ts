@@ -14,10 +14,12 @@ export const DEFAULT_WINDOW_HEIGHT = 760;
 
 // Font scale
 export const FONT_SCALE_STORAGE_KEY = 'calc.editor.fontScale';
+export const UI_FONT_SCALE_STORAGE_KEY = 'calc.ui.fontScale';
 export const FONT_SCALE_STEP = 0.1;
 export const FONT_SCALE_MIN = 0.7;
 export const FONT_SCALE_MAX = 2.2;
 export const DEFAULT_FONT_SCALE = 1;
+export const DEFAULT_UI_FONT_SCALE = 1;
 
 // Editor layout
 export const EDITOR_SIDE_PADDING_PX = 20;

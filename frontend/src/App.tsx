@@ -28,6 +28,7 @@ import { useTheme } from './useTheme';
 import { ThemeStore } from './ThemeStore';
 import {
     DEFAULT_FONT_SCALE,
+    DEFAULT_UI_FONT_SCALE,
     DEFAULT_SETTINGS_DRAWER_WIDTH,
     DOUBLE_ESCAPE_HIDE_WINDOW_MS,
     EDITOR_BOTTOM_PADDING_PX,
@@ -92,6 +93,9 @@ function App() {
         setScientificNotation,
         wordWrap,
         setWordWrap,
+        uiFontScale,
+        changeUIFontScale,
+        resetUIFontScale,
     } = useDisplaySettings();
     const {
         fontScale,
@@ -1122,6 +1126,7 @@ function App() {
     const windowStyle = {
         '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
         '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
+        '--ui-font-scale': uiFontScale,
     } as CSSProperties;
 
     return (
@@ -1576,11 +1581,15 @@ function App() {
                     className="settings-btn"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                        setShowPrecisionMenu(false);
-                        setShowBurgerMenu(false);
-                        setShowHelp(false);
-                        setShowSettings(true);
-                        setShowThemeStore(false);
+                        if (showSettings && !showThemeStore) {
+                            setShowSettings(false);
+                        } else {
+                            setShowPrecisionMenu(false);
+                            setShowBurgerMenu(false);
+                            setShowHelp(false);
+                            setShowSettings(true);
+                            setShowThemeStore(false);
+                        }
                     }}
                     aria-label="Settings"
                     title="Settings"
@@ -1652,6 +1661,117 @@ function App() {
                         </div>
                     ) : (
                     <div className="settings-body">
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">UI font size</div>
+                                    <div className="settings-row-desc">Adjust text size for menus and help panel</div>
+                                </div>
+                                <div className="settings-stepper-group">
+                                    <button
+                                        type="button"
+                                        className="settings-stepper"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => changeUIFontScale(-1)}
+                                        disabled={uiFontScale <= FONT_SCALE_MIN}
+                                        aria-label="Decrease UI font size"
+                                    >
+                                        −
+                                    </button>
+                                    <span className="settings-stepper-value">
+                                        {Math.round(uiFontScale * 100)}%
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="settings-stepper"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => changeUIFontScale(1)}
+                                        disabled={uiFontScale >= FONT_SCALE_MAX}
+                                        aria-label="Increase UI font size"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            {uiFontScale !== DEFAULT_UI_FONT_SCALE && (
+                                <div className="settings-subaction">
+                                    <button
+                                        type="button"
+                                        className="settings-link-btn"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={resetUIFontScale}
+                                    >
+                                        Reset to default
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Editor ── */}
+                        <p className="settings-section-label">Editor</p>
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Font size</div>
+                                    <div className="settings-row-desc">Adjust the editor text size</div>
+                                </div>
+                                <div className="settings-stepper-group">
+                                    <button
+                                        type="button"
+                                        className="settings-stepper"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => changeFontScale(-1)}
+                                        disabled={fontScale <= FONT_SCALE_MIN}
+                                        aria-label="Decrease font size"
+                                    >
+                                        −
+                                    </button>
+                                    <span className="settings-stepper-value">
+                                        {Math.round(fontScale * 100)}%
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="settings-stepper"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => changeFontScale(1)}
+                                        disabled={fontScale >= FONT_SCALE_MAX}
+                                        aria-label="Increase font size"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            {fontScale !== DEFAULT_FONT_SCALE && (
+                                <div className="settings-subaction">
+                                    <button
+                                        type="button"
+                                        className="settings-link-btn"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={resetFontSize}
+                                    >
+                                        Reset to default
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Word wrap</div>
+                                    <div className="settings-row-desc">Wrap long lines inside the editor</div>
+                                </div>
+                                <label className="settings-toggle" aria-label="Toggle word wrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={wordWrap}
+                                        onChange={(e) => setWordWrap(e.target.checked)}
+                                    />
+                                    <span className="settings-toggle-track" />
+                                </label>
+                            </div>
+                        </div>
+
                         {/* ── AI ── */}
                         <div className={`settings-ai-block${aiSettingsHasUnsavedChanges ? ' settings-ai-block--action-required' : ''}`}>
                             <p className="settings-section-label settings-section-label--with-chip">
@@ -1762,71 +1882,6 @@ function App() {
                                         );
                                     })}
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* ── Editor ── */}
-                        <p className="settings-section-label">Editor</p>
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Font size</div>
-                                    <div className="settings-row-desc">Adjust the editor text size</div>
-                                </div>
-                                <div className="settings-stepper-group">
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => changeFontScale(-1)}
-                                        disabled={fontScale <= FONT_SCALE_MIN}
-                                        aria-label="Decrease font size"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="settings-stepper-value">
-                                        {Math.round(fontScale * 100)}%
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => changeFontScale(1)}
-                                        disabled={fontScale >= FONT_SCALE_MAX}
-                                        aria-label="Increase font size"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            {fontScale !== DEFAULT_FONT_SCALE && (
-                                <div className="settings-subaction">
-                                    <button
-                                        type="button"
-                                        className="settings-link-btn"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={resetFontSize}
-                                    >
-                                        Reset to default
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Word wrap</div>
-                                    <div className="settings-row-desc">Wrap long lines inside the editor</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle word wrap">
-                                    <input
-                                        type="checkbox"
-                                        checked={wordWrap}
-                                        onChange={(e) => setWordWrap(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
                             </div>
                         </div>
 

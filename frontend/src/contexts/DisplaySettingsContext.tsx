@@ -13,6 +13,11 @@ import {
     PRECISION_STORAGE_KEY,
     SCIENTIFIC_NOTATION_STORAGE_KEY,
     WORD_WRAP_STORAGE_KEY,
+    UI_FONT_SCALE_STORAGE_KEY,
+    FONT_SCALE_STEP,
+    FONT_SCALE_MIN,
+    FONT_SCALE_MAX,
+    DEFAULT_UI_FONT_SCALE,
     PRECISION_MIN,
     PRECISION_MAX,
     FINANCIAL_PRECISION,
@@ -35,6 +40,10 @@ type DisplaySettingsContextValue = {
     setScientificNotation: (v: boolean) => void;
     wordWrap: boolean;
     setWordWrap: React.Dispatch<React.SetStateAction<boolean>>;
+    uiFontScale: number;
+    setUIFontScale: React.Dispatch<React.SetStateAction<number>>;
+    changeUIFontScale: (direction: 1 | -1) => void;
+    resetUIFontScale: () => void;
     formatNumber: (value: number, delimiter?: '.' | ',', prec?: PrecisionMode, sci?: boolean) => string;
     /** Call this to trigger a re-format pass on worksheet content when precision/delimiter changes.
      *  Accepts a setContent-like updater from WorksheetContext. */
@@ -71,6 +80,14 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         localStorage.getItem(WORD_WRAP_STORAGE_KEY) === 'true'
     );
 
+    const [uiFontScale, setUIFontScale] = useState(() => {
+        const raw = localStorage.getItem(UI_FONT_SCALE_STORAGE_KEY);
+        if (!raw) return DEFAULT_UI_FONT_SCALE;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) return DEFAULT_UI_FONT_SCALE;
+        return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, parsed));
+    });
+
     const precisionIncreasedRef = useRef(false);
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
 
@@ -98,8 +115,23 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(WORD_WRAP_STORAGE_KEY, String(wordWrap));
     }, [wordWrap]);
 
+    useEffect(() => {
+        localStorage.setItem(UI_FONT_SCALE_STORAGE_KEY, String(uiFontScale));
+    }, [uiFontScale]);
+
     const setDecimalDelimiterMode = (mode: DecimalDelimiterMode) => setDecimalDelimiterModeState(mode);
     const setScientificNotation = (v: boolean) => setScientificNotationState(v);
+
+    const changeUIFontScale = (direction: 1 | -1) => {
+        setUIFontScale((current) => {
+            const next = current + direction * FONT_SCALE_STEP;
+            return Number(Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, next)).toFixed(2));
+        });
+    };
+
+    const resetUIFontScale = () => {
+        setUIFontScale(DEFAULT_UI_FONT_SCALE);
+    };
 
     const decreasePrecision = () => {
         setPrecision((current: PrecisionMode) => {
@@ -160,6 +192,10 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
             setScientificNotation,
             wordWrap,
             setWordWrap,
+            uiFontScale,
+            setUIFontScale,
+            changeUIFontScale,
+            resetUIFontScale,
             formatNumber: fmtNumber,
             reformatContent,
             precisionIncreasedRef,
