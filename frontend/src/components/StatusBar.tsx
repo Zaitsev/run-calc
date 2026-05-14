@@ -10,7 +10,7 @@ import {
     PRECISION_MAX,
     PRECISION_MIN,
 } from '../constants';
-import { useAI, useDisplaySettings, useEditorUI, useStatus, useUIState, useWindow } from '../contexts';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow } from '../contexts';
 import { PrecisionPopover } from './PrecisionPopover';
 import { BurgerMenu } from './BurgerMenu';
 
@@ -32,7 +32,16 @@ export function StatusBar() {
         setShowClearWorksheetConfirm,
         setShowAIDebug,
     } = useUIState();
-    const { resetWindowLayout, expandWindowForThemeStore, restoreWindowAfterSettingsDrawer } = useWindow();
+    const { resetWindowLayout, expandWindowForThemeStore, restoreWindowAfterSettingsDrawer, restoreWindowAfterThemeStore } = useWindow();
+    const { pendingThemePreview, cancelThemePreview } = useThemeStore();
+    const { setTheme } = useThemeContext();
+    const closeThemeStoreInSidebar = () => {
+        if (pendingThemePreview) {
+            cancelThemePreview(setTheme);
+        }
+        setShowThemeStore(false);
+        void restoreWindowAfterThemeStore();
+    };
 
     useEffect(() => {
         if (!showBurgerMenu) {
