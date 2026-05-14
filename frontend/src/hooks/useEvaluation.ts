@@ -393,53 +393,72 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             }
 
             // A strict top-to-bottom pass can still leave lines stale when a referenced
-            // variable is reassigned later. Refresh those stale lines against the latest
-            // variable snapshot so the stale banner action always performs visible work.
+            // variable is reassigned later. Refresh stale lines against the latest state
+            // and propagate variable updates until snapshots converge.
             let refreshedStaleCount = 0;
-            for (const [lineKey, dependencySnapshot] of Object.entries(nextLineDependencyVersions)) {
-                const lineIndex = Number(lineKey);
-                if (!Number.isFinite(lineIndex)) {
-                    continue;
+            const maxRefreshPasses = Math.max(1, sourceLines.length);
+            for (let pass = 0; pass < maxRefreshPasses; pass++) {
+                const staleLineIndexes = Object.entries(nextLineDependencyVersions)
+                    .filter(([, dependencySnapshot]) => Object.entries(dependencySnapshot).some(([name, version]) => {
+                        const currentVersion = workingVariableVersions[name] ?? 0;
+                        return currentVersion !== version;
+                    }))
+                    .map(([lineKey]) => Number(lineKey))
+                    .filter((lineIndex) => Number.isFinite(lineIndex))
+                    .sort((left, right) => left - right);
+
+                if (staleLineIndexes.length === 0) {
+                    break;
                 }
 
-                const hasStaleDependency = Object.entries(dependencySnapshot).some(([name, version]) => {
-                    const currentVersion = workingVariableVersions[name] ?? 0;
-                    return currentVersion !== version;
-                });
-                if (!hasStaleDependency) {
-                    continue;
-                }
-
-                const editableLine = getExpressionSource(nextLines[lineIndex] ?? '');
-                if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
-                    delete nextLineDependencies[lineIndex];
-                    delete nextLineDependencyVersions[lineIndex];
-                    continue;
-                }
-
-                try {
-                    const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
-                    if (!evalResult.ok) {
-                        throw new Error(evalResult.error || 'Evaluation failed');
+                for (const lineIndex of staleLineIndexes) {
+                    const editableLine = getExpressionSource(nextLines[lineIndex] ?? '');
+                    if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                        delete nextLineDependencies[lineIndex];
+                        delete nextLineDependencyVersions[lineIndex];
+                        continue;
                     }
 
-                    const numberValue = evalResult.numberValue ?? 0;
-                    const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
-                    nextLines[lineIndex] = formatEvaluatedLine(editableLine, formatted);
+                    try {
+                        const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
+                        if (!evalResult.ok) {
+                            throw new Error(evalResult.error || 'Evaluation failed');
+                        }
 
-                    const dependencies = extractExpressionDependencies(editableLine);
-                    const dependencySnapshotAtLatestState: Record<string, number> = {};
-                    dependencies.forEach((name) => {
-                        dependencySnapshotAtLatestState[name] = workingVariableVersions[name] ?? 0;
-                    });
-                    nextLineDependencies[lineIndex] = dependencies;
-                    nextLineDependencyVersions[lineIndex] = dependencySnapshotAtLatestState;
-                    refreshedStaleCount++;
-                } catch {
-                    nextLines[lineIndex] = formatEvaluatedLine(editableLine, 'error');
-                    delete nextLineDependencies[lineIndex];
-                    delete nextLineDependencyVersions[lineIndex];
-                    failedCount++;
+                        const numberValue = evalResult.numberValue ?? 0;
+                        const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
+                        nextLines[lineIndex] = formatEvaluatedLine(editableLine, formatted);
+
+                        const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
+                        const changedVariableKeys = new Set<string>();
+                        const allVariableKeys = new Set<string>([...Object.keys(workingVariables), ...Object.keys(nextVariables)]);
+                        allVariableKeys.forEach((key) => {
+                            const nk = key.toLowerCase();
+                            if (!areValuesEquivalent(workingVariables[nk], nextVariables[nk])) {
+                                changedVariableKeys.add(nk);
+                            }
+                        });
+                        changedVariableKeys.forEach((key) => {
+                            workingVariableVersions[key] = (workingVariableVersions[key] ?? 0) + 1;
+                        });
+
+                        const dependencies = extractExpressionDependencies(editableLine);
+                        const dependencySnapshotAtLatestState: Record<string, number> = {};
+                        dependencies.forEach((name) => {
+                            dependencySnapshotAtLatestState[name] = workingVariableVersions[name] ?? 0;
+                        });
+                        nextLineDependencies[lineIndex] = dependencies;
+                        nextLineDependencyVersions[lineIndex] = dependencySnapshotAtLatestState;
+                        workingVariables = nextVariables;
+                        nextLastResult = evalResult.isNumber ? numberValue : null;
+                        refreshedStaleCount++;
+                    } catch {
+                        nextLines[lineIndex] = formatEvaluatedLine(editableLine, 'error');
+                        delete nextLineDependencies[lineIndex];
+                        delete nextLineDependencyVersions[lineIndex];
+                        failedCount++;
+                        nextLastResult = null;
+                    }
                 }
             }
 

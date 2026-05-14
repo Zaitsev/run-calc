@@ -7,15 +7,9 @@ vi.mock('../../wailsjs/go/main/App', () => ({
 }));
 
 import { EvaluateExprProgram } from '../../wailsjs/go/main/App';
+import type { main } from '../../wailsjs/go/models';
 
-type EvalResult = {
-    ok: boolean;
-    value?: unknown;
-    isNumber?: boolean;
-    numberValue?: number;
-    variables?: Record<string, unknown>;
-    error?: string;
-};
+type EvalResult = main.ExprEvalResponse;
 
 function evaluateSimpleExpression(expression: string, variables: Record<string, unknown>): number {
     const trimmed = expression.trim();
@@ -72,7 +66,7 @@ function mockedEvaluateExprProgram(expression: string, variables: Record<string,
 describe('buildEvaluationHooks reevaluateAllExpressions', () => {
     it('refreshes lines that remain stale after the top-to-bottom reevaluation pass', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
-        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables));
+        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
 
         const editorRef = {
             current: {
@@ -167,8 +161,8 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             expect(content.split('\n')[1]).toBe('b = a + 1 = 6');
             expect(lineDependencyVersions[1]).toEqual({ a: 2 });
             expect(variableValues.a).toBe(5);
-            expect(variableValues.b).toBe(2);
-            expect(lastResult).toBe(5);
+            expect(variableValues.b).toBe(6);
+            expect(lastResult).toBe(6);
             expect(isStatusError).toBe(false);
             expect(statusText).toContain('refreshed 1 stale');
             expect(isReevaluatingAll).toBe(false);
