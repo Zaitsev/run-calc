@@ -16,6 +16,7 @@ import {
     SETTINGS_DRAWER_MIN_WIDTH,
 } from '../constants';
 import { useSettingsPanelState } from '../hooks/useSettingsPanelState';
+import { useTheme } from '../useTheme';
 
 interface SettingsPanelProps {
     showSettings: boolean;
@@ -40,7 +41,8 @@ export function SettingsPanel({
     onOpenThemeStore,
     onCloseThemeStore,
 }: SettingsPanelProps) {
-    const { display, theme, themeStore, window: windowContext, ai } = useSettingsPanelState();
+    const { display, themeStore, window: windowContext, ai } = useSettingsPanelState();
+    const theme = useTheme();
     const { clampSettingsDrawerWidth } = useUIState();
     const { fontScale, setFontScale } = useEditorUI();
 
