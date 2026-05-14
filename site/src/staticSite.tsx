@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BYOKPage } from './pages/BYOKPage';
 import { FunctionsPage } from './pages/FunctionsPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { OperationsPage } from './pages/OperationsPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { PrivacyPage } from './pages/PrivacyPage';
@@ -65,6 +66,12 @@ export const staticPages: StaticPage[] = [
         description: 'Run-Calc privacy summary, legal links, and local-first data handling notes.',
         Component: PrivacyPage,
     },
+    {
+        fileName: '404.html',
+        title: 'Run-Calc Help - Page Not Found',
+        description: 'The requested help page was not found. Open the Run-Calc help overview to continue.',
+        Component: NotFoundPage,
+    },
 ];
 
 function escapeHtml(value: string): string {
@@ -86,9 +93,6 @@ export function renderPageDocument(page: StaticPage): string {
         '<head>',
         '    <meta charset="UTF-8" />',
         '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-        '    <meta http-equiv="Cache-Control" content="max-age=0, no-cache, no-store, must-revalidate" />',
-        '    <meta http-equiv="Pragma" content="no-cache" />',
-        '    <meta http-equiv="Expires" content="0" />',
         '    <link rel="icon" type="image/png" href="/hare-calc-128.png" />',
         `    <meta name="description" content="${escapeHtml(page.description)}" />`,
         `    <title>${escapeHtml(page.title)}</title>`,

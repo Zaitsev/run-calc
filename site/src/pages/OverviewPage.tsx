@@ -10,7 +10,7 @@ export function OverviewPage() {
             subtitle="A fast desktop calculator that feels like a notepad, not a form. Windows and Mac. Local-first, with optional AI."
         >
             <section className="panel hero-panel">
-                <h1>Run-Calc: Calculate at the Speed of Thought</h1>
+                <h2>Run-Calc: Calculate at the Speed of Thought</h2>
 
                 <p>
                     <strong>Run-Calc</strong> is a high-speed <strong>desktop calculator</strong> for Windows and Mac that empowers you to <strong>calculate the way you think</strong>. Designed to feel like a natural <strong>notepad</strong> rather than a rigid form, it allows you to jot down notes, stack equations line by line, and get <strong>instant answers</strong> exactly where you type them. Whether you are performing quick analysis or detailed planning, Run-Calc keeps your momentum high by delivering <strong>inline results</strong> the moment you press Enter.
@@ -33,9 +33,9 @@ export function OverviewPage() {
             <section className="panel hero-panel">
                 <h2 className="hero-title">Type naturally. Press Enter. Get instant answers inline.</h2>
                 <p className="hero-badge">Desktop app for everyday math, planning,   and quick analysis</p>
-                <h5>Easy calculate</h5>
+                <h3>Easy calculate</h3>
                 <p><img src="/images/im0.png" alt="Basic arithmetic" /></p>
-                <h5>Any conversions (AI powered)</h5>
+                <h3>Any conversions (AI powered)</h3>
                 <p><img src="/images/im1.png" alt="AI powered conversions" /></p>
                 <p className="hero-subtitle">
                     Run-Calc lets you calculate the way you think. Write one line after another, keep your notes,

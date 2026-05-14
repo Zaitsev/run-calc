@@ -22,11 +22,20 @@
         ]
       },
       {
-        "source": "**/*.{css,js}",
+        "source": "/styles.css",
         "headers": [
           {
             "key": "Cache-Control",
             "value": "max-age=3600, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/assets/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000, immutable"
           }
         ]
       },
