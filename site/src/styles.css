@@ -83,6 +83,28 @@ nav {
     margin-bottom: 16px;
 }
 
+.emoji-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.emoji-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.emoji-list li .emoji-bullet {
+    font-size: 1.3em;
+    line-height: 1.4;
+    flex-shrink: 0;
+    min-width: 1.6em;
+    text-align: center;
+    margin-top: -0.15em
+}
+
 .hero-panel {
     position: relative;
     overflow: hidden;

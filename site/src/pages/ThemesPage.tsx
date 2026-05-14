@@ -2,18 +2,20 @@ import { HelpLayout } from '../components/HelpLayout';
 
 export function ThemesPage() {
     return (
-        <HelpLayout title="Themes" subtitle="Personalise the editor with built-in options or any VS Code-compatible theme.">
+        <HelpLayout currentPage="themes" title="Themes" subtitle="Personalise the editor with built-in options or any VS Code-compatible theme.">
             <section className="panel">
                 <h2>Built-in themes</h2>
                 <p>
-                    Open <strong>Settings → Theme</strong> to switch between the four presets that ship with
+                    Open <strong>Settings → Theme</strong> to switch between the built-in presets that ship with
                     Run-Calc:
                 </p>
                 <ul>
                     <li><strong>System</strong> — follows your OS light / dark preference automatically.</li>
                     <li><strong>Light</strong> — a clean light background.</li>
                     <li><strong>Dark</strong> — a comfortable dark background.</li>
-                    <li><strong>Custom</strong> —  theme you installed from the Theme Store.</li>
+                    <li><strong>Light (High Contrast)</strong> — maximum contrast light theme for improved accessibility and visibility.</li>
+                    <li><strong>Dark (High Contrast)</strong> — maximum contrast dark theme for improved accessibility and visibility.</li>
+                    <li><strong>Custom</strong> — a theme you installed from the Theme Store.</li>
                 </ul>
                 <p style={{"margin": '1em',overflow: 'hidden'}}>
                     <video controls muted playsInline>

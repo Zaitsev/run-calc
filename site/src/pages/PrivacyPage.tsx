@@ -2,7 +2,7 @@ import { HelpLayout } from '../components/HelpLayout';
 
 export function PrivacyPage() {
     return (
-        <HelpLayout title="Privacy and Legal" subtitle="Policy links and data handling summary.">
+        <HelpLayout currentPage="privacy" title="Privacy and Legal" subtitle="Policy links and data handling summary.">
             <section className="panel">
                 <h2>Privacy Summary</h2>
                 <ul>
