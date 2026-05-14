@@ -1,4 +1,4 @@
-import { useAI, useDisplaySettings, useThemeStore, useWindow } from '../contexts';
+import { useAI, useDisplaySettings, useThemeContext, useThemeStore, useWindow } from '../contexts';
 
 /**
  * Lightweight facade hook that composes all settings-related hooks.
@@ -6,10 +6,11 @@ import { useAI, useDisplaySettings, useThemeStore, useWindow } from '../contexts
  */
 export function useSettingsPanelState() {
     const themeStore = useThemeStore();
+    const { theme, setTheme } = useThemeContext();
 
     return {
         display: useDisplaySettings(),
-        theme: themeStore,
+        theme: { theme, setTheme },
         themeStore,
         window: useWindow(),
         ai: useAI(),

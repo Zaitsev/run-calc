@@ -21,8 +21,6 @@ import { StaleBanner } from './components/StaleBanner';
 import { StatusBar } from './components/StatusBar';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
-import { useTheme } from './useTheme';
-
 import {
     DEFAULT_FONT_SCALE,
     DOUBLE_ESCAPE_HIDE_WINDOW_MS,
@@ -38,7 +36,7 @@ import {
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
-import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
 import type {
     PrecisionMode,
@@ -135,7 +133,7 @@ function App() {
         aiDebugIdRef,
         handleAIProgressEvent,
     } = useAI();
-    const {theme, setTheme} = useTheme();
+    const {theme, setTheme} = useThemeContext();
     const prefersDark = usePrefersDark();
     const isDarkTheme =
         theme.type === 'dark' ||
