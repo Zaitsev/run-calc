@@ -111,6 +111,13 @@ function App() {
         settingsDrawerWidth,
         setSettingsDrawerWidth,
         startSettingsDrawerResize,
+        helpPanelSideSize,
+        helpPanelBottomSize,
+        setHelpPanelSideSize,
+        setHelpPanelBottomSize,
+        startHelpPanelResize,
+        clampHelpPanelSideSize,
+        clampHelpPanelBottomSize,
         intelligenceShowTimerRef,
         intelligenceHideTimerRef,
         lastEscapeKeyAtRef,
@@ -1136,6 +1143,8 @@ function App() {
         '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
         '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
         '--ui-font-scale': uiFontScale,
+        '--help-panel-side-size': `${helpPanelSideSize}px`,
+        '--help-panel-bottom-size': `${helpPanelBottomSize}px`,
     } as CSSProperties;
 
     return (
@@ -1392,6 +1401,13 @@ function App() {
                 <HelpPanelContainer
                     helpPanelPosition={helpPanelPosition}
                     setHelpPanelPosition={setHelpPanelPosition}
+                    helpPanelSideSize={helpPanelSideSize}
+                    setHelpPanelSideSize={setHelpPanelSideSize}
+                    helpPanelBottomSize={helpPanelBottomSize}
+                    setHelpPanelBottomSize={setHelpPanelBottomSize}
+                    startHelpPanelResize={startHelpPanelResize}
+                    clampHelpPanelSideSize={clampHelpPanelSideSize}
+                    clampHelpPanelBottomSize={clampHelpPanelBottomSize}
                     onClose={() => setShowHelp(false)}
                 />
             )}

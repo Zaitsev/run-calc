@@ -48,6 +48,10 @@ export const helpContent: HelpContentMap = {
         'Variables and results are isolated: a variable defined in one worksheet is not visible in another.',
     ],
     new: [
+        'Version 6.0.0 - Worksheets Release',
+        'Worksheets are now a core part of Run-Calc: use independent tabs for separate calculations and variable scopes.',
+        'This release adds worksheet locking with password protection, hidden content while locked, and unlock controls in the lock screen.',
+        'Auto-lock options are included for inactivity timeout, minimize/hide, and system sleep/resume to protect worksheet data.',
         'Version 0.5.1 - First Test-Drive Release',
         'This is the initial test-drive version of Run-Calc. All core features are included and ready for feedback.',
         'Features: inline expression evaluation, AI mode with structured output, pipeline analytics, comprehensive math functions, themed editor, help system, and worksheet persistence.',

@@ -37,6 +37,8 @@ export const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
 export const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
 export const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
 export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
+export const HELP_PANEL_SIDE_SIZE_STORAGE_KEY = 'calc.help.sideSize';
+export const HELP_PANEL_BOTTOM_SIZE_STORAGE_KEY = 'calc.help.bottomSize';
 export const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 export const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
 export const AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY = 'calc.lock.autoLockTimeoutMinutes';
@@ -65,6 +67,16 @@ export const SETTINGS_DRAWER_MIN_WIDTH = 360;
 export const SETTINGS_DRAWER_MAX_WIDTH = 1520;
 export const SETTINGS_DRAWER_MIN_EDITOR_WIDTH = 380;
 export const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
+
+// Help panel sizing
+export const DEFAULT_HELP_PANEL_SIDE_SIZE = 320;
+export const HELP_PANEL_SIDE_MIN_SIZE = 260;
+export const HELP_PANEL_SIDE_MAX_SIZE = 860;
+export const HELP_PANEL_SIDE_MIN_EDITOR_WIDTH = 320;
+export const DEFAULT_HELP_PANEL_BOTTOM_SIZE = 420;
+export const HELP_PANEL_BOTTOM_MIN_SIZE = 220;
+export const HELP_PANEL_BOTTOM_MAX_SIZE = 760;
+export const HELP_PANEL_BOTTOM_MIN_EDITOR_HEIGHT = 160;
 
 // Precision
 export const PRECISION_MIN = 0;

@@ -1406,6 +1406,77 @@
     outline: none;
 }
 
+.help-resize-handle {
+    position: absolute;
+    border: none;
+    background: transparent;
+    z-index: 2;
+    padding: 0;
+}
+
+.help-resize-handle::after {
+    content: '';
+    position: absolute;
+    border-radius: 999px;
+    transition: background 0.12s ease;
+}
+
+.help-resize-handle--right {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    transform: translateX(-50%);
+    cursor: ew-resize;
+}
+
+.help-resize-handle--left {
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    transform: translateX(50%);
+    cursor: ew-resize;
+}
+
+.help-resize-handle--right::after,
+.help-resize-handle--left::after {
+    left: 50%;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--sideBar-border) 28%, transparent);
+}
+
+.help-resize-handle--bottom {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    transform: translateY(-50%);
+    cursor: ns-resize;
+}
+
+.help-resize-handle--bottom::after {
+    top: 50%;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    transform: translateY(-50%);
+    background: color-mix(in srgb, var(--sideBar-border) 28%, transparent);
+}
+
+.help-resize-handle:hover::after,
+.help-resize-handle:focus-visible::after,
+.is-resizing-help-panel .help-resize-handle::after {
+    background: color-mix(in srgb, var(--radio-accent) 72%, var(--sideBar-border));
+}
+
+.help-resize-handle:focus-visible {
+    outline: none;
+}
+
 @media (max-width: 1024px) {
     .settings-panel--theme-store {
         width: min(520px, calc(100vw - 28px));
@@ -1431,6 +1502,21 @@
 .is-resizing-settings-drawer * {
     cursor: ew-resize !important;
     user-select: none !important;
+}
+
+.is-resizing-help-panel,
+.is-resizing-help-panel * {
+    user-select: none !important;
+}
+
+.is-resizing-help-panel-ns,
+.is-resizing-help-panel-ns * {
+    cursor: ns-resize !important;
+}
+
+.is-resizing-help-panel-ew,
+.is-resizing-help-panel-ew * {
+    cursor: ew-resize !important;
 }
 
 .settings-header {
