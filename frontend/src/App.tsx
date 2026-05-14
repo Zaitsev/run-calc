@@ -151,7 +151,6 @@ function App() {
     const {
         aiContextMode,
         aiSettings,
-        aiDebugLog,
         setAIDebugLog,
         isAIQueryPending,
         setIsAIQueryPending,
@@ -1469,7 +1468,7 @@ function App() {
                                 className="status-menu-item"
                                 onClick={() => runBurgerAction(() => setShowAIDebug(true))}
                             >
-                                AI Debug Log{aiDebugLog.length > 0 ? ` (${aiDebugLog.length})` : ''}
+                                AI Debug Log
                             </button>
                             <button
                                 type="button"
@@ -1547,18 +1546,7 @@ function App() {
                 onCloseThemeStore={closeThemeStoreInSidebar}
             />
 
-            <div
-                className={`settings-panel settings-panel--ai-debug${showAIDebug ? ' settings-panel--open' : ''}`}
-                role="dialog"
-                aria-label="AI Debug Log"
-                aria-hidden={!showAIDebug}
-            >
-                <AIDebugDrawer
-                    entries={aiDebugLog}
-                    onClear={() => setAIDebugLog([])}
-                    onClose={() => setShowAIDebug(false)}
-                />
-            </div>
+            <AIDebugDrawer />
 
             {showHelp && (
                 <HelpPanelContainer
