@@ -256,6 +256,7 @@ export function StatusBar() {
                 {showBurgerMenu && (
                     <BurgerMenu
                         aiDebugLogCount={aiDebugLog.length}
+                        onClose={() => setShowBurgerMenu(false)}
                         onNewWorksheet={() => { setShowBurgerMenu(false); requestClearWorksheet(); }}
                         onChangeFontScale={(dir) => { setShowBurgerMenu(false); changeFontScale(dir); }}
                         onResetFontSize={() => { setShowBurgerMenu(false); resetFontSize(); }}

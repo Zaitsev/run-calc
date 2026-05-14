@@ -79,6 +79,9 @@ export default defineConfig({
     fs: {
       allow: [workspaceRootPath],
     },
+    watch: {
+      ignored: ['../site/**'],
+    },
   },
   test: {
     environment: 'node'

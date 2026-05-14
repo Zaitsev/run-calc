@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState } from 'react';
 
-export type ThemeType = 'light' | 'dark' | 'system' | 'custom';
+export type ThemeType = 'light' | 'dark' | 'light-high-contrast' | 'dark-high-contrast' | 'system' | 'custom';
 
 export interface ThemeState {
     type: ThemeType;

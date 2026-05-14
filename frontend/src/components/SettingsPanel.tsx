@@ -1,5 +1,5 @@
 import React from 'react';
-import { useEditorUI, useStatus, useUIState } from '../contexts';
+import { useEditorUI, useStatus, useThemeContext, useUIState } from '../contexts';
 import { AISettingsPanel } from '../AISettings';
 import { ThemeStore } from '../ThemeStore';
 import {
@@ -16,7 +16,6 @@ import {
     SETTINGS_DRAWER_MIN_WIDTH,
 } from '../constants';
 import { useSettingsPanelState } from '../hooks/useSettingsPanelState';
-import { useTheme } from '../useTheme';
 
 interface SettingsPanelProps {
     showSettings: boolean;
@@ -42,7 +41,7 @@ export function SettingsPanel({
     onCloseThemeStore,
 }: SettingsPanelProps) {
     const { display, themeStore, window: windowContext, ai } = useSettingsPanelState();
-    const theme = useTheme();
+    const theme = useThemeContext();
     const { clampSettingsDrawerWidth } = useUIState();
     const { fontScale, setFontScale } = useEditorUI();
 
@@ -424,6 +423,8 @@ export function SettingsPanel({
                                 {([
                                     { key: 'light', name: 'Light', meta: 'Default theme', icon: 'L' },
                                     { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
+                                    { key: 'light-high-contrast', name: 'Light (High Contrast)', meta: 'High visibility', icon: 'HC' },
+                                    { key: 'dark-high-contrast', name: 'Dark (High Contrast)', meta: 'High visibility', icon: 'HC' },
                                     { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
                                 ] as const).map((entry) => {
                                     const isActive = theme.theme.type === entry.key;
