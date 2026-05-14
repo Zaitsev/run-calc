@@ -19,7 +19,7 @@ const navItems: NavItem[] = [
     { key: 'operations', label: 'Operations', href: '/operations' },
     { key: 'shortcuts', label: 'Shortcuts', href: '/shortcuts' },
     { key: 'functions', label: 'Functions', href: '/functions' },
-    { key: 'byok', label: 'AI key Setup', href: '/byok' },
+    { key: 'byok', label: 'AI Key Setup', href: '/byok' },
     { key: 'themes', label: 'Themes', href: '/themes' },
     { key: 'whats-new', label: "What's New", href: '/whats-new' },
     { key: 'privacy', label: 'Privacy', href: '/privacy' },

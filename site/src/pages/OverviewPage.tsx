@@ -19,13 +19,13 @@ export function OverviewPage() {
                 <h2>Why Choose Run-Calc?</h2>
 
                 <ul className="emoji-list">
-                    <li><span className="emoji-bullet">⌨️</span><span><strong>Calculate Naturally:</strong> Type expressions naturally-like <code>42 + 3 * 4 - 5 * ( 2 + sin(3 + 2 * pi / 2) )</code> &mdash; and get results instantly without searching for a keypad.</span></li>
-                    <li><span className="emoji-bullet">❓</span><span><strong>Ask questions:</strong> <code>?? what is a speed of light in nautical miles?</code> <span>(😊 161874.97)</span></span></li>
+                    <li><span className="emoji-bullet">⌨️</span><span><strong>Calculate Naturally:</strong> Type expressions naturally &mdash; like <code>42 + 3 * 4 - 5 * ( 2 + sin(3 + 2 * pi / 2) )</code> &mdash; and get results instantly without searching for a keypad.</span></li>
+                    <li><span className="emoji-bullet">❓</span><span><strong>Ask questions:</strong> <code>?? what is the speed of light in nautical miles per second?</code> <span>(😊 161874.97 nautical miles per second)</span></span></li>
                     <li><span className="emoji-bullet">⚡</span><span><strong>Fluid Momentum:</strong> Start any new line with <code>+</code>, <code>-</code>, <code>*</code>, or <code>/</code> to automatically continue calculating from your previous result.</span></li>
                     <li><span className="emoji-bullet">🛠️</span><span><strong>Powerful Data Tools:</strong> Use <strong>variables</strong> to store values and <strong>pipelines</strong> to filter, map, or sum lists of data step-by-step.</span></li>
                     <li><span className="emoji-bullet">🎨</span><span><strong>Personalized Themes:</strong> Switch between built-in Dark, Light, and High Contrast modes, or install any community-made theme directly from the Open VSX registry.</span></li>
                     <li><span className="emoji-bullet">🤖</span><span><strong>AI (BYOK):</strong> Connect your own AI provider to ask complex questions or generate ready-to-run calculation lines.</span></li>
-                    <li><span className="emoji-bullet">🚀</span><span><strong>Lightweight Performance:</strong> Enjoy an ultra-lean footprint that stays out of your way, using only 30MB of RAM while you work.</span></li>
+                    <li><span className="emoji-bullet">🚀</span><span><strong>Lightweight Performance:</strong> Enjoy an ultra-lean footprint that stays out of your way while you work.</span></li>
                     <li><span className="emoji-bullet">📖</span><span><strong>Readable by Design:</strong> Calculations stay in <strong>plain text</strong>, making your work easy to scan, revisit, and share as notes.</span></li>
                     <li><span className="emoji-bullet">🔒</span><span><strong>Local-First Privacy:</strong> Your worksheets and settings stay securely on your machine, ensuring your data remains private.</span></li>
                 </ul>

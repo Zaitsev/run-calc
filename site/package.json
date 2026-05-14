@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build --ssr src/staticSite.tsx --outDir .ssr-temp && node scripts/build-static-site.mjs",
+    "build": "tsc && vite build && vite build --ssr src/staticSite.tsx --outDir .ssr-temp && node scripts/build-static-site.mjs",
     "preview": "vite preview",
     "deploy": "firebase deploy --only hosting",
     "deploy:build": "npm run build && firebase deploy --only hosting"
