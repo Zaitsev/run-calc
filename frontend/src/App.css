@@ -211,20 +211,31 @@
 }
 
 .worksheet-tab-rename {
-    width: 110px;
-    border: 1px solid var(--radio-accent);
-    border-radius: 4px;
-    background: var(--editor-background);
+    width: 100%;
+    min-width: 0;
+    border: none;
+    border-bottom: 1px solid var(--radio-accent);
+    border-radius: 0;
+    background: transparent;
     color: var(--editor-foreground);
     font-size: 12px;
-    padding: 2px 4px;
+    padding: 1px 2px;
     outline: none;
+}
+
+.worksheet-tab--renaming {
+    overflow: visible;
+    z-index: 5;
 }
 
 .worksheet-tabs--left .worksheet-tab-rename {
     width: 22px;
     min-height: 72px;
     writing-mode: vertical-rl;
+    border-bottom: none;
+    border: 1px solid var(--radio-accent);
+    border-radius: 4px;
+    background: var(--editor-background);
 }
 
 .worksheet-tab-menu {

@@ -33,6 +33,18 @@ export const helpContent: HelpContentMap = {
         'Ctrl/Cmd + Q: Quit (your work is saved).',
         'Press Escape twice quickly: Hide app window.'
     ],
+    worksheets: [
+        'Worksheets are independent tabs — each has its own expressions, variables, and results.',
+        'Create a new worksheet with the + button in the tab bar, or press Ctrl/Cmd + N.',
+        'Switch between worksheets by clicking a tab. Your work on each is preserved automatically.',
+        'Rename a worksheet by double-clicking its tab, or right-click → Rename. Press Enter to confirm, Escape to cancel.',
+        'Close a worksheet by clicking the × button on its tab, or right-click → Delete worksheet. The last worksheet cannot be closed.',
+        'Tabs resize dynamically — they share the available width and shrink as you open more.',
+        'Tab position (top, bottom, or left sidebar) can be changed in Settings → Worksheet tabs position.',
+        'Save a worksheet to an encrypted file: right-click the tab → Save to file.',
+        'Load a previously saved worksheet: right-click the tab → Load from file.',
+        'Variables and results are isolated: a variable defined in one worksheet is not visible in another.',
+    ],
     new: [
         'Version 0.5.1 - First Test-Drive Release',
         'This is the initial test-drive version of Run-Calc. All core features are included and ready for feedback.',

@@ -157,7 +157,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                     return (
                         <div
                             key={worksheet.id}
-                            className={`worksheet-tab${isActive ? ' worksheet-tab--active' : ''}`}
+                            className={`worksheet-tab${isActive ? ' worksheet-tab--active' : ''}${isRenaming ? ' worksheet-tab--renaming' : ''}`}
                             role="tab"
                             aria-selected={isActive}
                             title={worksheet.name}
@@ -182,6 +182,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                                     value={renameValue}
                                     onChange={(event) => setRenameValue(event.target.value)}
                                     onBlur={() => commitRename(worksheet.id)}
+                                    onClick={(event) => event.stopPropagation()}
                                     onKeyDown={(event) => {
                                         if (event.key === 'Enter') {
                                             event.preventDefault();
@@ -232,6 +233,18 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                     role="menu"
                     style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
                 >
+                    <button
+                        type="button"
+                        className="worksheet-tab-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                            const ws = worksheets.find((w) => w.id === contextMenu.worksheetId);
+                            if (ws) startRename(ws.id, ws.name);
+                            setContextMenu(null);
+                        }}
+                    >
+                        Rename
+                    </button>
                     <button
                         type="button"
                         className="worksheet-tab-menu-item"
