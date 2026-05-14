@@ -30,33 +30,36 @@
 
 .worksheet-tabs {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    background: color-mix(in srgb, var(--window-bg) 88%, var(--statusBar-background));
+    align-items: flex-end;
+    gap: 0;
+    padding: 6px 8px 0;
+    background: color-mix(in srgb, var(--window-bg) 70%, var(--statusBar-background) 30%);
     border-bottom: 1px solid var(--editorGroup-border);
     z-index: 10;
 }
 
 .worksheet-tabs--bottom {
+    align-items: flex-start;
+    padding: 0 8px 6px;
     border-top: 1px solid var(--editorGroup-border);
     border-bottom: none;
 }
 
 .worksheet-tabs--left {
-    width: 38px;
+    align-items: center;
     flex-direction: column;
     justify-content: flex-start;
+    width: 38px;
     border-right: 1px solid var(--editorGroup-border);
     border-bottom: none;
     padding: 8px 4px;
-    gap: 8px;
+    gap: 4px;
 }
 
 .worksheet-tabs-list {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-end;
+    flex: 1 1 0;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -68,38 +71,103 @@
 
 .worksheet-tabs--left .worksheet-tabs-list {
     flex-direction: column;
+    align-items: center;
     overflow-x: visible;
     overflow-y: auto;
     width: 100%;
+    gap: 4px;
 }
 
-.worksheet-tabs-add,
-.worksheet-tab {
-    border: 1px solid var(--sideBar-border);
-    background: color-mix(in srgb, var(--editor-background) 80%, transparent);
-    color: var(--editor-foreground);
-    border-radius: 8px;
-    min-height: 28px;
-    padding: 0 10px;
+/* Add button */
+.worksheet-tabs-add {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--descriptionForeground);
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+    cursor: pointer;
+    margin: 0 4px 4px;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background 0.1s, color 0.1s;
+}
+
+.worksheet-tabs-add:hover {
+    background: color-mix(in srgb, var(--editor-foreground) 12%, transparent);
+    color: var(--editor-foreground);
+}
+
+/* Tab — inactive */
+.worksheet-tab {
+    position: relative;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    color: color-mix(in srgb, var(--editor-foreground) 55%, transparent);
+    border-radius: 8px 8px 0 0;
+    min-height: 34px;
+    padding: 0 8px 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     cursor: pointer;
     font-size: 12px;
+    margin-bottom: -1px;
+    flex: 1 1 0;
+    min-width: 60px;
+    max-width: 200px;
+    overflow: hidden;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
 }
 
-.worksheet-tabs-add {
-    width: 28px;
-    min-width: 28px;
-    justify-content: center;
-    padding: 0;
-    font-weight: 700;
+.worksheet-tab:hover {
+    background: color-mix(in srgb, var(--editor-background) 55%, transparent);
+    color: var(--editor-foreground);
+    border-color: color-mix(in srgb, var(--editorGroup-border) 70%, transparent);
 }
 
-.worksheet-tab {
-    max-width: 220px;
+/* Active tab — merges with content area */
+.worksheet-tab--active {
+    background: var(--editor-background);
+    border-color: var(--editorGroup-border);
+    color: var(--editor-foreground);
+    z-index: 2;
 }
 
+/* Curved notch where active tab meets the bar */
+.worksheet-tab--active::before,
+.worksheet-tab--active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.worksheet-tab--active::before {
+    left: -12px;
+    border-bottom-right-radius: 8px;
+    box-shadow: 4px 0 0 0 var(--editor-background);
+}
+
+.worksheet-tab--active::after {
+    right: -12px;
+    border-bottom-left-radius: 8px;
+    box-shadow: -4px 0 0 0 var(--editor-background);
+}
+
+/* Left-sidebar tabs — keep pill style, no notch */
 .worksheet-tabs--left .worksheet-tab {
     writing-mode: vertical-rl;
     text-orientation: mixed;
@@ -107,17 +175,26 @@
     width: 28px;
     max-width: 28px;
     padding: 8px 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    margin-bottom: 0;
 }
 
-.worksheet-tab--active {
+.worksheet-tabs--left .worksheet-tab--active {
+    background: color-mix(in srgb, var(--radio-accent) 18%, var(--editor-background));
     border-color: var(--radio-accent);
-    background: color-mix(in srgb, var(--radio-accent) 22%, var(--editor-background));
+}
+
+.worksheet-tabs--left .worksheet-tab--active::before,
+.worksheet-tabs--left .worksheet-tab--active::after {
+    display: none;
 }
 
 .worksheet-tab-index {
     font-size: 10px;
-    font-weight: 700;
-    color: var(--descriptionForeground);
+    font-weight: 600;
+    opacity: 0.55;
+    flex-shrink: 0;
 }
 
 .worksheet-tab-name {
@@ -125,6 +202,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .worksheet-tabs--left .worksheet-tab-name {
@@ -133,13 +211,14 @@
 }
 
 .worksheet-tab-rename {
-    width: 120px;
+    width: 110px;
     border: 1px solid var(--radio-accent);
     border-radius: 4px;
     background: var(--editor-background);
     color: var(--editor-foreground);
     font-size: 12px;
     padding: 2px 4px;
+    outline: none;
 }
 
 .worksheet-tabs--left .worksheet-tab-rename {
@@ -180,14 +259,55 @@
     cursor: not-allowed;
 }
 
+.worksheet-tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: transparent;
+    color: var(--descriptionForeground);
+    border-radius: 50%;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background 0.1s, opacity 0.1s;
+}
+
+.worksheet-tab:hover .worksheet-tab-close,
+.worksheet-tab--active .worksheet-tab-close {
+    opacity: 0.55;
+}
+
+.worksheet-tab-close:hover {
+    opacity: 1 !important;
+    background: color-mix(in srgb, var(--editor-foreground) 15%, transparent);
+    color: var(--editor-foreground);
+}
+
+.worksheet-tab-menu-divider {
+    height: 1px;
+    background: var(--sideBar-border);
+    margin: 4px 0;
+}
+
 .worksheet-tab-active-hint {
     margin-left: auto;
+    margin-bottom: 6px;
     color: var(--descriptionForeground);
     font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .worksheet-tabs--left .worksheet-tab-active-hint {
     margin-left: 0;
+    margin-bottom: 0;
     writing-mode: vertical-rl;
     text-orientation: mixed;
 }

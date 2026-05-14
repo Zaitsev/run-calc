@@ -10,17 +10,23 @@ export function GetAIKeyStatusForSettings(arg1:main.AISettings):Promise<main.AIK
 
 export function GetAISettings():Promise<main.AISettingsResponse>;
 
+export function GetDefaultWorksheetDirectory():Promise<string>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
 
 export function IsRunningAsMSIX():Promise<boolean>;
 
+export function LoadWorksheetFromFile(arg1:string):Promise<main.LoadWorksheetResponse>;
+
 export function OpenThemeStore():Promise<void>;
 
 export function RunAIQuery(arg1:main.AIRunRequest):Promise<main.AIRunResponse>;
 
 export function SaveAISettings(arg1:main.AISettings):Promise<main.AISettingsResponse>;
+
+export function SaveWorksheetToFile(arg1:string,arg2:string):Promise<main.SaveWorksheetResponse>;
 
 export function SearchThemes(arg1:string):Promise<Array<main.OpenVSXExtension>>;
 

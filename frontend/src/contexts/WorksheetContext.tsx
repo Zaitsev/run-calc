@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { WorksheetSnapshot } from '../types/app';
 import { useWorksheetManager } from './WorksheetManagerContext';
 
 type WorksheetContextValue = {
@@ -78,13 +79,19 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const manager = useWorksheetManager();
     const activeWorksheet = manager.worksheets.find(w => w.id === manager.activeId);
 
-    if (!activeWorksheet) {
-        throw new Error('WorksheetProvider: no active worksheet found');
-    }
+    // Provide a default context even during hydration, to avoid null renders
+    const fallbackWorksheet: WorksheetSnapshot = activeWorksheet || {
+        id: manager.activeId || 'temp',
+        name: 'Worksheet',
+        content: '',
+        lastResult: null,
+        markedLines: [],
+        variableValues: {},
+    };
 
-    const [lastResult, setLastResultState] = useState<number | null>(activeWorksheet.lastResult);
-    const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(new Set(activeWorksheet.markedLines));
-    const [variableValues, setVariableValues] = useState<Record<string, unknown>>(activeWorksheet.variableValues);
+    const [lastResult, setLastResultState] = useState<number | null>(fallbackWorksheet.lastResult);
+    const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(new Set(fallbackWorksheet.markedLines));
+    const [variableValues, setVariableValues] = useState<Record<string, unknown>>(fallbackWorksheet.variableValues);
 
     // Session-only state (not persisted)
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
@@ -93,6 +100,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
 
     // Sync local state from active worksheet when it changes
     useEffect(() => {
+        if (!activeWorksheet) return;
         setLastResultState(activeWorksheet.lastResult);
         setMarkedLines(new Set(activeWorksheet.markedLines));
         setVariableValues(activeWorksheet.variableValues);
@@ -100,19 +108,30 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setVariableVersions({});
         setLineDependencies({});
         setLineDependencyVersions({});
-    }, [manager.activeId, activeWorksheet.id]);
+    }, [manager.activeId]);
 
-    // Persist state changes back to manager
+    // Persist state changes back to manager - debounced to avoid excessive updates
+    const persistTimerRef = useRef<number | null>(null);
     useEffect(() => {
-        manager.updateActiveWorksheet({
-            lastResult,
-            markedLines: [...markedLines],
-            variableValues,
-        });
-    }, [lastResult, markedLines, variableValues, manager]);
+        if (persistTimerRef.current !== null) {
+            window.clearTimeout(persistTimerRef.current);
+        }
+        persistTimerRef.current = window.setTimeout(() => {
+            manager.updateActiveWorksheet({
+                lastResult,
+                markedLines: [...markedLines],
+                variableValues,
+            });
+        }, 200);
+
+        return () => {
+            if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
+        };
+    }, [lastResult, markedLines, variableValues]);
 
     const setContent = (next: React.SetStateAction<string>) => {
-        const newContent = typeof next === 'function' ? next(activeWorksheet.content) : next;
+        const currentContent = activeWorksheet?.content || fallbackWorksheet.content;
+        const newContent = typeof next === 'function' ? next(currentContent) : next;
         manager.updateActiveWorksheet({ content: newContent });
     };
 
@@ -126,8 +145,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setVariableVersions({});
         setLineDependencies({});
         setLineDependencyVersions({});
-        localStorage.removeItem(WORKSHEET_CONTENT_STORAGE_KEY);
-        localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
         editorFocusCb?.();
     };
 
@@ -180,7 +197,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
 
     return (
         <WorksheetContext.Provider value={{
-            content: activeWorksheet.content,
+            content: activeWorksheet?.content || fallbackWorksheet.content,
             setContent,
             lastResult,
             setLastResult,

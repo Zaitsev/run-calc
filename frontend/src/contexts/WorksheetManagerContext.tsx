@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { WorksheetSnapshot } from '../types/app';
 import {
@@ -130,23 +130,15 @@ function loadWorksheets(): { worksheets: WorksheetSnapshot[]; activeId: string }
 }
 
 export function WorksheetManagerProvider({ children }: { children: ReactNode }) {
-    const [worksheets, setWorksheets] = useState<WorksheetSnapshot[]>([]);
-    const [activeId, setActiveId] = useState<string>('');
-    const [isHydrated, setIsHydrated] = useState(false);
+    // Use lazy initialization to load from localStorage synchronously
+    const { worksheets: initialWorksheets, activeId: initialActiveId } = loadWorksheets();
+    
+    const [worksheets, setWorksheets] = useState<WorksheetSnapshot[]>(initialWorksheets);
+    const [activeId, setActiveId] = useState<string>(initialActiveId);
     const persistTimerRef = useRef<number | null>(null);
-
-    // Initialize from localStorage on mount
-    useEffect(() => {
-        const { worksheets: loaded, activeId: active } = loadWorksheets();
-        setWorksheets(loaded);
-        setActiveId(active);
-        setIsHydrated(true);
-    }, []);
 
     // Persist worksheets to localStorage (debounced)
     useEffect(() => {
-        if (!isHydrated) return;
-
         if (persistTimerRef.current !== null) {
             window.clearTimeout(persistTimerRef.current);
         }
@@ -158,13 +150,12 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         return () => {
             if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
         };
-    }, [worksheets, isHydrated]);
+    }, [worksheets]);
 
     // Persist active ID to localStorage
     useEffect(() => {
-        if (!isHydrated) return;
         if (activeId) localStorage.setItem(WORKSHEETS_ACTIVE_ID_STORAGE_KEY, activeId);
-    }, [activeId, isHydrated]);
+    }, [activeId]);
 
     const createWorksheet = (name?: string) => {
         const newId = generateWorksheetId();
@@ -221,20 +212,18 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         );
     };
 
-    if (!isHydrated) {
-        return <div style={{ display: 'none' }}>{children}</div>;
-    }
+    const contextValue = useMemo(() => ({
+        worksheets,
+        activeId,
+        createWorksheet,
+        deleteWorksheet,
+        renameWorksheet,
+        switchWorksheet,
+        updateActiveWorksheet,
+    }), [worksheets, activeId]);
 
     return (
-        <WorksheetManagerContext.Provider value={{
-            worksheets,
-            activeId,
-            createWorksheet,
-            deleteWorksheet,
-            renameWorksheet,
-            switchWorksheet,
-            updateActiveWorksheet,
-        }}>
+        <WorksheetManagerContext.Provider value={contextValue}>
             {children}
         </WorksheetManagerContext.Provider>
     );

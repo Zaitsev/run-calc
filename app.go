@@ -2,7 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -202,4 +209,241 @@ func (a *App) unregisterRestoreHotkeyLocked() {
 		_ = hk.Unregister()
 	}
 	a.restoreHotkey = nil
+}
+
+// ===================== Worksheet File I/O (Secure Persistence) =====================
+
+// WorksheetExportPayload is the plaintext structure exported to encrypted file
+type WorksheetExportPayload struct {
+	Content         string                 `json:"content"`
+	LastResult      *float64               `json:"lastResult"`
+	MarkedLines     []int                  `json:"markedLines"`
+	VariableValues  map[string]interface{} `json:"variableValues"`
+}
+
+// WorksheetEncryptedFile is the on-disk format (JSON with base64-encoded ciphertext + nonce)
+type WorksheetEncryptedFile struct {
+	Version    int    `json:"version"`
+	Ciphertext string `json:"ciphertext"` // base64-encoded AES-256-GCM ciphertext
+	Nonce      string `json:"nonce"`      // base64-encoded nonce (12 bytes)
+	KeyID      string `json:"keyId"`      // OS keyring identifier
+}
+
+// SaveWorksheetResponse is returned by SaveWorksheetToFile
+type SaveWorksheetResponse struct {
+	OK       bool   `json:"ok"`
+	Error    string `json:"error,omitempty"`
+	FilePath string `json:"filePath,omitempty"`
+}
+
+// LoadWorksheetResponse is returned by LoadWorksheetFromFile
+type LoadWorksheetResponse struct {
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	Payload *WorksheetExportPayload `json:"payload,omitempty"`
+}
+
+// GetDefaultWorksheetDirectory returns the default directory for saving worksheets
+// (e.g., ~/Documents on all platforms, with platform-specific logic)
+func (a *App) GetDefaultWorksheetDirectory() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to current working directory
+		wd, _ := os.Getwd()
+		return wd
+	}
+
+	// Use Documents on all platforms (Windows: %USERPROFILE%\Documents, macOS/Linux: ~/Documents)
+	docsDir := filepath.Join(homeDir, "Documents")
+	return docsDir
+}
+
+// SaveWorksheetToFile encrypts a worksheet and saves it to a file.
+// The encryption key is stored in the OS keyring (DPAPI on Windows, Keychain on macOS, libsecret on Linux).
+// Format: JSON { version, ciphertext (base64), nonce (base64), keyId }
+func (a *App) SaveWorksheetToFile(worksheetJSON string, filePath string) SaveWorksheetResponse {
+	// Unmarshal the incoming JSON to WorksheetExportPayload to validate
+	var payload WorksheetExportPayload
+	if err := json.Unmarshal([]byte(worksheetJSON), &payload); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("invalid worksheet JSON: %v", err),
+		}
+	}
+
+	// Generate random 32-byte key for AES-256-GCM
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to generate encryption key: %v", err),
+		}
+	}
+
+	// Create AES-256-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create cipher: %v", err),
+		}
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create GCM: %v", err),
+		}
+	}
+
+	// Generate random 12-byte nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to generate nonce: %v", err),
+		}
+	}
+
+	// Encrypt the JSON payload
+	ciphertext := gcm.Seal(nil, nonce, []byte(worksheetJSON), nil)
+
+	// Generate keyID from file hash (user-friendly identifier)
+	keyID := filepath.Base(filePath) // Use filename as keyID for simplicity
+
+	// Store key in OS keyring
+	if err := storeOrCreateWorksheetKey(keyID, key); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to store key in OS keyring: %v", err),
+		}
+	}
+
+	// Create the encrypted file structure
+	encFile := WorksheetEncryptedFile{
+		Version:    1,
+		Ciphertext: base64.StdEncoding.EncodeToString(ciphertext),
+		Nonce:      base64.StdEncoding.EncodeToString(nonce),
+		KeyID:      keyID,
+	}
+
+	// Marshal to JSON
+	encFileJSON, err := json.MarshalIndent(encFile, "", "  ")
+	if err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to marshal encrypted file: %v", err),
+		}
+	}
+
+	// Ensure directory exists
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create directory: %v", err),
+		}
+	}
+
+	// Write to file
+	if err := os.WriteFile(filePath, encFileJSON, 0600); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to write file: %v", err),
+		}
+	}
+
+	return SaveWorksheetResponse{
+		OK:       true,
+		FilePath: filePath,
+	}
+}
+
+// LoadWorksheetFromFile decrypts and loads a worksheet from file.
+// Retrieves the encryption key from OS keyring and decrypts the AES-256-GCM ciphertext.
+func (a *App) LoadWorksheetFromFile(filePath string) LoadWorksheetResponse {
+	// Read the encrypted file
+	encFileJSON, err := os.ReadFile(filePath)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to read file: %v", err),
+		}
+	}
+
+	// Unmarshal the encrypted file structure
+	var encFile WorksheetEncryptedFile
+	if err := json.Unmarshal(encFileJSON, &encFile); err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("invalid encrypted file format: %v", err),
+		}
+	}
+
+	// Retrieve key from OS keyring
+	key, err := getOrCreateWorksheetKey(encFile.KeyID)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to retrieve key from OS keyring: %v", err),
+		}
+	}
+
+	// Decode base64 ciphertext and nonce
+	ciphertext, err := base64.StdEncoding.DecodeString(encFile.Ciphertext)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to decode ciphertext: %v", err),
+		}
+	}
+
+	nonce, err := base64.StdEncoding.DecodeString(encFile.Nonce)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to decode nonce: %v", err),
+		}
+	}
+
+	// Create AES-256-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create cipher: %v", err),
+		}
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create GCM: %v", err),
+		}
+	}
+
+	// Decrypt the JSON payload
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("decryption failed (corrupt file or wrong key): %v", err),
+		}
+	}
+
+	// Unmarshal the plaintext JSON to WorksheetExportPayload
+	var payload WorksheetExportPayload
+	if err := json.Unmarshal(plaintext, &payload); err != nil {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to parse decrypted payload: %v", err),
+		}
+	}
+
+	return LoadWorksheetResponse{
+		OK:      true,
+		Payload: &payload,
+	}
 }
