@@ -40,7 +40,7 @@ export function SettingsPanel({
     onOpenThemeStore,
     onCloseThemeStore,
 }: SettingsPanelProps) {
-    const { display, theme, themeStore, window: windowContext, ai } = useSettingsPanelState();
+    const { display, themeContext, themeStore, window: windowContext, ai } = useSettingsPanelState();
     const { clampSettingsDrawerWidth } = useUIState();
     const { fontScale, setFontScale } = useEditorUI();
 
@@ -62,7 +62,7 @@ export function SettingsPanel({
     };
 
     const handleSetTheme = (themeConfig: any) => {
-        theme.setTheme(themeConfig);
+        themeContext.setTheme(themeConfig);
     };
 
     const { setStatusText, setIsStatusError, setDevError } = useStatus();
@@ -424,7 +424,7 @@ export function SettingsPanel({
                                     { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
                                     { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
                                 ] as const).map((entry) => {
-                                    const isActive = theme.theme.type === entry.key;
+                                    const isActive = themeContext.theme.type === entry.key;
                                     return (
                                         <button
                                             key={entry.key}
@@ -450,7 +450,7 @@ export function SettingsPanel({
 
                             <div className="saved-theme-group" role="group" aria-label="Downloaded themes">
                                 {themeStore.savedThemes.map((entry) => {
-                                    const isActive = theme.theme.type === 'custom' && theme.theme.customId === entry.id;
+                                    const isActive = themeContext.theme.type === 'custom' && themeContext.theme.customId === entry.id;
                                     return (
                                         <div key={entry.id} className="saved-theme-item-wrapper">
                                             <button

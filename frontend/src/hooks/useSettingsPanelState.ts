@@ -10,7 +10,7 @@ export function useSettingsPanelState() {
 
     return {
         display: useDisplaySettings(),
-        theme: { theme, setTheme },
+        themeContext: { theme, setTheme },
         themeStore,
         window: useWindow(),
         ai: useAI(),
