@@ -9,6 +9,11 @@ import {
 } from '../utils/formatting';
 import { reformatComputedLineResult } from '../appInteractionLogic';
 import {
+    AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY,
+    AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY,
+    AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY,
+    DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP,
+    DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES,
     DECIMAL_DELIMITER_STORAGE_KEY,
     PRECISION_STORAGE_KEY,
     SCIENTIFIC_NOTATION_STORAGE_KEY,
@@ -22,6 +27,8 @@ import {
     PRECISION_MAX,
     FINANCIAL_PRECISION,
     FOUR_POINT_PRECISION,
+    MIN_AUTO_LOCK_TIMEOUT_MINUTES,
+    MAX_AUTO_LOCK_TIMEOUT_MINUTES,
 } from '../constants';
 
 type DisplaySettingsContextValue = {
@@ -44,6 +51,12 @@ type DisplaySettingsContextValue = {
     setUIFontScale: React.Dispatch<React.SetStateAction<number>>;
     changeUIFontScale: (direction: 1 | -1) => void;
     resetUIFontScale: () => void;
+    autoLockTimeoutMinutes: number;
+    setAutoLockTimeoutMinutes: (value: number) => void;
+    autoLockOnWindowHide: boolean;
+    setAutoLockOnWindowHide: (value: boolean) => void;
+    autoLockOnSystemSleep: boolean;
+    setAutoLockOnSystemSleep: (value: boolean) => void;
     formatNumber: (value: number, delimiter?: '.' | ',', prec?: PrecisionMode, sci?: boolean) => string;
     /** Call this to trigger a re-format pass on worksheet content when precision/delimiter changes.
      *  Accepts a setContent-like updater from WorksheetContext. */
@@ -88,6 +101,27 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, parsed));
     });
 
+    const [autoLockTimeoutMinutes, setAutoLockTimeoutMinutesState] = useState(() => {
+        const raw = localStorage.getItem(AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY);
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+            return DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES;
+        }
+        return Math.min(MAX_AUTO_LOCK_TIMEOUT_MINUTES, Math.max(MIN_AUTO_LOCK_TIMEOUT_MINUTES, Math.round(parsed)));
+    });
+
+    const [autoLockOnWindowHide, setAutoLockOnWindowHideState] = useState(() =>
+        localStorage.getItem(AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY) === 'true'
+    );
+
+    const [autoLockOnSystemSleep, setAutoLockOnSystemSleepState] = useState(() => {
+        const raw = localStorage.getItem(AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY);
+        if (raw === null) {
+            return DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP;
+        }
+        return raw === 'true';
+    });
+
     const precisionIncreasedRef = useRef(false);
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
 
@@ -119,8 +153,26 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(UI_FONT_SCALE_STORAGE_KEY, String(uiFontScale));
     }, [uiFontScale]);
 
+    useEffect(() => {
+        localStorage.setItem(AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY, String(autoLockTimeoutMinutes));
+    }, [autoLockTimeoutMinutes]);
+
+    useEffect(() => {
+        localStorage.setItem(AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY, String(autoLockOnWindowHide));
+    }, [autoLockOnWindowHide]);
+
+    useEffect(() => {
+        localStorage.setItem(AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY, String(autoLockOnSystemSleep));
+    }, [autoLockOnSystemSleep]);
+
     const setDecimalDelimiterMode = (mode: DecimalDelimiterMode) => setDecimalDelimiterModeState(mode);
     const setScientificNotation = (v: boolean) => setScientificNotationState(v);
+    const setAutoLockTimeoutMinutes = (value: number) => {
+        const normalized = Math.min(MAX_AUTO_LOCK_TIMEOUT_MINUTES, Math.max(MIN_AUTO_LOCK_TIMEOUT_MINUTES, Math.round(value)));
+        setAutoLockTimeoutMinutesState(normalized);
+    };
+    const setAutoLockOnWindowHide = (value: boolean) => setAutoLockOnWindowHideState(value);
+    const setAutoLockOnSystemSleep = (value: boolean) => setAutoLockOnSystemSleepState(value);
 
     const changeUIFontScale = (direction: 1 | -1) => {
         setUIFontScale((current) => {
@@ -196,6 +248,12 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
             setUIFontScale,
             changeUIFontScale,
             resetUIFontScale,
+            autoLockTimeoutMinutes,
+            setAutoLockTimeoutMinutes,
+            autoLockOnWindowHide,
+            setAutoLockOnWindowHide,
+            autoLockOnSystemSleep,
+            setAutoLockOnSystemSleep,
             formatNumber: fmtNumber,
             reformatContent,
             precisionIncreasedRef,

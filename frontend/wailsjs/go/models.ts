@@ -246,6 +246,8 @@ export namespace main {
 	    lastResult?: number;
 	    markedLines: number[];
 	    variableValues: Record<string, any>;
+	    isLocked?: boolean;
+	    lockPasswordHash?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorksheetExportPayload(source);
@@ -257,6 +259,8 @@ export namespace main {
 	        this.lastResult = source["lastResult"];
 	        this.markedLines = source["markedLines"];
 	        this.variableValues = source["variableValues"];
+	        this.isLocked = source["isLocked"];
+	        this.lockPasswordHash = source["lockPasswordHash"];
 	    }
 	}
 	export class LoadWorksheetResponse {

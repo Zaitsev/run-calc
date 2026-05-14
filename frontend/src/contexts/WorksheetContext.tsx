@@ -87,6 +87,8 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         lastResult: null,
         markedLines: [],
         variableValues: {},
+        isLocked: false,
+        lockPasswordHash: undefined,
     };
 
     const [lastResult, setLastResultState] = useState<number | null>(fallbackWorksheet.lastResult);

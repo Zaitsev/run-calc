@@ -34,6 +34,7 @@ type App struct {
 	themeSearchMu       sync.Mutex
 	themeSearchCancel   context.CancelFunc
 	themeSearchActiveID uint64
+	sleepMonitorCancel  context.CancelFunc
 	aiMu                sync.Mutex
 }
 
@@ -51,12 +52,48 @@ func (a *App) startup(ctx context.Context) {
 	a.restoreShortcutOn.Store(!isRunningAsMSIX())
 	a.startTray()
 	a.ensureRestoreHotkeyRegistration()
+	a.startSleepResumeMonitor()
 	a.ShowWindow()
 }
 
 func (a *App) shutdown(ctx context.Context) {
 	a.stopTray()
 	a.unregisterRestoreHotkey()
+	if a.sleepMonitorCancel != nil {
+		a.sleepMonitorCancel()
+		a.sleepMonitorCancel = nil
+	}
+}
+
+func (a *App) startSleepResumeMonitor() {
+	if a.ctx == nil {
+		return
+	}
+
+	if a.sleepMonitorCancel != nil {
+		a.sleepMonitorCancel()
+	}
+
+	monitorCtx, cancel := context.WithCancel(a.ctx)
+	a.sleepMonitorCancel = cancel
+
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		lastTick := time.Now()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				if now.Sub(lastTick) > 2*time.Minute {
+					wruntime.EventsEmit(a.ctx, "system:resume")
+				}
+				lastTick = now
+			}
+		}
+	}(monitorCtx)
 }
 
 // Greet returns a greeting for the given name
@@ -115,6 +152,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 
+	wruntime.EventsEmit(ctx, "window:hidden")
 	wruntime.WindowHide(ctx)
 	return true
 }
@@ -219,6 +257,8 @@ type WorksheetExportPayload struct {
 	LastResult      *float64               `json:"lastResult"`
 	MarkedLines     []int                  `json:"markedLines"`
 	VariableValues  map[string]interface{} `json:"variableValues"`
+	IsLocked        bool                   `json:"isLocked,omitempty"`
+	LockPasswordHash string                `json:"lockPasswordHash,omitempty"`
 }
 
 // WorksheetEncryptedFile is the on-disk format (JSON with base64-encoded ciphertext + nonce)

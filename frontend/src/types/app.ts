@@ -24,6 +24,8 @@ export type WorksheetSnapshot = {
     lastResult: number | null;
     markedLines: number[];
     variableValues: Record<string, unknown>;
+    isLocked: boolean;
+    lockPasswordHash?: string;
 };
 
 export type IdentifierContext = {

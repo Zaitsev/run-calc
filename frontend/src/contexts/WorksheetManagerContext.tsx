@@ -17,6 +17,9 @@ type WorksheetManagerContextValue = {
     deleteWorksheet: (id: string) => void;
     renameWorksheet: (id: string, name: string) => void;
     switchWorksheet: (id: string) => void;
+    lockWorksheet: (id: string, passwordHash: string) => void;
+    lockProtectedWorksheets: () => void;
+    unlockWorksheet: (id: string) => void;
     updateActiveWorksheet: (updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => void;
 };
 
@@ -65,6 +68,8 @@ function migrateFromLegacyStorage(): WorksheetSnapshot | null {
         lastResult,
         markedLines,
         variableValues,
+        isLocked: false,
+        lockPasswordHash: undefined,
     };
 
     // Clear legacy storage keys
@@ -96,7 +101,11 @@ function loadWorksheets(): { worksheets: WorksheetSnapshot[]; activeId: string }
                         ((w as any).lastResult === null || typeof (w as any).lastResult === 'number') &&
                         Array.isArray((w as any).markedLines) &&
                         typeof (w as any).variableValues === 'object';
-                });
+                }).map((w) => ({
+                    ...w,
+                    isLocked: typeof (w as any).isLocked === 'boolean' ? (w as any).isLocked : false,
+                    lockPasswordHash: typeof (w as any).lockPasswordHash === 'string' ? (w as any).lockPasswordHash : undefined,
+                }));
             }
         } catch { /* ignore */ }
     }
@@ -116,6 +125,8 @@ function loadWorksheets(): { worksheets: WorksheetSnapshot[]; activeId: string }
             lastResult: null,
             markedLines: [],
             variableValues: {},
+            isLocked: false,
+            lockPasswordHash: undefined,
         }];
     }
 
@@ -167,6 +178,8 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
             lastResult: null,
             markedLines: [],
             variableValues: {},
+            isLocked: false,
+            lockPasswordHash: undefined,
         };
         setWorksheets(prev => [...prev, newWorksheet]);
         setActiveId(newId);
@@ -199,6 +212,30 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         }
     };
 
+    const lockWorksheet = (id: string, passwordHash: string) => {
+        if (!passwordHash.trim()) return;
+        setWorksheets(prev =>
+            prev.map((w) => w.id === id ? { ...w, isLocked: true, lockPasswordHash: passwordHash } : w)
+        );
+    };
+
+    const lockProtectedWorksheets = () => {
+        setWorksheets((prev) =>
+            prev.map((w) => {
+                if (!w.lockPasswordHash || w.isLocked) {
+                    return w;
+                }
+                return { ...w, isLocked: true };
+            })
+        );
+    };
+
+    const unlockWorksheet = (id: string) => {
+        setWorksheets(prev =>
+            prev.map((w) => w.id === id ? { ...w, isLocked: false } : w)
+        );
+    };
+
     const updateActiveWorksheet = (updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
         setWorksheets(prev =>
             prev.map(w =>
@@ -219,6 +256,9 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         deleteWorksheet,
         renameWorksheet,
         switchWorksheet,
+        lockWorksheet,
+        lockProtectedWorksheets,
+        unlockWorksheet,
         updateActiveWorksheet,
     }), [worksheets, activeId]);
 

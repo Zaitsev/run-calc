@@ -198,10 +198,9 @@
     display: none;
 }
 
-.worksheet-tab-index {
-    font-size: 10px;
-    font-weight: 600;
-    opacity: 0.55;
+.worksheet-tab-lock {
+    font-size: 11px;
+    opacity: 0.7;
     flex-shrink: 0;
 }
 
@@ -635,6 +634,10 @@
     isolation: isolate;
 }
 
+.editor-overlay--locked {
+    z-index: 2;
+}
+
 .editor-overlay::before {
     content: '';
     position: absolute;
@@ -653,9 +656,78 @@
     z-index: 1;
 }
 
+.editor-lock-screen {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    width: min(420px, calc(100% - 40px));
+    padding: 22px 24px;
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--editorGroup-border) 68%, transparent);
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--editor-background) 88%, transparent),
+            color-mix(in srgb, var(--statusBar-background) 28%, var(--editor-background))
+        );
+    box-shadow: 0 18px 50px color-mix(in srgb, var(--editorGroup-border) 22%, transparent);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+}
+
+.editor-lock-screen-icon {
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.editor-lock-screen-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--editor-foreground);
+    margin-bottom: 8px;
+}
+
+.editor-lock-screen-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--editor-foreground) 76%, transparent);
+}
+
+.editor-lock-screen-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.editor-lock-screen-btn {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--gutter-var-color);
+    color: var(--button-primary-foreground);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.editor-lock-screen-btn:hover {
+    opacity: 0.92;
+}
+
+.editor-lock-screen-btn:active {
+    transform: translateY(1px);
+}
+
 @media (max-width: 720px) {
     .editor-overlay::before {
         background-size: min(82vmin, calc(100vw - 32px)) auto;
+    }
+
+    .editor-lock-screen {
+        width: min(360px, calc(100% - 28px));
+        padding: 18px 18px;
     }
 }
 
@@ -890,6 +962,55 @@
     margin: 0 0 24px 0;
     font-size: 14px;
     line-height: 1.5;
+}
+
+.password-modal {
+    min-width: min(420px, calc(100vw - 24px));
+}
+
+.password-modal-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.password-modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--editor-foreground);
+}
+
+.password-modal-input {
+    width: 100%;
+    border: 1px solid var(--editorGroup-border);
+    border-radius: 6px;
+    background: var(--input-background, var(--editor-background));
+    color: var(--editor-foreground);
+    padding: 10px 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.password-modal-input:focus {
+    outline: 1px solid color-mix(in srgb, var(--radio-accent) 70%, transparent);
+    border-color: color-mix(in srgb, var(--radio-accent) 70%, transparent);
+}
+
+.password-modal-input::-ms-reveal,
+.password-modal-input::-ms-clear {
+    color: var(--editor-foreground);
+    background-color: transparent;
+}
+
+.password-modal-error {
+    margin-bottom: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--editorError-foreground);
 }
 
 .recalc-modal-actions {
@@ -1877,6 +1998,31 @@ html[data-theme="dark"] .settings-provider-icon--invert {
 .settings-row-desc--error {
     margin-top: 6px;
     color: var(--statusBarItem-errorBackground);
+    font-weight: 600;
+}
+
+.settings-slider-block {
+    width: 100%;
+}
+
+.settings-range {
+    width: 100%;
+    accent-color: var(--radio-accent);
+    cursor: pointer;
+}
+
+.settings-slider-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 0.75em;
+    color: var(--descriptionForeground);
+    gap: 8px;
+}
+
+.settings-slider-meta span:nth-child(2) {
+    color: var(--sideBarTitle-foreground);
     font-weight: 600;
 }
 

@@ -39,10 +39,20 @@ export const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
 export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
 export const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 export const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
+export const AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY = 'calc.lock.autoLockTimeoutMinutes';
+export const AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY = 'calc.lock.autoLockOnWindowHide';
+export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystemSleep';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
 export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
 export const WORKSHEETS_ACTIVE_ID_STORAGE_KEY = 'calc.worksheets.activeId';
 export const WORKSHEETS_TAB_POSITION_STORAGE_KEY = 'calc.worksheets.tabPosition';
+
+export const DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES = 5;
+export const MIN_AUTO_LOCK_TIMEOUT_MINUTES = 0;
+export const MAX_AUTO_LOCK_TIMEOUT_MINUTES = 30;
+export const DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP = true;
+export const AUTO_LOCK_SLEEP_GAP_MS = 120000;
+export const AUTO_LOCK_SLEEP_CHECK_INTERVAL_MS = 30000;
 
 // Timing
 export const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;

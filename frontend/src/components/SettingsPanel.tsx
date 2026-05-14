@@ -90,6 +90,12 @@ export function SettingsPanel({
         await ai.clearAIKeyInBackend(withStatusSetters);
     };
 
+    const formatAutoLockTimeout = (minutes: number) => {
+        if (minutes <= 0) return 'Off';
+        if (minutes === 1) return '1 minute';
+        return `${minutes} minutes`;
+    };
+
     return (
         <div
             className={`settings-panel settings-panel--main${showSettings ? ' settings-panel--open' : ''}${showThemeStore ? ' settings-panel--theme-store' : ''}`}
@@ -280,6 +286,64 @@ export function SettingsPanel({
                                     </span>
                                 </label>
                             ))}
+                        </div>
+                    </div>
+                    <p className="settings-section-label">Privacy</p>
+                    <div className="settings-card">
+                        <div className="settings-row settings-row--stack">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Inactivity auto-lock</div>
+                                <div className="settings-row-desc">Automatically lock the current protected worksheet after inactivity.</div>
+                            </div>
+                            <div className="settings-slider-block">
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={30}
+                                    step={1}
+                                    className="settings-range"
+                                    value={display.autoLockTimeoutMinutes}
+                                    onChange={(event) => display.setAutoLockTimeoutMinutes(Number(event.target.value))}
+                                    aria-label="Auto-lock timeout in minutes"
+                                />
+                                <div className="settings-slider-meta">
+                                    <span>Off</span>
+                                    <span>{formatAutoLockTimeout(display.autoLockTimeoutMinutes)}</span>
+                                    <span>30 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Lock on minimize or hide</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets when the window is hidden or minimized.</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle lock on minimize or hide">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoLockOnWindowHide}
+                                    onChange={(e) => display.setAutoLockOnWindowHide(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Lock on system sleep/resume</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets after the computer wakes from sleep.</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle lock on system sleep/resume">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoLockOnSystemSleep}
+                                    onChange={(e) => display.setAutoLockOnSystemSleep(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
                         </div>
                     </div>
            {/* ── Calculation ── */}
