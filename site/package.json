@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --ssr src/staticSite.tsx --outDir .ssr-temp && node scripts/build-static-site.mjs",
     "preview": "vite preview",
     "deploy": "firebase deploy --only hosting",
     "deploy:build": "npm run build && firebase deploy --only hosting"
@@ -13,8 +13,7 @@
   "dependencies": {
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "react-router-dom": "^7.9.5"
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

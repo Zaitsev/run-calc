@@ -5,7 +5,7 @@ import { Sparkles } from 'lucide-react';
 
 export function WhatsNewPage() {
     return (
-        <HelpLayout title="What's New" subtitle="Current release highlights and behavior updates.">
+        <HelpLayout currentPage="whats-new" title="What's New" subtitle="Current release highlights and behavior updates.">
             <section className="panel">
                 <h2 className="icon-heading"><Sparkles size={20} />Latest Highlights</h2>
                 <HelpList items={helpContent.new} />

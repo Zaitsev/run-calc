@@ -5,7 +5,7 @@ const ext = { target: '_blank', rel: 'noopener noreferrer' };
 
 export function BYOKPage() {
     return (
-        <HelpLayout title="AI Key Setup" subtitle="Connect AI in a few simple steps, even if you are not technical.">
+        <HelpLayout currentPage="byok" title="AI Key Setup" subtitle="Connect AI in a few simple steps, even if you are not technical.">
             <section className="panel">
                 <h2 className="icon-heading"><HelpCircle size={20} />How it works</h2>
                 <p>

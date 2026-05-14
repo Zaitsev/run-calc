@@ -5,7 +5,7 @@ import { Keyboard } from 'lucide-react';
 
 export function ShortcutsPage() {
     return (
-        <HelpLayout title="Keyboard Shortcuts" subtitle="Fast interaction and navigation inside the app.">
+        <HelpLayout currentPage="shortcuts" title="Keyboard Shortcuts" subtitle="Fast interaction and navigation inside the app.">
             <section className="panel">
                 <h2 className="icon-heading"><Keyboard size={20} />Shortcuts</h2>
                 <HelpList items={helpContent.shortcuts} />

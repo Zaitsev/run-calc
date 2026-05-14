@@ -1,42 +1,47 @@
-import { NavLink } from 'react-router-dom';
 import type { PropsWithChildren } from 'react';
+
+export type SitePageKey = 'overview' | 'operations' | 'shortcuts' | 'functions' | 'byok' | 'themes' | 'whats-new' | 'privacy';
 
 type HelpLayoutProps = PropsWithChildren<{
     title: string;
     subtitle: string;
+    currentPage: SitePageKey;
 }>;
 
-export function HelpLayout({ title, subtitle, children }: HelpLayoutProps) {
+type NavItem = {
+    key: SitePageKey;
+    label: string;
+    href: string;
+};
+
+const navItems: NavItem[] = [
+    { key: 'overview', label: 'Overview', href: '/' },
+    { key: 'operations', label: 'Operations', href: '/operations' },
+    { key: 'shortcuts', label: 'Shortcuts', href: '/shortcuts' },
+    { key: 'functions', label: 'Functions', href: '/functions' },
+    { key: 'byok', label: 'AI key Setup', href: '/byok' },
+    { key: 'themes', label: 'Themes', href: '/themes' },
+    { key: 'whats-new', label: "What's New", href: '/whats-new' },
+    { key: 'privacy', label: 'Privacy', href: '/privacy' },
+];
+
+export function HelpLayout({ title, subtitle, currentPage, children }: HelpLayoutProps) {
     return (
         <main className="container">
             <header>
                 <h1><img src="/hare-calc-128.png" alt="" width={64} height={64} style={{ verticalAlign: 'middle', marginRight: '0.4em' }} />{title}</h1>
                 <p className="subtitle">{subtitle}</p>
                 <nav aria-label="Main help pages">
-                    <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Overview
-                    </NavLink>
-                    <NavLink to="/operations" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Operations
-                    </NavLink>
-                    <NavLink to="/shortcuts" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Shortcuts
-                    </NavLink>
-                    <NavLink to="/functions" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Functions
-                    </NavLink>
-                    <NavLink to="/byok" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        AI key Setup
-                    </NavLink>
-                    <NavLink to="/themes" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Themes
-                    </NavLink>
-                    <NavLink to="/whats-new" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        What's New
-                    </NavLink>
-                    <NavLink to="/privacy" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                        Privacy
-                    </NavLink>
+                    {navItems.map((item) => (
+                        <a
+                            key={item.key}
+                            href={item.href}
+                            className={`nav-link${item.key === currentPage ? ' active' : ''}`}
+                            aria-current={item.key === currentPage ? 'page' : undefined}
+                        >
+                            {item.label}
+                        </a>
+                    ))}
                     <a
                         href="https://github.com/Zaitsev/run-calc/releases"
                         className="nav-link"

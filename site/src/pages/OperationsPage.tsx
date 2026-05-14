@@ -5,7 +5,7 @@ import { PlayCircle, BookOpen } from 'lucide-react';
 
 export function OperationsPage() {
     return (
-        <HelpLayout title="Operations" subtitle="A beginner-friendly path from first formula to practical workflows.">
+        <HelpLayout currentPage="operations" title="Operations" subtitle="A beginner-friendly path from first formula to practical workflows.">
             <section className="panel hero-panel operations-hero">
                 <span className="hero-badge">Start Here</span>
                 <h2 className="hero-title">Learn Run-Calc in four tiny wins</h2>

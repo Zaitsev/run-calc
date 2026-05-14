@@ -12,6 +12,7 @@ export function FunctionsPage() {
 
     return (
         <HelpLayout
+            currentPage="functions"
             title="Function Reference"
             subtitle="Functions currently exposed by the Run-Calc evaluator."
         >
