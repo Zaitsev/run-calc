@@ -2,6 +2,7 @@ import React from 'react';
 import { useEditorUI, useStatus, useThemeContext, useUIState } from '../contexts';
 import { AISettingsPanel } from '../AISettings';
 import { ThemeStore } from '../ThemeStore';
+import type { WorksheetTabPosition } from '../types/app';
 import {
     DEFAULT_FONT_SCALE,
     DEFAULT_UI_FONT_SCALE,
@@ -24,6 +25,8 @@ interface SettingsPanelProps {
     settingsDrawerWidth: number;
     setSettingsDrawerWidth: React.Dispatch<React.SetStateAction<number>>;
     startSettingsDrawerResize: (e: React.MouseEvent<HTMLDivElement>) => void;
+    worksheetTabPosition: WorksheetTabPosition;
+    setWorksheetTabPosition: (position: WorksheetTabPosition) => void;
     onClose: () => void;
     onOpenThemeStore: () => void;
     onCloseThemeStore: () => void;
@@ -36,6 +39,8 @@ export function SettingsPanel({
     settingsDrawerWidth,
     setSettingsDrawerWidth,
     startSettingsDrawerResize,
+    worksheetTabPosition,
+    setWorksheetTabPosition,
     onClose,
     onOpenThemeStore,
     onCloseThemeStore,
@@ -253,6 +258,28 @@ export function SettingsPanel({
                                 />
                                 <span className="settings-toggle-track" />
                             </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="settings-card-title">Worksheet tabs position</div>
+                            <div className="settings-card-desc">Choose where worksheet tabs are displayed</div>
+                        </div>
+                        <div className="settings-options">
+                            {(['top', 'bottom', 'left'] as const).map((position) => (
+                                <label key={position} className="settings-option">
+                                    <input
+                                        type="radio"
+                                        name="worksheet-tabs-position"
+                                        value={position}
+                                        checked={worksheetTabPosition === position}
+                                        onChange={() => setWorksheetTabPosition(position)}
+                                    />
+                                    <span>
+                                        {position === 'top' ? 'Top' : position === 'bottom' ? 'Bottom' : 'Left'}
+                                    </span>
+                                </label>
+                            ))}
                         </div>
                     </div>
            {/* ── Calculation ── */}

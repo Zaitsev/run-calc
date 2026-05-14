@@ -19,6 +19,7 @@ import { HelpPanelContainer } from './components/HelpPanelContainer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StaleBanner } from './components/StaleBanner';
 import { StatusBar } from './components/StatusBar';
+import { WorksheetTabs } from './components/WorksheetTabs';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
 import {
@@ -36,7 +37,7 @@ import {
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
-import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet, useWorksheetManager } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
 import type {
     PrecisionMode,
@@ -51,6 +52,7 @@ import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRec
 
 
 function App() {
+    const { worksheets } = useWorksheetManager();
     const {
         content,
         setContent,
@@ -96,6 +98,8 @@ function App() {
         setShowThemeStore,
         helpPanelPosition,
         setHelpPanelPosition,
+        worksheetTabPosition,
+        setWorksheetTabPosition,
         showIntelligenceHint,
         setShowIntelligenceHint,
         showClearWorksheetConfirm,
@@ -913,7 +917,13 @@ function App() {
 
     return (
         <div id="app" className={`window${helpDockClass}`} style={windowStyle}>
+            {worksheets.length > 0 && worksheetTabPosition === 'top' && (
+                <WorksheetTabs placement="top" />
+            )}
             <div className="editor-container">
+                {worksheets.length > 0 && worksheetTabPosition === 'left' && (
+                    <WorksheetTabs placement="left" />
+                )}
                 <div className="gutter" ref={gutterRef}>
                     <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX, paddingBottom: EDITOR_BOTTOM_PADDING_PX}}>
                         {contentLines.map((_, i) => (
@@ -1129,6 +1139,9 @@ function App() {
                     )}
                 </div>
             </div>
+            {worksheets.length > 0 && worksheetTabPosition === 'bottom' && (
+                <WorksheetTabs placement="bottom" />
+            )}
             <StatusBar />
 
             <SettingsPanel
@@ -1138,6 +1151,8 @@ function App() {
                 settingsDrawerWidth={settingsDrawerWidth}
                 setSettingsDrawerWidth={setSettingsDrawerWidth}
                 startSettingsDrawerResize={startSettingsDrawerResize}
+                worksheetTabPosition={worksheetTabPosition}
+                setWorksheetTabPosition={setWorksheetTabPosition}
                 onClose={() => setShowSettings(false)}
                 onOpenThemeStore={openThemeStoreInSidebar}
                 onCloseThemeStore={closeThemeStoreInSidebar}

@@ -28,6 +28,170 @@
     transition: margin 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.worksheet-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: color-mix(in srgb, var(--window-bg) 88%, var(--statusBar-background));
+    border-bottom: 1px solid var(--editorGroup-border);
+    z-index: 10;
+}
+
+.worksheet-tabs--bottom {
+    border-top: 1px solid var(--editorGroup-border);
+    border-bottom: none;
+}
+
+.worksheet-tabs--left {
+    width: 38px;
+    flex-direction: column;
+    justify-content: flex-start;
+    border-right: 1px solid var(--editorGroup-border);
+    border-bottom: none;
+    padding: 8px 4px;
+    gap: 8px;
+}
+
+.worksheet-tabs-list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.worksheet-tabs-list::-webkit-scrollbar {
+    display: none;
+}
+
+.worksheet-tabs--left .worksheet-tabs-list {
+    flex-direction: column;
+    overflow-x: visible;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.worksheet-tabs-add,
+.worksheet-tab {
+    border: 1px solid var(--sideBar-border);
+    background: color-mix(in srgb, var(--editor-background) 80%, transparent);
+    color: var(--editor-foreground);
+    border-radius: 8px;
+    min-height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.worksheet-tabs-add {
+    width: 28px;
+    min-width: 28px;
+    justify-content: center;
+    padding: 0;
+    font-weight: 700;
+}
+
+.worksheet-tab {
+    max-width: 220px;
+}
+
+.worksheet-tabs--left .worksheet-tab {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    min-height: 80px;
+    width: 28px;
+    max-width: 28px;
+    padding: 8px 0;
+}
+
+.worksheet-tab--active {
+    border-color: var(--radio-accent);
+    background: color-mix(in srgb, var(--radio-accent) 22%, var(--editor-background));
+}
+
+.worksheet-tab-index {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--descriptionForeground);
+}
+
+.worksheet-tab-name {
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.worksheet-tabs--left .worksheet-tab-name {
+    white-space: normal;
+    overflow: visible;
+}
+
+.worksheet-tab-rename {
+    width: 120px;
+    border: 1px solid var(--radio-accent);
+    border-radius: 4px;
+    background: var(--editor-background);
+    color: var(--editor-foreground);
+    font-size: 12px;
+    padding: 2px 4px;
+}
+
+.worksheet-tabs--left .worksheet-tab-rename {
+    width: 22px;
+    min-height: 72px;
+    writing-mode: vertical-rl;
+}
+
+.worksheet-tab-menu {
+    position: fixed;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--sideBar-border);
+    background: var(--sideBar-background);
+    box-shadow: var(--drawer-shadow);
+}
+
+.worksheet-tab-menu-item {
+    border: none;
+    background: transparent;
+    color: var(--sideBarTitle-foreground);
+    text-align: left;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+
+.worksheet-tab-menu-item:hover:not(:disabled) {
+    background: var(--btn-hover-bg);
+}
+
+.worksheet-tab-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.worksheet-tab-active-hint {
+    margin-left: auto;
+    color: var(--descriptionForeground);
+    font-size: 11px;
+}
+
+.worksheet-tabs--left .worksheet-tab-active-hint {
+    margin-left: 0;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+}
+
 .window--help-right .editor-container {
     margin-right: var(--help-panel-side-size);
 }
