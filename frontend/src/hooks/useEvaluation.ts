@@ -392,6 +392,57 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                 }
             }
 
+            // A strict top-to-bottom pass can still leave lines stale when a referenced
+            // variable is reassigned later. Refresh those stale lines against the latest
+            // variable snapshot so the stale banner action always performs visible work.
+            let refreshedStaleCount = 0;
+            for (const [lineKey, dependencySnapshot] of Object.entries(nextLineDependencyVersions)) {
+                const lineIndex = Number(lineKey);
+                if (!Number.isFinite(lineIndex)) {
+                    continue;
+                }
+
+                const hasStaleDependency = Object.entries(dependencySnapshot).some(([name, version]) => {
+                    const currentVersion = workingVariableVersions[name] ?? 0;
+                    return currentVersion !== version;
+                });
+                if (!hasStaleDependency) {
+                    continue;
+                }
+
+                const editableLine = getExpressionSource(nextLines[lineIndex] ?? '');
+                if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                    delete nextLineDependencies[lineIndex];
+                    delete nextLineDependencyVersions[lineIndex];
+                    continue;
+                }
+
+                try {
+                    const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
+                    if (!evalResult.ok) {
+                        throw new Error(evalResult.error || 'Evaluation failed');
+                    }
+
+                    const numberValue = evalResult.numberValue ?? 0;
+                    const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
+                    nextLines[lineIndex] = formatEvaluatedLine(editableLine, formatted);
+
+                    const dependencies = extractExpressionDependencies(editableLine);
+                    const dependencySnapshotAtLatestState: Record<string, number> = {};
+                    dependencies.forEach((name) => {
+                        dependencySnapshotAtLatestState[name] = workingVariableVersions[name] ?? 0;
+                    });
+                    nextLineDependencies[lineIndex] = dependencies;
+                    nextLineDependencyVersions[lineIndex] = dependencySnapshotAtLatestState;
+                    refreshedStaleCount++;
+                } catch {
+                    nextLines[lineIndex] = formatEvaluatedLine(editableLine, 'error');
+                    delete nextLineDependencies[lineIndex];
+                    delete nextLineDependencyVersions[lineIndex];
+                    failedCount++;
+                }
+            }
+
             const nextContent = nextLines.join('\n');
             setContent(nextContent);
             setVariableValues(workingVariables);
@@ -403,8 +454,8 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             setDevError('');
             setStatusText(
                 failedCount > 0
-                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}, ${failedCount} failed`
-                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}`
+                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}${refreshedStaleCount > 0 ? `, refreshed ${refreshedStaleCount} stale` : ''}, ${failedCount} failed`
+                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}${refreshedStaleCount > 0 ? `, refreshed ${refreshedStaleCount} stale` : ''}`
             );
 
             requestAnimationFrame(() => {
