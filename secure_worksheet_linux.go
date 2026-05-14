@@ -98,7 +98,10 @@ func deriveWorksheetKeyFromPassphrase(keyID string) ([]byte, error) {
 	}
 
 	// Derive key using PBKDF2 (100,000 iterations, SHA-256)
-	key := pbkdf2.Key([]byte(passphrase), saltBytes, 100000, 32, sha256.New)
+	key, err := pbkdf2.Key([]byte(passphrase), saltBytes, 100000, 32, sha256.New)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive key from passphrase: %v", err)
+	}
 	return key, nil
 }
 
@@ -126,7 +129,10 @@ func storeWorksheetKeyPassphrase(keyID string, keyBytes []byte) error {
 	synthesizedPassphrase := hex.EncodeToString(keyBytes[:16])
 
 	// Verify we can derive the same key back
-	derivedKey := pbkdf2.Key([]byte(synthesizedPassphrase), salt, 100000, 32, sha256.New)
+	derivedKey, err := pbkdf2.Key([]byte(synthesizedPassphrase), salt, 100000, 32, sha256.New)
+	if err != nil {
+		return fmt.Errorf("failed to derive verification key: %v", err)
+	}
 	if string(derivedKey) != string(keyBytes) {
 		return fmt.Errorf("passphrase derivation mismatch (should derive to same key)")
 	}
