@@ -6,3 +6,4 @@ export { UIStateProvider, useUIState } from './UIStateContext';
 export { WindowProvider, useWindow } from './WindowContext';
 export { AIProvider, useAI } from './AIContext';
 export { ThemeStoreProvider, useThemeStore } from './ThemeStoreContext';
+export { ThemeProvider, useThemeContext } from './ThemeContext';

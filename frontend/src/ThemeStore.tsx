@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SearchThemes, InstallTheme } from '../wailsjs/go/main/App';
-import { useThemeStore } from './contexts';
-import { useTheme } from './useTheme';
+import { useThemeContext, useThemeStore } from './contexts';
 import './ThemeStore.css';
 
 const SEARCH_DEBOUNCE_MS = 1000;
@@ -69,7 +68,7 @@ export interface AcceptedThemeEntry {
 
 export function ThemeStore() {
     const themeStore = useThemeStore();
-    const theme = useTheme();
+    const theme = useThemeContext();
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [results, setResults] = useState<ThemeSearchResult[]>([]);

@@ -7,6 +7,7 @@ import {
     DisplaySettingsProvider,
     EditorUIProvider,
     StatusProvider,
+    ThemeProvider,
     ThemeStoreProvider,
     UIStateProvider,
     WindowProvider,
@@ -19,22 +20,24 @@ const root = createRoot(container!)
 
 root.render(
     <React.StrictMode>
-        <StatusProvider>
-            <DisplaySettingsProvider>
-                <WorksheetProvider>
-                    <EditorUIProvider>
-                        <UIStateProvider>
-                            <WindowProvider>
-                                <AIProvider>
-                                    <ThemeStoreProvider>
-                                        <App/>
-                                    </ThemeStoreProvider>
-                                </AIProvider>
-                            </WindowProvider>
-                        </UIStateProvider>
-                    </EditorUIProvider>
-                </WorksheetProvider>
-            </DisplaySettingsProvider>
-        </StatusProvider>
+        <ThemeProvider>
+            <StatusProvider>
+                <DisplaySettingsProvider>
+                    <WorksheetProvider>
+                        <EditorUIProvider>
+                            <UIStateProvider>
+                                <WindowProvider>
+                                    <AIProvider>
+                                        <ThemeStoreProvider>
+                                            <App/>
+                                        </ThemeStoreProvider>
+                                    </AIProvider>
+                                </WindowProvider>
+                            </UIStateProvider>
+                        </EditorUIProvider>
+                    </WorksheetProvider>
+                </DisplaySettingsProvider>
+            </StatusProvider>
+        </ThemeProvider>
     </React.StrictMode>
 )
