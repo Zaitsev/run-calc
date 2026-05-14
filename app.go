@@ -258,6 +258,72 @@ func (a *App) GetDefaultWorksheetDirectory() string {
 	return docsDir
 }
 
+// SelectWorksheetEncryptedSavePath opens native OS save dialog for encrypted worksheet files.
+// Returns empty string if user cancels or dialog fails.
+func (a *App) SelectWorksheetEncryptedSavePath(defaultFileName string) string {
+	if a.ctx == nil {
+		return ""
+	}
+
+	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:               "Save Worksheet (Encrypted)",
+		DefaultDirectory:    a.GetDefaultWorksheetDirectory(),
+		DefaultFilename:     defaultFileName,
+		CanCreateDirectories: true,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Run-Calc Worksheet (*.rcalc)", Pattern: "*.rcalc"},
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	return selectedPath
+}
+
+// SelectWorksheetPlaintextExportPath opens native OS save dialog for plaintext worksheet exports.
+// Returns empty string if user cancels or dialog fails.
+func (a *App) SelectWorksheetPlaintextExportPath(defaultFileName string) string {
+	if a.ctx == nil {
+		return ""
+	}
+
+	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:               "Export Worksheet (Plain Text)",
+		DefaultDirectory:    a.GetDefaultWorksheetDirectory(),
+		DefaultFilename:     defaultFileName,
+		CanCreateDirectories: true,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	return selectedPath
+}
+
+// SelectWorksheetLoadPath opens native OS open dialog for encrypted worksheet files.
+// Returns empty string if user cancels or dialog fails.
+func (a *App) SelectWorksheetLoadPath() string {
+	if a.ctx == nil {
+		return ""
+	}
+
+	selectedPath, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
+		Title:            "Load Worksheet",
+		DefaultDirectory: a.GetDefaultWorksheetDirectory(),
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Run-Calc Worksheet (*.rcalc)", Pattern: "*.rcalc"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	return selectedPath
+}
+
 // SaveWorksheetToFile encrypts a worksheet and saves it to a file.
 // The encryption key is stored in the OS keyring (DPAPI on Windows, Keychain on macOS, libsecret on Linux).
 // Format: JSON { version, ciphertext (base64), nonce (base64), keyId }
@@ -348,6 +414,47 @@ func (a *App) SaveWorksheetToFile(worksheetJSON string, filePath string) SaveWor
 
 	// Write to file
 	if err := os.WriteFile(filePath, encFileJSON, 0600); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to write file: %v", err),
+		}
+	}
+
+	return SaveWorksheetResponse{
+		OK:       true,
+		FilePath: filePath,
+	}
+}
+
+// ExportWorksheetPlaintextToFile saves a worksheet payload as readable plaintext JSON.
+// This is intended for explicit export workflows where encryption is not required.
+func (a *App) ExportWorksheetPlaintextToFile(worksheetJSON string, filePath string) SaveWorksheetResponse {
+	// Validate and normalize payload first
+	var payload WorksheetExportPayload
+	if err := json.Unmarshal([]byte(worksheetJSON), &payload); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("invalid worksheet JSON: %v", err),
+		}
+	}
+
+	plaintextJSON, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to marshal plaintext worksheet: %v", err),
+		}
+	}
+
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to create directory: %v", err),
+		}
+	}
+
+	if err := os.WriteFile(filePath, plaintextJSON, 0600); err != nil {
 		return SaveWorksheetResponse{
 			OK:    false,
 			Error: fmt.Sprintf("failed to write file: %v", err),

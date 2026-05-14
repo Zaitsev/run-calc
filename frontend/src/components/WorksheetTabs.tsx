@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { WorksheetTabPosition, WorksheetSnapshot } from '../types/app';
 import { useWorksheetManager, useWorksheet } from '../contexts';
-import { SaveWorksheetToFile, LoadWorksheetFromFile, GetDefaultWorksheetDirectory } from '../../wailsjs/go/main/App';
+import {
+    SaveWorksheetToFile,
+    LoadWorksheetFromFile,
+    ExportWorksheetPlaintextToFile,
+    SelectWorksheetEncryptedSavePath,
+    SelectWorksheetPlaintextExportPath,
+    SelectWorksheetLoadPath,
+} from '../../wailsjs/go/main/App';
 
 type WorksheetTabsProps = {
     placement: WorksheetTabPosition;
@@ -29,7 +36,12 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
     const [renameValue, setRenameValue] = useState('');
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
+    const contextMenuOffsetX = 2;
+    const contextMenuOffsetY = placement === 'bottom' ? -8 : 2;
 
     useEffect(() => {
         if (!contextMenu) return;
@@ -46,12 +58,36 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         };
     }, [contextMenu]);
 
-    const canDeleteWorksheet = worksheets.length > 1;
+    useEffect(() => {
+        if (!contextMenu || !contextMenuRef.current) return;
 
-    const activeIndex = useMemo(() => {
-        const index = worksheets.findIndex((w) => w.id === activeId);
-        return index < 0 ? 0 : index;
-    }, [worksheets, activeId]);
+        const margin = 8;
+        const rect = contextMenuRef.current.getBoundingClientRect();
+        let nextX = contextMenu.x;
+        let nextY = contextMenu.y;
+
+        if (rect.right > window.innerWidth - margin) {
+            nextX = Math.max(margin, contextMenu.x - (rect.right - (window.innerWidth - margin)));
+        }
+        if (rect.bottom > window.innerHeight - margin) {
+            nextY = Math.max(margin, contextMenu.y - (rect.bottom - (window.innerHeight - margin)));
+        }
+        if (rect.left < margin) {
+            nextX = margin;
+        }
+        if (rect.top < margin) {
+            nextY = margin;
+        }
+
+        if (nextX !== contextMenu.x || nextY !== contextMenu.y) {
+            setContextMenu((prev) => {
+                if (!prev) return prev;
+                return { ...prev, x: nextX, y: nextY };
+            });
+        }
+    }, [contextMenu]);
+
+    const canDeleteWorksheet = worksheets.length > 1;
 
     const startRename = (worksheetId: string, currentName: string) => {
         setRenamingId(worksheetId);
@@ -62,6 +98,45 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         renameWorksheet(worksheetId, renameValue);
         setRenamingId(null);
         setRenameValue('');
+    };
+
+    const handleExportPlainText = async (worksheetId: string) => {
+        const worksheet = worksheets.find((w) => w.id === worksheetId);
+        if (!worksheet) return;
+
+        setIsExporting(true);
+        try {
+            const payload = {
+                content: worksheet.content,
+                lastResult: worksheet.lastResult ?? null,
+                markedLines: worksheet.markedLines,
+                variableValues: worksheet.variableValues,
+            };
+
+            const defaultFileName = `${worksheet.name.replace(/\s+/g, '_')}.rcalc.json`;
+            const filePath = await SelectWorksheetPlaintextExportPath(defaultFileName);
+
+            if (!filePath) {
+                setIsExporting(false);
+                return;
+            }
+
+            const result = await ExportWorksheetPlaintextToFile(
+                JSON.stringify(payload),
+                filePath
+            );
+
+            if (result.ok) {
+                alert(`Plaintext worksheet exported to: ${result.filePath}`);
+            } else {
+                alert(`Failed to export plaintext worksheet: ${result.error}`);
+            }
+        } catch (error) {
+            alert(`Error exporting plaintext worksheet: ${error}`);
+        } finally {
+            setIsExporting(false);
+            setContextMenu(null);
+        }
     };
 
     const handleSaveToFile = async (worksheetId: string) => {
@@ -78,18 +153,8 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                 variableValues: worksheet.variableValues,
             };
 
-            // Get default directory
-            const defaultDir = await GetDefaultWorksheetDirectory();
             const defaultFileName = `${worksheet.name.replace(/\s+/g, '_')}.rcalc`;
-            const defaultPath = `${defaultDir}/${defaultFileName}`;
-
-            // TODO: In production, use Wails file dialog: wruntime.SaveFileDialog()
-            // For now, we'll construct a basic path. File dialog integration requires runtime API.
-            // Example: const filePath = await wruntime.SaveFileDialog(...)
-            const filePath = prompt(
-                `Save worksheet to file (default: ${defaultPath}):`,
-                defaultPath
-            );
+            const filePath = await SelectWorksheetEncryptedSavePath(defaultFileName);
 
             if (!filePath) {
                 setIsSaving(false);
@@ -117,9 +182,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
     const handleLoadFromFile = async (worksheetId: string) => {
         setIsLoading(true);
         try {
-            // TODO: Use Wails file dialog: wruntime.OpenFileDialog()
-            // For now, we'll use prompt to get file path
-            const filePath = prompt('Enter path to worksheet file (.rcalc):');
+            const filePath = await SelectWorksheetLoadPath();
 
             if (!filePath) {
                 setIsLoading(false);
@@ -136,7 +199,13 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                     markedLines: result.payload.markedLines,
                     variableValues: result.payload.variableValues,
                 });
-                alert('Worksheet loaded successfully');
+
+                // Auto-rename tab from the loaded file name
+                const fileNameWithExt = filePath.split(/[\\/]/).pop() ?? filePath;
+                const loadedName = fileNameWithExt.replace(/\.(rcalc|json)$/i, '').trim();
+                if (loadedName) {
+                    renameWorksheet(worksheetId, loadedName);
+                }
             } else {
                 alert(`Failed to load worksheet: ${result.error}`);
             }
@@ -163,6 +232,13 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                             title={worksheet.name}
                             tabIndex={0}
                             onClick={() => switchWorksheet(worksheet.id)}
+                            onMouseDown={(event) => {
+                                if (event.button !== 1) return; // middle click
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (!canDeleteWorksheet) return;
+                                deleteWorksheet(worksheet.id);
+                            }}
                             onKeyDown={(event) => {
                                 if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault();
@@ -172,7 +248,11 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                             onDoubleClick={() => startRename(worksheet.id, worksheet.name)}
                             onContextMenu={(event) => {
                                 event.preventDefault();
-                                setContextMenu({ x: event.clientX, y: event.clientY, worksheetId: worksheet.id });
+                                setContextMenu({
+                                    x: event.clientX + contextMenuOffsetX,
+                                    y: event.clientY + contextMenuOffsetY,
+                                    worksheetId: worksheet.id,
+                                });
                             }}
                         >
                             <span className="worksheet-tab-index">{worksheets.indexOf(worksheet) + 1}</span>
@@ -182,6 +262,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                                     value={renameValue}
                                     onChange={(event) => setRenameValue(event.target.value)}
                                     onBlur={() => commitRename(worksheet.id)}
+                                    onFocus={(event) => event.currentTarget.select()}
                                     onClick={(event) => event.stopPropagation()}
                                     onKeyDown={(event) => {
                                         if (event.key === 'Enter') {
@@ -216,19 +297,20 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                         </div>
                     );
                 })}
+                <button
+                    type="button"
+                    className="worksheet-tabs-add"
+                    onClick={() => createWorksheet()}
+                    title="Add worksheet"
+                    aria-label="Add worksheet"
+                >
+                    +
+                </button>
             </div>
-            <button
-                type="button"
-                className="worksheet-tabs-add"
-                onClick={() => createWorksheet()}
-                title="Add worksheet"
-                aria-label="Add worksheet"
-            >
-                +
-            </button>
 
             {contextMenu && (
                 <div
+                    ref={contextMenuRef}
                     className="worksheet-tab-menu"
                     role="menu"
                     style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
@@ -274,7 +356,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                         type="button"
                         className="worksheet-tab-menu-item"
                         role="menuitem"
-                        disabled={isSaving}
+                        disabled={isSaving || isExporting || isLoading}
                         onClick={() => handleSaveToFile(contextMenu.worksheetId)}
                         title="Save worksheet to encrypted file"
                     >
@@ -284,7 +366,17 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                         type="button"
                         className="worksheet-tab-menu-item"
                         role="menuitem"
-                        disabled={isLoading}
+                        disabled={isSaving || isExporting || isLoading}
+                        onClick={() => handleExportPlainText(contextMenu.worksheetId)}
+                        title="Export worksheet as plaintext JSON"
+                    >
+                        {isExporting ? 'Exporting...' : 'Export plain text'}
+                    </button>
+                    <button
+                        type="button"
+                        className="worksheet-tab-menu-item"
+                        role="menuitem"
+                        disabled={isSaving || isExporting || isLoading}
                         onClick={() => handleLoadFromFile(contextMenu.worksheetId)}
                         title="Load worksheet from encrypted file"
                     >
@@ -293,9 +385,6 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                 </div>
             )}
 
-            <div className="worksheet-tab-active-hint" aria-hidden="true">
-                {activeIndex + 1}/{worksheets.length}
-            </div>
         </div>
     );
 }

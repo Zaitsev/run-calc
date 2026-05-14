@@ -10,6 +10,10 @@ export function EvaluateExprProgram(arg1, arg2) {
   return window['go']['main']['App']['EvaluateExprProgram'](arg1, arg2);
 }
 
+export function ExportWorksheetPlaintextToFile(arg1, arg2) {
+  return window['go']['main']['App']['ExportWorksheetPlaintextToFile'](arg1, arg2);
+}
+
 export function GetAIKeyStatusForSettings(arg1) {
   return window['go']['main']['App']['GetAIKeyStatusForSettings'](arg1);
 }
@@ -56,6 +60,18 @@ export function SaveWorksheetToFile(arg1, arg2) {
 
 export function SearchThemes(arg1) {
   return window['go']['main']['App']['SearchThemes'](arg1);
+}
+
+export function SelectWorksheetEncryptedSavePath(arg1) {
+  return window['go']['main']['App']['SelectWorksheetEncryptedSavePath'](arg1);
+}
+
+export function SelectWorksheetLoadPath() {
+  return window['go']['main']['App']['SelectWorksheetLoadPath']();
+}
+
+export function SelectWorksheetPlaintextExportPath(arg1) {
+  return window['go']['main']['App']['SelectWorksheetPlaintextExportPath'](arg1);
 }
 
 export function SetAIAPIKey(arg1, arg2) {

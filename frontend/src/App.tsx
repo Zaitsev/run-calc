@@ -52,7 +52,7 @@ import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRec
 
 
 function App() {
-    const { worksheets } = useWorksheetManager();
+    const { worksheets, createWorksheet } = useWorksheetManager();
     const {
         content,
         setContent,
@@ -278,7 +278,7 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', () => setShowClearWorksheetConfirm(true));
+        const unsubNew = EventsOn('menu:file:new', () => createWorksheet());
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
@@ -580,6 +580,12 @@ function App() {
         }
 
         const shortcutAction = getPrimaryShortcutAction(event);
+        if (shortcutAction === 'new-worksheet') {
+            event.preventDefault();
+            createWorksheet();
+            return;
+        }
+
         if (shortcutAction === 'insert-line-below') {
             event.preventDefault();
             insertLineBelowCurrent();

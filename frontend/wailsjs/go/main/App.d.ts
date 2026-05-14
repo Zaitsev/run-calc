@@ -6,6 +6,8 @@ export function ClearAIAPIKey(arg1:main.AISettings):Promise<main.AIKeyStatus>;
 
 export function EvaluateExprProgram(arg1:string,arg2:Record<string, any>):Promise<main.ExprEvalResponse>;
 
+export function ExportWorksheetPlaintextToFile(arg1:string,arg2:string):Promise<main.SaveWorksheetResponse>;
+
 export function GetAIKeyStatusForSettings(arg1:main.AISettings):Promise<main.AIKeyStatus>;
 
 export function GetAISettings():Promise<main.AISettingsResponse>;
@@ -29,6 +31,12 @@ export function SaveAISettings(arg1:main.AISettings):Promise<main.AISettingsResp
 export function SaveWorksheetToFile(arg1:string,arg2:string):Promise<main.SaveWorksheetResponse>;
 
 export function SearchThemes(arg1:string):Promise<Array<main.OpenVSXExtension>>;
+
+export function SelectWorksheetEncryptedSavePath(arg1:string):Promise<string>;
+
+export function SelectWorksheetLoadPath():Promise<string>;
+
+export function SelectWorksheetPlaintextExportPath(arg1:string):Promise<string>;
 
 export function SetAIAPIKey(arg1:string,arg2:main.AISettings):Promise<main.AIKeyStatus>;
 
