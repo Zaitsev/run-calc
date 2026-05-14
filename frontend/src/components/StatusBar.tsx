@@ -292,14 +292,14 @@ export function StatusBar() {
                 onClick={() => {
                     if (showSettings) {
                         setShowSettings(false);
-                        setShowThemeStore(false);
+                        closeThemeStoreInSidebar();
                         return;
                     }
                     setShowPrecisionMenu(false);
                     setShowBurgerMenu(false);
                     setShowHelp(false);
                     setShowSettings(true);
-                    setShowThemeStore(false);
+                    closeThemeStoreInSidebar();
                 }}
                 aria-label="Settings"
                 title="Settings"
