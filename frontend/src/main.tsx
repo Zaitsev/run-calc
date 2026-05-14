@@ -11,6 +11,7 @@ import {
     ThemeStoreProvider,
     UIStateProvider,
     WindowProvider,
+    WorksheetManagerProvider,
     WorksheetProvider,
 } from './contexts'
 
@@ -23,19 +24,21 @@ root.render(
         <ThemeProvider>
             <StatusProvider>
                 <DisplaySettingsProvider>
-                    <WorksheetProvider>
-                        <EditorUIProvider>
-                            <UIStateProvider>
-                                <WindowProvider>
-                                    <AIProvider>
-                                        <ThemeStoreProvider>
-                                            <App/>
-                                        </ThemeStoreProvider>
-                                    </AIProvider>
-                                </WindowProvider>
-                            </UIStateProvider>
-                        </EditorUIProvider>
-                    </WorksheetProvider>
+                    <WorksheetManagerProvider>
+                        <WorksheetProvider>
+                            <EditorUIProvider>
+                                <UIStateProvider>
+                                    <WindowProvider>
+                                        <AIProvider>
+                                            <ThemeStoreProvider>
+                                                <App/>
+                                            </ThemeStoreProvider>
+                                        </AIProvider>
+                                    </WindowProvider>
+                                </UIStateProvider>
+                            </EditorUIProvider>
+                        </WorksheetProvider>
+                    </WorksheetManagerProvider>
                 </DisplaySettingsProvider>
             </StatusProvider>
         </ThemeProvider>

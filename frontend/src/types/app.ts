@@ -8,12 +8,22 @@ export type SavedThemeEntry = AcceptedThemeEntry;
 export type DecimalDelimiter = '.' | ',';
 export type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
 export type HelpPanelPosition = 'left' | 'right' | 'bottom';
+export type WorksheetTabPosition = 'top' | 'bottom' | 'left';
 export type SuggestionKind = 'variable' | 'function' | 'constant';
 
 export type SuggestionItem = {
     label: string;
     kind: SuggestionKind;
     matchText: string;
+};
+
+export type WorksheetSnapshot = {
+    id: string;
+    name: string;
+    content: string;
+    lastResult: number | null;
+    markedLines: number[];
+    variableValues: Record<string, unknown>;
 };
 
 export type IdentifierContext = {

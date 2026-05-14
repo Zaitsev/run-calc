@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode, MouseEvent as ReactMouseEvent } from 'react';
-import type { HelpPanelPosition } from '../types/app';
+import type { HelpPanelPosition, WorksheetTabPosition } from '../types/app';
 import {
     HELP_PANEL_POSITION_STORAGE_KEY,
     SETTINGS_DRAWER_WIDTH_STORAGE_KEY,
+    WORKSHEETS_TAB_POSITION_STORAGE_KEY,
     DEFAULT_SETTINGS_DRAWER_WIDTH,
     SETTINGS_DRAWER_MIN_WIDTH,
     SETTINGS_DRAWER_MAX_WIDTH,
@@ -17,6 +18,8 @@ type UIStateContextValue = {
     setShowHelp: (v: boolean) => void;
     helpPanelPosition: HelpPanelPosition;
     setHelpPanelPosition: (v: HelpPanelPosition) => void;
+    worksheetTabPosition: WorksheetTabPosition;
+    setWorksheetTabPosition: (v: WorksheetTabPosition) => void;
     showThemeStore: boolean;
     setShowThemeStore: (v: boolean) => void;
     showBurgerMenu: boolean;
@@ -53,6 +56,11 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
         if (raw === 'left' || raw === 'right' || raw === 'bottom') return raw;
         return 'right';
     });
+    const [worksheetTabPosition, setWorksheetTabPositionState] = useState<WorksheetTabPosition>(() => {
+        const raw = localStorage.getItem(WORKSHEETS_TAB_POSITION_STORAGE_KEY);
+        if (raw === 'top' || raw === 'bottom' || raw === 'left') return raw;
+        return 'top';
+    });
     const [showThemeStore, setShowThemeStore] = useState(false);
     const [showBurgerMenu, setShowBurgerMenu] = useState(false);
     const [showPrecisionMenu, setShowPrecisionMenu] = useState(false);
@@ -74,10 +82,15 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
     const lastEscapeKeyAtRef = useRef(0);
 
     const setHelpPanelPosition = (v: HelpPanelPosition) => setHelpPanelPositionState(v);
+    const setWorksheetTabPosition = (v: WorksheetTabPosition) => setWorksheetTabPositionState(v);
 
     useEffect(() => {
         localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
     }, [helpPanelPosition]);
+
+    useEffect(() => {
+        localStorage.setItem(WORKSHEETS_TAB_POSITION_STORAGE_KEY, worksheetTabPosition);
+    }, [worksheetTabPosition]);
 
     useEffect(() => {
         localStorage.setItem(SETTINGS_DRAWER_WIDTH_STORAGE_KEY, String(settingsDrawerWidth));
@@ -160,6 +173,7 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
             showSettings, setShowSettings,
             showHelp, setShowHelp,
             helpPanelPosition, setHelpPanelPosition,
+            worksheetTabPosition, setWorksheetTabPosition,
             showThemeStore, setShowThemeStore,
             showBurgerMenu, setShowBurgerMenu,
             showPrecisionMenu, setShowPrecisionMenu,

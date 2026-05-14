@@ -40,6 +40,9 @@ export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
 export const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 export const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
+export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
+export const WORKSHEETS_ACTIVE_ID_STORAGE_KEY = 'calc.worksheets.activeId';
+export const WORKSHEETS_TAB_POSITION_STORAGE_KEY = 'calc.worksheets.tabPosition';
 
 // Timing
 export const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;

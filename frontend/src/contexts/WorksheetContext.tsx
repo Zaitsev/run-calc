@@ -1,11 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-    WORKSHEET_CONTENT_STORAGE_KEY,
-    LAST_RESULT_STORAGE_KEY,
-    MARKED_LINES_STORAGE_KEY,
-    VARIABLE_VALUES_STORAGE_KEY,
-} from '../constants';
+import { useWorksheetManager } from './WorksheetManagerContext';
 
 type WorksheetContextValue = {
     content: string;
@@ -80,61 +75,46 @@ function remapLineIndex(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function WorksheetProvider({ children }: { children: ReactNode }) {
-    const [content, setContent] = useState(() => localStorage.getItem(WORKSHEET_CONTENT_STORAGE_KEY) ?? '');
+    const manager = useWorksheetManager();
+    const activeWorksheet = manager.worksheets.find(w => w.id === manager.activeId);
 
-    const [lastResult, setLastResultState] = useState<number | null>(() => {
-        const raw = localStorage.getItem(LAST_RESULT_STORAGE_KEY);
-        if (!raw) return null;
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? parsed : null;
-    });
+    if (!activeWorksheet) {
+        throw new Error('WorksheetProvider: no active worksheet found');
+    }
 
-    const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(() => {
-        const raw = localStorage.getItem(MARKED_LINES_STORAGE_KEY);
-        if (!raw) return new Set<number>();
-        try {
-            const arr: unknown = JSON.parse(raw);
-            if (Array.isArray(arr)) return new Set<number>(arr.filter((n): n is number => typeof n === 'number'));
-        } catch { /* ignore */ }
-        return new Set<number>();
-    });
+    const [lastResult, setLastResultState] = useState<number | null>(activeWorksheet.lastResult);
+    const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(new Set(activeWorksheet.markedLines));
+    const [variableValues, setVariableValues] = useState<Record<string, unknown>>(activeWorksheet.variableValues);
 
-    const [variableValues, setVariableValues] = useState<Record<string, unknown>>(() => {
-        const raw = localStorage.getItem(VARIABLE_VALUES_STORAGE_KEY);
-        if (!raw) return {};
-        try {
-            const obj = JSON.parse(raw);
-            if (typeof obj === 'object' && obj !== null) return obj as Record<string, unknown>;
-        } catch { /* ignore */ }
-        return {};
-    });
-
+    // Session-only state (not persisted)
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
     const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
 
+    // Sync local state from active worksheet when it changes
     useEffect(() => {
-        const timer = setTimeout(() => {
-            localStorage.setItem(WORKSHEET_CONTENT_STORAGE_KEY, content);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [content]);
+        setLastResultState(activeWorksheet.lastResult);
+        setMarkedLines(new Set(activeWorksheet.markedLines));
+        setVariableValues(activeWorksheet.variableValues);
+        // Clear session state when switching worksheets
+        setVariableVersions({});
+        setLineDependencies({});
+        setLineDependencyVersions({});
+    }, [manager.activeId, activeWorksheet.id]);
 
+    // Persist state changes back to manager
     useEffect(() => {
-        if (lastResult === null) {
-            localStorage.removeItem(LAST_RESULT_STORAGE_KEY);
-            return;
-        }
-        localStorage.setItem(LAST_RESULT_STORAGE_KEY, String(lastResult));
-    }, [lastResult]);
+        manager.updateActiveWorksheet({
+            lastResult,
+            markedLines: [...markedLines],
+            variableValues,
+        });
+    }, [lastResult, markedLines, variableValues, manager]);
 
-    useEffect(() => {
-        localStorage.setItem(MARKED_LINES_STORAGE_KEY, JSON.stringify([...markedLines]));
-    }, [markedLines]);
-
-    useEffect(() => {
-        localStorage.setItem(VARIABLE_VALUES_STORAGE_KEY, JSON.stringify(variableValues));
-    }, [variableValues]);
+    const setContent = (next: React.SetStateAction<string>) => {
+        const newContent = typeof next === 'function' ? next(activeWorksheet.content) : next;
+        manager.updateActiveWorksheet({ content: newContent });
+    };
 
     const setLastResult = (v: number | null) => setLastResultState(v);
 
@@ -200,13 +180,20 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
 
     return (
         <WorksheetContext.Provider value={{
-            content, setContent,
-            lastResult, setLastResult,
-            markedLines, setMarkedLines,
-            variableValues, setVariableValues,
-            variableVersions, setVariableVersions,
-            lineDependencies, setLineDependencies,
-            lineDependencyVersions, setLineDependencyVersions,
+            content: activeWorksheet.content,
+            setContent,
+            lastResult,
+            setLastResult,
+            markedLines,
+            setMarkedLines,
+            variableValues,
+            setVariableValues,
+            variableVersions,
+            setVariableVersions,
+            lineDependencies,
+            setLineDependencies,
+            lineDependencyVersions,
+            setLineDependencyVersions,
             clearWorksheet,
             remapMarkedLinesForEdit,
             remapLineRecordForEdit,
