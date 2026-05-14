@@ -1,57 +1,182 @@
-import type { RefObject } from 'react';
-import type { PrecisionMode } from '../types/app';
-import { IS_DEV } from '../constants';
+import { useEffect } from 'react';
+import {
+    DEFAULT_FONT_SCALE,
+    FINANCIAL_PRECISION,
+    FONT_SCALE_MAX,
+    FONT_SCALE_MIN,
+    FONT_SCALE_STEP,
+    FOUR_POINT_PRECISION,
+    IS_DEV,
+    PRECISION_MAX,
+    PRECISION_MIN,
+} from '../constants';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useUIState, useWindow } from '../contexts';
 import { PrecisionPopover } from './PrecisionPopover';
 import { BurgerMenu } from './BurgerMenu';
 
-type Props = {
-    statusText: string;
-    isStatusError: boolean;
-    devError: string;
-    isAIQueryPending: boolean;
-    wordWrap: boolean;
-    setWordWrap: (fn: (prev: boolean) => boolean) => void;
-    precision: PrecisionMode;
-    setPrecision: (v: PrecisionMode) => void;
-    scientificNotation: boolean;
-    setScientificNotation: (v: boolean) => void;
-    decreasePrecision: () => void;
-    increasePrecision: () => void;
-    applyFinancialPrecision: () => void;
-    applyFourPointPrecision: () => void;
-    resetPrecision: () => void;
-    showPrecisionMenu: boolean;
-    setShowPrecisionMenu: (fn: (prev: boolean) => boolean) => void;
-    showBurgerMenu: boolean;
-    setShowBurgerMenu: (fn: (prev: boolean) => boolean) => void;
-    setShowHelp: (v: boolean) => void;
-    setShowSettings: (v: boolean) => void;
-    setShowThemeStore: (v: boolean) => void;
-    showHelp: boolean;
-    precisionMenuRef: RefObject<HTMLDivElement | null>;
-    burgerMenuRef: RefObject<HTMLDivElement | null>;
-    onRequestClearWorksheet: () => void;
-    onOpenHelp: () => void;
-    aiDebugLogCount: number;
-    onChangeFontScale: (dir: 1 | -1) => void;
-    onResetFontSize: () => void;
-    onResetWindowLayout: () => void;
-    onOpenThemeStore: () => void;
-    onOpenAIDebug: () => void;
-};
+export function StatusBar() {
+    const { statusText, isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
+    const { isAIQueryPending, aiDebugLog } = useAI();
+    const { wordWrap, setWordWrap, precision, setPrecision, scientificNotation, setScientificNotation } = useDisplaySettings();
+    const { setFontScale, precisionMenuRef, burgerMenuRef } = useEditorUI();
+    const {
+        showSettings,
+        setShowSettings,
+        showHelp,
+        setShowHelp,
+        setShowThemeStore,
+        showBurgerMenu,
+        setShowBurgerMenu,
+        showPrecisionMenu,
+        setShowPrecisionMenu,
+        setShowClearWorksheetConfirm,
+        setShowAIDebug,
+    } = useUIState();
+    const { resetWindowLayout, expandWindowForThemeStore, restoreWindowAfterSettingsDrawer } = useWindow();
 
-export function StatusBar({
-    statusText, isStatusError, devError, isAIQueryPending,
-    wordWrap, setWordWrap,
-    precision, setPrecision, scientificNotation, setScientificNotation,
-    decreasePrecision, increasePrecision, applyFinancialPrecision, applyFourPointPrecision, resetPrecision,
-    showPrecisionMenu, setShowPrecisionMenu,
-    showBurgerMenu, setShowBurgerMenu,
-    setShowHelp, setShowSettings, setShowThemeStore, showHelp,
-    precisionMenuRef, burgerMenuRef,
-    onRequestClearWorksheet, onOpenHelp, aiDebugLogCount,
-    onChangeFontScale, onResetFontSize, onResetWindowLayout, onOpenThemeStore, onOpenAIDebug,
-}: Props) {
+    useEffect(() => {
+        if (!showBurgerMenu) {
+            return;
+        }
+
+        const onMouseDown = (event: MouseEvent) => {
+            if (!burgerMenuRef.current) {
+                return;
+            }
+            if (!burgerMenuRef.current.contains(event.target as Node)) {
+                setShowBurgerMenu(false);
+            }
+        };
+
+        const onEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setShowBurgerMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('keydown', onEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, [burgerMenuRef, setShowBurgerMenu, showBurgerMenu]);
+
+    useEffect(() => {
+        if (!showPrecisionMenu) {
+            return;
+        }
+
+        const onMouseDown = (event: MouseEvent) => {
+            if (!precisionMenuRef.current) {
+                return;
+            }
+            if (!precisionMenuRef.current.contains(event.target as Node)) {
+                setShowPrecisionMenu(false);
+            }
+        };
+
+        const onEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setShowPrecisionMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('keydown', onEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, [precisionMenuRef, setShowPrecisionMenu, showPrecisionMenu]);
+
+    const requestClearWorksheet = () => {
+        setShowPrecisionMenu(false);
+        setShowBurgerMenu(false);
+        setShowClearWorksheetConfirm(true);
+    };
+
+    const changeFontScale = (direction: 1 | -1) => {
+        setFontScale((current) => {
+            const next = current + direction * FONT_SCALE_STEP;
+            return Number(Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, next)).toFixed(2));
+        });
+    };
+
+    const resetFontSize = () => {
+        setFontScale(DEFAULT_FONT_SCALE);
+        setStatusText('Font size reset');
+        setIsStatusError(false);
+        setDevError('');
+    };
+
+    const handleResetWindowLayout = () => {
+        resetWindowLayout();
+        setStatusText('Window layout reset');
+        setIsStatusError(false);
+        setDevError('');
+    };
+
+    const decreasePrecision = () => {
+        setPrecision((current) => {
+            if (current === 'full') {
+                return 'full';
+            }
+            if (current === 'auto') {
+                return 'full';
+            }
+            if (current === PRECISION_MIN) {
+                return 'auto';
+            }
+            return current - 1;
+        });
+    };
+
+    const increasePrecision = () => {
+        setPrecision((current) => {
+            if (current === 'full') {
+                return 'auto';
+            }
+            if (current === 'auto') {
+                return PRECISION_MIN;
+            }
+            if (current >= PRECISION_MAX) {
+                return current;
+            }
+            return current + 1;
+        });
+    };
+
+    const resetPrecision = () => {
+        setPrecision('auto');
+    };
+
+    const applyFinancialPrecision = () => {
+        setPrecision(FINANCIAL_PRECISION);
+    };
+
+    const applyFourPointPrecision = () => {
+        setPrecision(FOUR_POINT_PRECISION);
+    };
+
+    const openHelpPanel = () => {
+        setShowPrecisionMenu(false);
+        setShowBurgerMenu(false);
+        setShowThemeStore(false);
+        setShowSettings(false);
+        setShowHelp(true);
+    };
+
+    const openThemeStore = () => {
+        void restoreWindowAfterSettingsDrawer();
+        setShowHelp(false);
+        setShowSettings(true);
+        setShowThemeStore(true);
+        void expandWindowForThemeStore();
+    };
+
     return (
         <div className={`status-bar${isStatusError ? ' error' : ''}`}>
             <span className="status-text">
@@ -70,7 +195,7 @@ export function StatusBar({
                 title="Clear all expressions"
                 aria-label="Clear all expressions"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={onRequestClearWorksheet}
+                onClick={requestClearWorksheet}
             >
                 clear
             </button>
@@ -94,7 +219,7 @@ export function StatusBar({
                     aria-expanded={showPrecisionMenu}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                        setShowBurgerMenu(() => false);
+                        setShowBurgerMenu(false);
                         setShowPrecisionMenu((prev) => !prev);
                     }}
                 >
@@ -120,7 +245,7 @@ export function StatusBar({
                     className="settings-btn status-menu-btn"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                        setShowPrecisionMenu(() => false);
+                        setShowPrecisionMenu(false);
                         setShowBurgerMenu((prev) => !prev);
                     }}
                     aria-label="Menu"
@@ -130,14 +255,14 @@ export function StatusBar({
                 </button>
                 {showBurgerMenu && (
                     <BurgerMenu
-                        aiDebugLogCount={aiDebugLogCount}
-                        onNewWorksheet={() => { setShowBurgerMenu(() => false); onRequestClearWorksheet(); }}
-                        onChangeFontScale={(dir) => { setShowBurgerMenu(() => false); onChangeFontScale(dir); }}
-                        onResetFontSize={() => { setShowBurgerMenu(() => false); onResetFontSize(); }}
-                        onResetWindowLayout={() => { setShowBurgerMenu(() => false); onResetWindowLayout(); }}
-                        onOpenThemeStore={() => { setShowBurgerMenu(() => false); onOpenThemeStore(); }}
-                        onOpenHelp={() => { setShowBurgerMenu(() => false); onOpenHelp(); }}
-                        onOpenAIDebug={() => { setShowBurgerMenu(() => false); onOpenAIDebug(); }}
+                        aiDebugLogCount={aiDebugLog.length}
+                        onNewWorksheet={() => { setShowBurgerMenu(false); requestClearWorksheet(); }}
+                        onChangeFontScale={(dir) => { setShowBurgerMenu(false); changeFontScale(dir); }}
+                        onResetFontSize={() => { setShowBurgerMenu(false); resetFontSize(); }}
+                        onResetWindowLayout={() => { setShowBurgerMenu(false); handleResetWindowLayout(); }}
+                        onOpenThemeStore={() => { setShowBurgerMenu(false); openThemeStore(); }}
+                        onOpenHelp={() => { setShowBurgerMenu(false); openHelpPanel(); }}
+                        onOpenAIDebug={() => { setShowBurgerMenu(false); setShowAIDebug(true); }}
                     />
                 )}
             </div>
@@ -146,10 +271,13 @@ export function StatusBar({
                 className="settings-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                    setShowPrecisionMenu(() => false);
-                    setShowBurgerMenu(() => false);
-                    if (showHelp) { setShowHelp(false); return; }
-                    onOpenHelp();
+                    setShowPrecisionMenu(false);
+                    setShowBurgerMenu(false);
+                    if (showHelp) {
+                        setShowHelp(false);
+                        return;
+                    }
+                    openHelpPanel();
                 }}
                 aria-label="Help"
                 title="Help"
@@ -161,8 +289,13 @@ export function StatusBar({
                 className="settings-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                    setShowPrecisionMenu(() => false);
-                    setShowBurgerMenu(() => false);
+                    if (showSettings) {
+                        setShowSettings(false);
+                        setShowThemeStore(false);
+                        return;
+                    }
+                    setShowPrecisionMenu(false);
+                    setShowBurgerMenu(false);
                     setShowHelp(false);
                     setShowSettings(true);
                     setShowThemeStore(false);

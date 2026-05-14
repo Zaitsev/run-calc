@@ -165,7 +165,7 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">UI font size</div>
+                                <div className="settings-row-title">Interface font size</div>
                                 <div className="settings-row-desc">Adjust text size for menus and help panel</div>
                             </div>
                             <div className="settings-stepper-group">
@@ -272,133 +272,7 @@ export function SettingsPanel({
                             </label>
                         </div>
                     </div>
-                    <div className={`settings-ai-block${ai.aiSettingsHasUnsavedChanges ? ' settings-ai-block--action-required' : ''}`}>
-                        <p className="settings-section-label settings-section-label--with-chip">
-                            <span>AI</span>
-                            {ai.aiSettingsHasUnsavedChanges && (
-                                <span className="settings-status-chip" aria-label="AI settings have unsaved changes">
-                                    Unsaved
-                                </span>
-                            )}
-                        </p>
-                        <AISettingsPanel
-                            settings={ai.aiSettingsDraft}
-                            keyStatus={ai.aiKeyStatus}
-                            busy={ai.aiSettingsBusy}
-                            hasUnsavedChanges={ai.aiSettingsHasUnsavedChanges}
-                            showRevertChanges={ai.aiSettingsActionFailed}
-                            applyErrorMessage={ai.aiSettingsApplyError}
-                            onChange={(next) => {
-                                ai.setAISettingsDraft(next);
-                            }}
-                            onTestAndSave={onTestAndSaveAISettings}
-                            onRevertChanges={onRevertAISettingsDraft}
-                            onSaveKey={onSaveAIKeyToBackend}
-                            onClearKey={onClearAIKeyInBackend}
-                        />
-                    </div>
-
-                    {/* ── Appearance ── */}
-                    <p className="settings-section-label">Appearance</p>
-                    <div className="settings-card">
-                        <div className="settings-card-header">
-                            <div className="settings-card-title">App theme</div>
-                            <div className="settings-card-desc">Select which app theme to display</div>
-                        </div>
-                        <div className="saved-theme-list" role="list">
-                            <div className="saved-theme-group" role="group" aria-label="Browse themes">
-                                <button
-                                    type="button"
-                                    className="saved-theme-item saved-theme-browse-btn"
-                                    onClick={onOpenThemeStore}
-                                    role="listitem"
-                                >
-                                    <span className="saved-theme-icon saved-theme-icon--browse" aria-hidden="true">
-                                        +
-                                    </span>
-                                    <span className="saved-theme-text">
-                                        <span className="saved-theme-name">Browse themes</span>
-                                        <span className="saved-theme-meta">Theme store</span>
-                                    </span>
-                                </button>
-                            </div>
-
-                            <div className="saved-theme-group" role="group" aria-label="Default themes">
-                                {([
-                                    { key: 'light', name: 'Light', meta: 'Default theme', icon: 'L' },
-                                    { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
-                                    { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
-                                ] as const).map((entry) => {
-                                    const isActive = theme.theme.type === entry.key;
-                                    return (
-                                        <button
-                                            key={entry.key}
-                                            type="button"
-                                            className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
-                                            onClick={() => handleSetTheme({ type: entry.key })}
-                                            role="listitem"
-                                        >
-                                            <span className="saved-theme-icon saved-theme-icon--builtin" aria-hidden="true">
-                                                {entry.icon}
-                                            </span>
-                                            <span className="saved-theme-text">
-                                                <span className="saved-theme-name">{entry.name}</span>
-                                                <span className="saved-theme-meta">{entry.meta}</span>
-                                            </span>
-                                            <span className="saved-theme-check" aria-hidden="true">
-                                                v
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="saved-theme-group" role="group" aria-label="Downloaded themes">
-                                {themeStore.savedThemes.map((entry) => {
-                                    const isActive = theme.theme.type === 'custom' && theme.theme.customId === entry.id;
-                                    return (
-                                        <div key={entry.id} className="saved-theme-item-wrapper">
-                                            <button
-                                                type="button"
-                                                className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
-                                                onClick={() =>
-                                                    handleSetTheme({
-                                                        type: 'custom',
-                                                        customColors: entry.colors,
-                                                        customId: entry.id,
-                                                        customThemeBase: entry.themeBase,
-                                                    })
-                                                }
-                                                role="listitem"
-                                            >
-                                                {entry.iconUrl && (
-                                                    <img src={entry.iconUrl} alt="" aria-hidden="true" className="saved-theme-icon" />
-                                                )}
-                                                <span className="saved-theme-text">
-                                                    <span className="saved-theme-name">{entry.name}</span>
-                                                    {entry.publisher && <span className="saved-theme-meta">{entry.publisher}</span>}
-                                                </span>
-                                                <span className="saved-theme-check" aria-hidden="true">
-                                                    v
-                                                </span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="saved-theme-delete-btn"
-                                                onClick={() => themeStore.deleteSavedTheme(entry.id)}
-                                                aria-label={`Delete saved theme ${entry.name}`}
-                                                title={`Delete ${entry.name}`}
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Calculation ── */}
+           {/* ── Calculation ── */}
                     <p className="settings-section-label">Calculation</p>
                     <div className="settings-card">
                         <div className="settings-card-header">
@@ -511,6 +385,132 @@ export function SettingsPanel({
                             </label>
                         </div>
                     </div>
+                    {/* ── AI Settings ── */}
+                    <p className={`settings-section-label settings-ai-block${ai.aiSettingsHasUnsavedChanges ? ' settings-section-label--with-chip' : ''}`}><span>AI</span>
+                            {ai.aiSettingsHasUnsavedChanges && (
+                                <span className="settings-status-chip" aria-label="AI settings have unsaved changes">
+                                    Unsaved
+                                </span>
+                            )}</p>
+                    <div className={`settings-ai-block${ai.aiSettingsHasUnsavedChanges ? ' settings-ai-block--action-required' : ''}`}>
+                        <AISettingsPanel
+                            settings={ai.aiSettingsDraft}
+                            keyStatus={ai.aiKeyStatus}
+                            busy={ai.aiSettingsBusy}
+                            hasUnsavedChanges={ai.aiSettingsHasUnsavedChanges}
+                            showRevertChanges={ai.aiSettingsActionFailed}
+                            applyErrorMessage={ai.aiSettingsApplyError}
+                            onChange={(next) => {
+                                ai.setAISettingsDraft(next);
+                            }}
+                            onTestAndSave={onTestAndSaveAISettings}
+                            onRevertChanges={onRevertAISettingsDraft}
+                            onSaveKey={onSaveAIKeyToBackend}
+                            onClearKey={onClearAIKeyInBackend}
+                        />
+                    </div>
+         
+
+                    {/* ── Appearance ── */}
+                    <p className="settings-section-label">Appearance</p>
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="settings-card-title">App theme</div>
+                            <div className="settings-card-desc">Select which app theme to display</div>
+                        </div>
+                        <div className="saved-theme-list" role="list">
+                            <div className="saved-theme-group" role="group" aria-label="Browse themes">
+                                <button
+                                    type="button"
+                                    className="saved-theme-item saved-theme-browse-btn"
+                                    onClick={onOpenThemeStore}
+                                    role="listitem"
+                                >
+                                    <span className="saved-theme-icon saved-theme-icon--browse" aria-hidden="true">
+                                        +
+                                    </span>
+                                    <span className="saved-theme-text">
+                                        <span className="saved-theme-name">Browse themes</span>
+                                        <span className="saved-theme-meta">Theme store</span>
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="saved-theme-group" role="group" aria-label="Default themes">
+                                {([
+                                    { key: 'light', name: 'Light', meta: 'Default theme', icon: 'L' },
+                                    { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
+                                    { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
+                                ] as const).map((entry) => {
+                                    const isActive = theme.theme.type === entry.key;
+                                    return (
+                                        <button
+                                            key={entry.key}
+                                            type="button"
+                                            className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
+                                            onClick={() => handleSetTheme({ type: entry.key })}
+                                            role="listitem"
+                                        >
+                                            <span className="saved-theme-icon saved-theme-icon--builtin" aria-hidden="true">
+                                                {entry.icon}
+                                            </span>
+                                            <span className="saved-theme-text">
+                                                <span className="saved-theme-name">{entry.name}</span>
+                                                <span className="saved-theme-meta">{entry.meta}</span>
+                                            </span>
+                                            <span className="saved-theme-check" aria-hidden="true">
+                                                v
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="saved-theme-group" role="group" aria-label="Downloaded themes">
+                                {themeStore.savedThemes.map((entry) => {
+                                    const isActive = theme.theme.type === 'custom' && theme.theme.customId === entry.id;
+                                    return (
+                                        <div key={entry.id} className="saved-theme-item-wrapper">
+                                            <button
+                                                type="button"
+                                                className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
+                                                onClick={() =>
+                                                    handleSetTheme({
+                                                        type: 'custom',
+                                                        customColors: entry.colors,
+                                                        customId: entry.id,
+                                                        customThemeBase: entry.themeBase,
+                                                    })
+                                                }
+                                                role="listitem"
+                                            >
+                                                {entry.iconUrl && (
+                                                    <img src={entry.iconUrl} alt="" aria-hidden="true" className="saved-theme-icon" />
+                                                )}
+                                                <span className="saved-theme-text">
+                                                    <span className="saved-theme-name">{entry.name}</span>
+                                                    {entry.publisher && <span className="saved-theme-meta">{entry.publisher}</span>}
+                                                </span>
+                                                <span className="saved-theme-check" aria-hidden="true">
+                                                    v
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="saved-theme-delete-btn"
+                                                onClick={() => themeStore.deleteSavedTheme(entry.id)}
+                                                aria-label={`Delete saved theme ${entry.name}`}
+                                                title={`Delete ${entry.name}`}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
 
                     {/* ── Window ── */}
                     <p className="settings-section-label">Window</p>

@@ -1,11 +1,8 @@
 import { KeyboardEvent, WheelEvent as ReactWheelEvent, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import {
-    BrowserOpenURL,
     EventsOn,
-    Quit,
     WindowGetSize,
     WindowHide,
-    WindowReload,
     WindowSetSize
 } from '../wailsjs/runtime/runtime';
 import { AIDebugDrawer } from './AIDebugDrawer';
@@ -21,6 +18,7 @@ import { ClearWorksheetModal } from './components/ClearWorksheetModal';
 import { HelpPanelContainer } from './components/HelpPanelContainer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StaleBanner } from './components/StaleBanner';
+import { StatusBar } from './components/StatusBar';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
 import { useTheme } from './useTheme';
@@ -31,18 +29,13 @@ import {
     EDITOR_BOTTOM_PADDING_PX,
     EDITOR_SIDE_PADDING_PX,
     EDITOR_TOP_PADDING_PX,
-    FINANCIAL_PRECISION,
     FONT_SCALE_MAX,
     FONT_SCALE_MIN,
     FONT_SCALE_STEP,
-    FOUR_POINT_PRECISION,
-    HELP_SITE_URL,
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
     INTELLIGENCE_HINT_SHOW_DELAY_MS,
     IS_DEV,
     OPERATOR_KEY_RE,
-    PRECISION_MAX,
-    PRECISION_MIN,
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
@@ -79,16 +72,7 @@ function App() {
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const {
-        decimalDelimiterMode,
-        precision,
-        setPrecision,
-        scientificNotation,
-        setScientificNotation,
-        wordWrap,
-        setWordWrap,
-        uiFontScale,
-    } = useDisplaySettings();
+    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -106,8 +90,6 @@ function App() {
         editorRef,
         overlayRef,
         gutterRef,
-        burgerMenuRef,
-        precisionMenuRef,
     } = useEditorUI();
     const {
         showSettings,
@@ -118,10 +100,6 @@ function App() {
         setShowThemeStore,
         helpPanelPosition,
         setHelpPanelPosition,
-        showBurgerMenu,
-        setShowBurgerMenu,
-        showPrecisionMenu,
-        setShowPrecisionMenu,
         showIntelligenceHint,
         setShowIntelligenceHint,
         showClearWorksheetConfirm,
@@ -147,7 +125,7 @@ function App() {
         pendingThemePreview,
         cancelThemePreview: cancelThemePreviewInStore,
     } = useThemeStore();
-    const { statusText, setStatusText, isStatusError, setIsStatusError, devError, setDevError } = useStatus();
+    const { isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
     const {
         aiContextMode,
         aiSettings,
@@ -214,35 +192,6 @@ function App() {
     }, [syncWindowTheme, theme]);
 
     useEffect(() => {
-        if (!showBurgerMenu) {
-            return;
-        }
-
-        const onMouseDown = (event: MouseEvent) => {
-            if (!burgerMenuRef.current) {
-                return;
-            }
-            if (!burgerMenuRef.current.contains(event.target as Node)) {
-                setShowBurgerMenu(false);
-            }
-        };
-
-        const onEscape = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setShowBurgerMenu(false);
-            }
-        };
-
-        document.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('keydown', onEscape);
-
-        return () => {
-            document.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('keydown', onEscape);
-        };
-    }, [showBurgerMenu]);
-
-    useEffect(() => {
         if (!showClearWorksheetConfirm) {
             return;
         }
@@ -259,40 +208,6 @@ function App() {
             document.removeEventListener('keydown', onDocumentKeyDown);
         };
     }, [showClearWorksheetConfirm]);
-
-    useEffect(() => {
-        if (!showPrecisionMenu) {
-            return;
-        }
-
-        const onMouseDown = (event: MouseEvent) => {
-            if (!precisionMenuRef.current) {
-                return;
-            }
-            if (!precisionMenuRef.current.contains(event.target as Node)) {
-                setShowPrecisionMenu(false);
-            }
-        };
-
-        const onEscape = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setShowPrecisionMenu(false);
-            }
-        };
-
-        document.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('keydown', onEscape);
-
-        return () => {
-            document.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('keydown', onEscape);
-        };
-    }, [showPrecisionMenu]);
-
-
-
-
-
 
     const changeFontScale = (direction: 1 | -1) => {
         setFontScale((current) => {
@@ -316,12 +231,6 @@ function App() {
         setStatusText('Ready');
         setIsStatusError(false);
         setDevError('');
-    };
-
-    const requestClearWorksheet = () => {
-        setShowPrecisionMenu(false);
-        setShowBurgerMenu(false);
-        setShowClearWorksheetConfirm(true);
     };
 
     const cancelClearWorksheet = () => {
@@ -362,48 +271,6 @@ function App() {
         setDevError('');
     };
 
-    const decreasePrecision = () => {
-        setPrecision((current) => {
-            if (current === 'full') {
-                return 'full';
-            }
-            if (current === 'auto') {
-                return 'full';
-            }
-            if (current === PRECISION_MIN) {
-                return 'auto';
-            }
-            return current - 1;
-        });
-    };
-
-    const increasePrecision = () => {
-        setPrecision((current) => {
-            if (current === 'full') {
-                return 'auto';
-            }
-            if (current === 'auto') {
-                return PRECISION_MIN;
-            }
-            if (current >= PRECISION_MAX) {
-                return current;
-            }
-            return current + 1;
-        });
-    };
-
-    const resetPrecision = () => {
-        setPrecision('auto');
-    };
-
-    const applyFinancialPrecision = () => {
-        setPrecision(FINANCIAL_PRECISION);
-    };
-
-    const applyFourPointPrecision = () => {
-        setPrecision(FOUR_POINT_PRECISION);
-    };
-
     // --- Menu / keyboard event subscriptions ---
 
     useEffect(() => {
@@ -413,14 +280,12 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', requestClearWorksheet);
+        const unsubNew = EventsOn('menu:file:new', () => setShowClearWorksheetConfirm(true));
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
         const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
         const unsubOpenHelp = EventsOn('menu:help:open', () => {
-            setShowPrecisionMenu(false);
-            setShowBurgerMenu(false);
             setShowThemeStore(false);
             setShowSettings(false);
             setShowHelp(true);
@@ -1031,25 +896,12 @@ function App() {
         void expandWindowForThemeStore();
     };
 
-    const openHelpPanel = () => {
-        setShowPrecisionMenu(false);
-        setShowBurgerMenu(false);
-        setShowThemeStore(false);
-        setShowSettings(false);
-        setShowHelp(true);
-    };
-
     const closeThemeStoreInSidebar = () => {
         if (pendingThemePreview) {
             cancelThemePreview();
         }
         setShowThemeStore(false);
         void restoreWindowAfterThemeStore();
-    };
-
-    const runBurgerAction = (action: () => void) => {
-        setShowBurgerMenu(false);
-        action();
     };
 
     const helpDockClass = !showHelp
@@ -1283,256 +1135,7 @@ function App() {
                     )}
                 </div>
             </div>
-            <div className={`status-bar${isStatusError ? ' error' : ''}`}>
-                <span className="status-text">
-                    {statusText}
-                    {IS_DEV && devError ? ` | dev: ${devError}` : ''}
-                </span>
-                {isAIQueryPending && (
-                    <span className="status-chip status-chip--busy" title="AI request is in progress">
-                        <span className="status-spinner" aria-hidden="true" />
-                        AI waiting...
-                    </span>
-                )}
-                <button
-                    type="button"
-                    className="status-chip status-chip-btn status-chip-btn--clear-first"
-                    title="Clear all expressions"
-                    aria-label="Clear all expressions"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={requestClearWorksheet}
-                >
-                    clear
-                </button>
-                <button
-                    type="button"
-                    className={`status-chip status-chip-btn${wordWrap ? ' status-chip-btn--active' : ''}`}
-                    title={wordWrap ? 'Word wrap: on' : 'Word wrap: off'}
-                    aria-label="Toggle word wrap"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setWordWrap((prev) => !prev)}
-                >
-                    wrap: {wordWrap ? 'on' : 'off'}
-                </button>
-                <div className="status-chip-wrap" ref={precisionMenuRef}>
-                    <button
-                        type="button"
-                        className={`status-chip status-chip-btn${showPrecisionMenu ? ' status-chip-btn--active' : ''}`}
-                        title={precision === 'full' ? 'Precision: full (no rounding)' : precision === 'auto' ? 'Precision: auto (10 decimal places)' : `Precision: ${precision} decimal place${precision === 1 ? '' : 's'}`}
-                        aria-label="Open precision selector"
-                        aria-haspopup="dialog"
-                        aria-expanded={showPrecisionMenu}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                            setShowBurgerMenu(false);
-                            setShowPrecisionMenu((prev) => !prev);
-                        }}
-                    >
-                        {precision === 'full' ? 'prec: full' : precision === 'auto' ? 'prec: auto' : `prec: ${precision}`}
-                    </button>
-                    {showPrecisionMenu && (
-                        <div className="precision-popover" role="dialog" aria-label="Precision selector">
-                            <div className="precision-popover-title">Display precision</div>
-                            <div className="precision-popover-desc">Applies to rendered result text.</div>
-                            <div className="precision-popover-row">
-                                <div className="precision-popover-row-info">
-                                    <div className="precision-popover-label">Decimals</div>
-                                    <div className="precision-popover-value">
-                                        {precision === 'full' ? 'Full — no rounding' : precision === 'auto' ? 'Auto — 10 dec. places' : `${precision} place${precision === 1 ? '' : 's'}`}
-                                    </div>
-                                </div>
-                                <div className="settings-stepper-group precision-popover-stepper">
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={decreasePrecision}
-                                        disabled={precision === 'full'}
-                                        aria-label="Decrease precision"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="settings-stepper-value">
-                                        {precision === 'full' ? 'Full' : precision === 'auto' ? 'Auto' : String(precision)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={increasePrecision}
-                                        disabled={precision === PRECISION_MAX}
-                                        aria-label="Increase precision"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="precision-popover-actions">
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => setPrecision('full')}
-                                    disabled={precision === 'full'}
-                                >
-                                    Full
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFinancialPrecision}
-                                    disabled={precision === FINANCIAL_PRECISION}
-                                >
-                                    Financial (2)
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFourPointPrecision}
-                                    disabled={precision === FOUR_POINT_PRECISION}
-                                >
-                                    Intermediate (4)
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={resetPrecision}
-                                    disabled={precision === 'auto'}
-                                >
-                                    Auto (10)
-                                </button>
-                            </div>
-                            <div className="precision-popover-row precision-popover-row--toggle">
-                                <div className="precision-popover-row-info">
-                                    <div className="precision-popover-label">Scientific mode</div>
-                                    <div className="precision-popover-value">Use 1e+7 and 1e-7 for extreme values.</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle scientific notation">
-                                    <input
-                                        type="checkbox"
-                                        checked={scientificNotation}
-                                        onChange={(e) => setScientificNotation(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                                                </div>
-                            </div>
-                    )}
-                </div>
-                <div className="status-menu-wrap" ref={burgerMenuRef}>
-                    <button
-                        type="button"
-                        className="settings-btn status-menu-btn"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                            setShowPrecisionMenu(false);
-                            setShowBurgerMenu((prev) => !prev);
-                        }}
-                        aria-label="Menu"
-                        title="Menu"
-                    >
-                        ☰
-                    </button>
-                    {showBurgerMenu && (
-                        <div className="status-menu-popover" role="menu" aria-label="App menu">
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(requestClearWorksheet)}>New worksheet</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => WindowReload())}>Reload app</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(1))}>Increase font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(-1))}>Decrease font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetFontSize)}>Reset font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetWindowLayout)}>Reset window layout</button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => {
-                                    setShowHelp(false);
-                                    setShowSettings(true);
-                                    openThemeStoreInSidebar();
-                                })}
-                            >
-                                Open Theme Store
-                            </button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(openHelpPanel)}>Help</button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL(HELP_SITE_URL))}
-                            >
-                                Open Full Help Site
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => setShowAIDebug(true))}
-                            >
-                                AI Debug Log
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://github.com/Zaitsev/run-calc'))}
-                            >
-                                GitHub
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'))}
-                            >
-                                About
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item status-menu-item--danger"
-                                onClick={() => runBurgerAction(() => Quit())}
-                            >
-                                Quit (your work is saved)
-                            </button>
-                        </div>
-                    )}
-                </div>
-                <button
-                    type="button"
-                    className="settings-btn"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        setShowPrecisionMenu(false);
-                        setShowBurgerMenu(false);
-                        if (showHelp) {
-                            setShowHelp(false);
-                            return;
-                        }
-                        openHelpPanel();
-                    }}
-                    aria-label="Help"
-                    title="Help"
-                >
-                    ?
-                </button>
-                <button
-                    type="button"
-                    className="settings-btn"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        if (showSettings && !showThemeStore) {
-                            setShowSettings(false);
-                        } else {
-                            setShowPrecisionMenu(false);
-                            setShowBurgerMenu(false);
-                            setShowHelp(false);
-                            setShowSettings(true);
-                            setShowThemeStore(false);
-                        }
-                    }}
-                    aria-label="Settings"
-                    title="Settings"
-                >
-                    ⚙
-                </button>
-            </div>
+            <StatusBar />
 
             <SettingsPanel
                 showSettings={showSettings}
