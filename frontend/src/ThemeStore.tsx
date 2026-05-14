@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SearchThemes, InstallTheme } from '../wailsjs/go/main/App';
+import { useThemeStore } from './contexts';
+import { useTheme } from './useTheme';
 import './ThemeStore.css';
 
 const SEARCH_DEBOUNCE_MS = 1000;
@@ -7,6 +9,41 @@ const SEARCH_DEBOUNCE_MS = 1000;
 function isCancelledSearchError(err: unknown): boolean {
     const message = err instanceof Error ? err.message : String(err ?? '');
     return /cancelled|canceled|aborted|context canceled/i.test(message);
+}
+
+function toFriendlyThemeError(err: unknown): string {
+    const raw = (err instanceof Error ? err.message : String(err ?? '')).trim();
+    const normalized = raw.toLowerCase();
+
+    if (!normalized) {
+        return 'This theme could not be previewed. Please try another theme.';
+    }
+
+    if (normalized.includes('tmtheme') || normalized.includes('plist') || normalized.includes('xml')) {
+        return 'This theme format is not supported here yet. Please try a different theme.';
+    }
+
+    if (normalized.includes('json/jsonc') || normalized.includes('no json')) {
+        return 'This theme uses a format that is not supported in this app.';
+    }
+
+    if (normalized.includes('no supported color') || normalized.includes('no supported colors')) {
+        return 'This theme does not provide compatible colors for this app.';
+    }
+
+    if (normalized.includes('theme package is too large')) {
+        return 'This theme package is too large to import.';
+    }
+
+    if (normalized.includes('theme package url missing')) {
+        return 'This theme is missing download information. Please try another one.';
+    }
+
+    if (normalized.includes('failed to download') || normalized.includes('status:')) {
+        return 'We could not download this theme right now. Please try again.';
+    }
+
+    return 'This theme could not be previewed. Please try another theme.';
 }
 
 interface ThemeSearchResult {
@@ -30,20 +67,16 @@ export interface AcceptedThemeEntry {
     themeBase?: 'dark' | 'light';
 }
 
-export interface ThemeStoreProps {
-    onPreviewTheme: (theme: AcceptedThemeEntry) => void;
-    onAcceptTheme: (theme: AcceptedThemeEntry) => void;
-    onCancelThemePreview: () => void;
-    currentPreviewThemeId: string | null;
-}
-
-export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview, currentPreviewThemeId }: ThemeStoreProps) {
+export function ThemeStore() {
+    const themeStore = useThemeStore();
+    const theme = useTheme();
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [results, setResults] = useState<ThemeSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [installingId, setInstallingId] = useState<string | null>(null);
+    const [inlineError, setInlineError] = useState<{ extensionName: string; message: string } | null>(null);
     const [previewMap, setPreviewMap] = useState<Record<string, AcceptedThemeEntry>>({});
     const searchRequestIdRef = useRef(0);
 
@@ -63,7 +96,7 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
 
         const runSearch = async () => {
             setError('');
-        setLoading(true);
+            setLoading(true);
             try {
                 const res = await SearchThemes(debouncedQuery);
                 if (!active || requestId !== searchRequestIdRef.current) {
@@ -101,8 +134,13 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
 
         setInstallingId(ext.name);
         setError('');
+        setInlineError(null);
         try {
             const customTheme = await InstallTheme(ext.name, ext.downloadUrl) as { id: string; colors: Record<string, string>; type?: string };
+            const colorCount = Object.keys(customTheme.colors || {}).length;
+            if (colorCount === 0) {
+                throw new Error('Theme incompatible: no supported colors were found for this app.');
+            }
             const themeToPreview: AcceptedThemeEntry = {
                 id: customTheme.id,
                 name: ext.displayName || ext.name,
@@ -111,22 +149,24 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
                 colors: customTheme.colors || {},
                 themeBase: customTheme.type === 'dark' || customTheme.type === 'light' ? customTheme.type : undefined,
             };
-            setPreviewMap((prev) => ({ ...prev, [themeToPreview.id]: themeToPreview }));
-            onPreviewTheme(themeToPreview);
-        } catch (err: any) {
-            setError(err.message || String(err));
+            setPreviewMap((prev) => ({ ...prev, [ext.name]: themeToPreview }));
+            themeStore.startThemePreview(themeToPreview, theme.theme, theme.setTheme);
+        } catch (err: unknown) {
+            const message = toFriendlyThemeError(err);
+            setError(message);
+            setInlineError({ extensionName: ext.name, message });
         } finally {
             setInstallingId(null);
         }
     };
 
-    const handleAccept = (themeId: string) => {
-        const previewed = previewMap[themeId];
+    const handleAccept = (extensionName: string) => {
+        const previewed = previewMap[extensionName];
         if (!previewed) {
             setError('Preview this theme before accepting.');
             return;
         }
-        onAcceptTheme(previewed);
+        themeStore.acceptThemePreview(previewed, theme.setTheme);
     };
 
     return (
@@ -149,7 +189,10 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
 
                 <div className="theme-store-results">
                     {results.map((ext, idx) => {
-                        const isPreviewActive = currentPreviewThemeId === ext.name;
+                        const previewed = previewMap[ext.name];
+                        const isPreviewActive =
+                            !!previewed &&
+                            themeStore.pendingThemePreview?.id === previewed.id;
                         return (
                         <div key={idx} className="theme-store-card">
                             <div className="theme-store-card-icon-wrap">
@@ -184,7 +227,7 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
                                         <button
                                             type="button"
                                             className="theme-store-install-btn"
-                                            onClick={onCancelThemePreview}
+                                            onClick={() => themeStore.cancelThemePreview(theme.setTheme)}
                                         >
                                             Cancel
                                         </button>
@@ -200,6 +243,11 @@ export function ThemeStore({ onPreviewTheme, onAcceptTheme, onCancelThemePreview
                                     </button>
                                 )}
                             </div>
+                            {inlineError?.extensionName === ext.name && (
+                                <div className="theme-store-card-error" role="alert">
+                                    {inlineError.message}
+                                </div>
+                            )}
                         </div>
                         );
                     })}

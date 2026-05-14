@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDisplaySettings, useEditorUI, useStatus, useUIState, useWindow } from '../contexts';
-import { ThemeStore } from '../ThemeStore';
 import { AISettingsPanel } from '../AISettings';
+import { ThemeStore } from '../ThemeStore';
 import {
     DEFAULT_FONT_SCALE,
     DEFAULT_UI_FONT_SCALE,
@@ -64,18 +64,6 @@ export function SettingsPanel({
 
     const handleSetTheme = (themeConfig: any) => {
         theme.setTheme(themeConfig);
-    };
-
-    const handlePreviewTheme = (candidate: any) => {
-        themeStore.startThemePreview(candidate, theme.theme, theme.setTheme);
-    };
-
-    const handleAcceptTheme = (candidate: any) => {
-        themeStore.acceptThemePreview(candidate, theme.setTheme);
-    };
-
-    const handleCancelThemePreview = () => {
-        themeStore.cancelThemePreview(theme.setTheme);
     };
 
     const { setStatusText, setIsStatusError, setDevError } = useStatus();
@@ -152,12 +140,7 @@ export function SettingsPanel({
 
             {showThemeStore ? (
                 <div className="settings-body settings-body--theme-store">
-                    <ThemeStore
-                        onPreviewTheme={handlePreviewTheme}
-                        onAcceptTheme={handleAcceptTheme}
-                        onCancelThemePreview={handleCancelThemePreview}
-                        currentPreviewThemeId={themeStore.pendingThemePreview?.id ?? null}
-                    />
+                    <ThemeStore />
                 </div>
             ) : (
                 <div className="settings-body">

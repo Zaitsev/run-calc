@@ -34,7 +34,6 @@ import {
     FONT_SCALE_STEP,
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
     INTELLIGENCE_HINT_SHOW_DELAY_MS,
-    IS_DEV,
     OPERATOR_KEY_RE,
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
@@ -43,12 +42,11 @@ import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeStore, useUI
 import { buildEvaluationHooks } from './hooks/useEvaluation';
 import type {
     PrecisionMode,
-    SavedThemeEntry,
-    SuggestionItem,
+    SuggestionItem
 } from './types/app';
 import { inferCustomThemeMode } from './utils/colorUtils';
 import { buildIntelligenceSuggestions, buildSuggestionCatalog, collectKnownVariableNames, getIdentifierContextAtPosition } from './utils/editorIntelligence';
-import { formatNumber, getPrecisionScale, getSystemDecimalDelimiter, resolveDecimalDelimiter } from './utils/formatting';
+import { formatNumber, getPrecisionScale, resolveDecimalDelimiter } from './utils/formatting';
 import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
 import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
 
@@ -106,8 +104,6 @@ function App() {
         setShowClearWorksheetConfirm,
         isReevaluatingAll,
         setIsReevaluatingAll,
-        showAIDebug,
-        setShowAIDebug,
         settingsDrawerWidth,
         setSettingsDrawerWidth,
         startSettingsDrawerResize,

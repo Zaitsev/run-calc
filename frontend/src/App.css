@@ -427,7 +427,7 @@
 
 .syntax-token--comment {
     color: var(--syntax-comment);
-    font-style: italic;
+    font-style: normal;
 }
 
 .line-error {
