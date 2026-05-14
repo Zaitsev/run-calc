@@ -27,7 +27,8 @@
                 resolved = theme.customThemeBase || 'dark';
             }
 
-            if (resolved !== 'dark' && resolved !== 'light') {
+            var validThemes = ['dark', 'light', 'dark-high-contrast', 'light-high-contrast'];
+            if (validThemes.indexOf(resolved) === -1) {
                 resolved = 'dark';
             }
 

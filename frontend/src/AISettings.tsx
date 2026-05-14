@@ -165,7 +165,7 @@ export function AISettingsPanel({
 
     return (
         <>
-            <div className="settings-card">
+            <div className={`settings-card`}>
                 <div className="settings-card-header">
                     <div className="settings-card-title">Provider</div>
                     <div className="settings-card-desc">Choose a preset to auto-fill endpoint and model, or set them manually.</div>
@@ -299,7 +299,7 @@ export function AISettingsPanel({
                     <div className="settings-row-info">
                         <div className="settings-row-title">Current key status</div>
                         <div className="settings-row-desc">
-                            {keyStatus.hasKey ? `Available via ${keyStatus.storageMode}` : 'Not configured for selected provider. Save an API key before Test and Save.'}
+                            {keyStatus.hasKey ? `Available via ${keyStatus.storageMode} storage` : 'Not configured for selected provider. Save an API key before Test and Save.'}
                         </div>
                         {keyStatus.lastError && <div className="settings-row-desc settings-row-desc--error">Last error: {keyStatus.lastError}</div>}
                     </div>

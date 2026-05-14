@@ -79,6 +79,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
 }
 
 .theme-store-card-icon-wrap {
@@ -150,6 +151,14 @@
     align-items: center;
     gap: 6px;
     margin-left: 8px;
+}
+
+.theme-store-card-error {
+    width: 100%;
+    margin-top: 8px;
+    color: var(--editorError-foreground);
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 .theme-store-actions .theme-store-install-btn {

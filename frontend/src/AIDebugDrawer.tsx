@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAI, useUIState } from './contexts';
 
 export type AIDebugEntry = {
     id: number;
@@ -20,12 +21,6 @@ export type AIDebugEntry = {
     error?: string;
     durationMs: number;
     raw?: unknown;
-};
-
-type Props = {
-    entries: AIDebugEntry[];
-    onClear: () => void;
-    onClose: () => void;
 };
 
 function EntryCard({ entry }: { entry: AIDebugEntry }) {
@@ -120,24 +115,32 @@ function EntryCard({ entry }: { entry: AIDebugEntry }) {
     );
 }
 
-export function AIDebugDrawer({ entries, onClear, onClose }: Props) {
+export function AIDebugDrawer() {
+    const { aiDebugLog, setAIDebugLog } = useAI();
+    const { showAIDebug, setShowAIDebug } = useUIState();
+
     return (
-        <>
+        <div
+            className={`settings-panel settings-panel--ai-debug${showAIDebug ? ' settings-panel--open' : ''}`}
+            role="dialog"
+            aria-label="AI Debug Log"
+            aria-hidden={!showAIDebug}
+        >
             <div className="settings-header">
                 <button
                     type="button"
                     className="settings-back"
-                    onClick={onClose}
+                    onClick={() => setShowAIDebug(false)}
                     aria-label="Close"
                 >
                     &#8594;
                 </button>
                 <span className="settings-title">AI Debug Log</span>
-                {entries.length > 0 && (
+                {aiDebugLog.length > 0 && (
                     <button
                         type="button"
                         className="ai-debug-clear-btn"
-                        onClick={onClear}
+                        onClick={() => setAIDebugLog([])}
                         title="Clear log"
                     >
                         Clear
@@ -145,18 +148,18 @@ export function AIDebugDrawer({ entries, onClear, onClose }: Props) {
                 )}
             </div>
             <div className="settings-body ai-debug-body">
-                {entries.length === 0 ? (
+                {aiDebugLog.length === 0 ? (
                     <div className="ai-debug-empty">
                         No AI requests yet. Type a line starting with <code>?</code> and press Enter.
                     </div>
                 ) : (
                     <div className="ai-debug-list">
-                        {[...entries].reverse().map((entry) => (
+                        {[...aiDebugLog].reverse().map((entry) => (
                             <EntryCard key={entry.id} entry={entry} />
                         ))}
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }

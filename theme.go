@@ -213,14 +213,23 @@ func selectInstallableTheme(themes []manifestThemeEntry) (string, string, error)
 		return "", "", errors.New("no themes contributed by this extension")
 	}
 
+	hasTMTheme := false
+
 	for _, t := range themes {
 		clean := normalizeThemePath(t.Path)
 		if isJSONThemePath(clean) {
 			return clean, t.UITheme, nil
 		}
+		if strings.HasSuffix(strings.ToLower(clean), ".tmtheme") {
+			hasTMTheme = true
+		}
 	}
 
-	return "", "", errors.New("theme format not supported: extension has no JSON/JSONC theme file")
+	if hasTMTheme {
+		return "", "", errors.New("theme incompatible: this extension uses .tmTheme (plist/XML) files, but only JSON/JSONC themes are supported")
+	}
+
+	return "", "", errors.New("theme incompatible: extension has no JSON/JSONC theme file")
 }
 
 func (a *App) beginThemeSearch() (context.Context, uint64) {
@@ -559,6 +568,10 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 		if allowedColors[k] {
 			validColors[k] = v
 		}
+	}
+
+	if len(validColors) == 0 {
+		return nil, errors.New("theme incompatible: no supported color tokens were found in this theme")
 	}
 
 	// 5. Determine theme base type (dark or light)

@@ -1,15 +1,11 @@
 import { KeyboardEvent, WheelEvent as ReactWheelEvent, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import {
-    BrowserOpenURL,
     EventsOn,
-    Quit,
     WindowGetSize,
     WindowHide,
-    WindowReload,
     WindowSetSize
 } from '../wailsjs/runtime/runtime';
 import { AIDebugDrawer } from './AIDebugDrawer';
-import { AISettingsPanel } from './AISettings';
 import './App.css';
 import {
     buildStaleLineDetails,
@@ -20,46 +16,35 @@ import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
 import { ClearWorksheetModal } from './components/ClearWorksheetModal';
 import { HelpPanelContainer } from './components/HelpPanelContainer';
+import { SettingsPanel } from './components/SettingsPanel';
 import { StaleBanner } from './components/StaleBanner';
+import { StatusBar } from './components/StatusBar';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
-import { useTheme } from './useTheme';
-
-import { ThemeStore } from './ThemeStore';
 import {
     DEFAULT_FONT_SCALE,
-    DEFAULT_SETTINGS_DRAWER_WIDTH,
     DOUBLE_ESCAPE_HIDE_WINDOW_MS,
     EDITOR_BOTTOM_PADDING_PX,
     EDITOR_SIDE_PADDING_PX,
     EDITOR_TOP_PADDING_PX,
-    FINANCIAL_PRECISION,
     FONT_SCALE_MAX,
     FONT_SCALE_MIN,
     FONT_SCALE_STEP,
-    FOUR_POINT_PRECISION,
-    HELP_SITE_URL,
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
     INTELLIGENCE_HINT_SHOW_DELAY_MS,
-    IS_DEV,
     OPERATOR_KEY_RE,
-    PRECISION_MAX,
-    PRECISION_MIN,
-    SETTINGS_DRAWER_MAX_WIDTH,
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
-    SETTINGS_DRAWER_MIN_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
-import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
 import type {
     PrecisionMode,
-    SavedThemeEntry,
-    SuggestionItem,
+    SuggestionItem
 } from './types/app';
 import { inferCustomThemeMode } from './utils/colorUtils';
 import { buildIntelligenceSuggestions, buildSuggestionCatalog, collectKnownVariableNames, getIdentifierContextAtPosition } from './utils/editorIntelligence';
-import { formatNumber, getPrecisionScale, getSystemDecimalDelimiter, resolveDecimalDelimiter } from './utils/formatting';
+import { formatNumber, getPrecisionScale, resolveDecimalDelimiter } from './utils/formatting';
 import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
 import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
 
@@ -83,16 +68,7 @@ function App() {
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const {
-        decimalDelimiterMode,
-        setDecimalDelimiterMode,
-        precision,
-        setPrecision,
-        scientificNotation,
-        setScientificNotation,
-        wordWrap,
-        setWordWrap,
-    } = useDisplaySettings();
+    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -110,8 +86,6 @@ function App() {
         editorRef,
         overlayRef,
         gutterRef,
-        burgerMenuRef,
-        precisionMenuRef,
     } = useEditorUI();
     const {
         showSettings,
@@ -122,61 +96,33 @@ function App() {
         setShowThemeStore,
         helpPanelPosition,
         setHelpPanelPosition,
-        showBurgerMenu,
-        setShowBurgerMenu,
-        showPrecisionMenu,
-        setShowPrecisionMenu,
         showIntelligenceHint,
         setShowIntelligenceHint,
         showClearWorksheetConfirm,
         setShowClearWorksheetConfirm,
         isReevaluatingAll,
         setIsReevaluatingAll,
-        showAIDebug,
-        setShowAIDebug,
         settingsDrawerWidth,
         setSettingsDrawerWidth,
-        clampSettingsDrawerWidth,
         startSettingsDrawerResize,
         intelligenceShowTimerRef,
         intelligenceHideTimerRef,
         lastEscapeKeyAtRef,
     } = useUIState();
     const {
-        minimiseToTrayOnClose,
-        setMinimiseToTrayOnClose,
-        restoreShortcutEnabled,
-        setRestoreShortcutEnabled,
-        runtimePlatform,
-        isMSIX,
         resetWindowLayout: resetWindowLayoutFromContext,
         themeStoreOriginalSizeRef,
         settingsDrawerOriginalSizeRef,
         syncWindowTheme,
     } = useWindow();
     const {
-        savedThemes,
-        setSavedThemes,
         pendingThemePreview,
-        previewRestoreThemeRef,
-        startThemePreview: startThemePreviewInStore,
         cancelThemePreview: cancelThemePreviewInStore,
-        acceptThemePreview: acceptThemePreviewInStore,
-        deleteSavedTheme: deleteSavedThemeInStore,
     } = useThemeStore();
-    const { statusText, setStatusText, isStatusError, setIsStatusError, devError, setDevError } = useStatus();
+    const { isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
     const {
         aiContextMode,
-        setAIContextMode,
         aiSettings,
-        setAISettings,
-        aiSettingsDraft,
-        setAISettingsDraft,
-        aiSettingsActionFailed,
-        aiSettingsApplyError,
-        aiKeyStatus,
-        aiSettingsBusy,
-        aiDebugLog,
         setAIDebugLog,
         isAIQueryPending,
         setIsAIQueryPending,
@@ -185,14 +131,9 @@ function App() {
         aiProgressMessage,
         setAIProgressMessage,
         aiDebugIdRef,
-        aiSettingsHasUnsavedChanges,
-        testAndSaveAISettings,
-        revertAISettingsDraftToSaved,
-        saveAIKeyToBackend,
-        clearAIKeyInBackend,
         handleAIProgressEvent,
     } = useAI();
-    const {theme, setTheme} = useTheme();
+    const {theme, setTheme} = useThemeContext();
     const prefersDark = usePrefersDark();
     const isDarkTheme =
         theme.type === 'dark' ||
@@ -201,7 +142,6 @@ function App() {
     const isContentEmpty = content.trim() === '';
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
 
-    const systemDecimalDelimiter = getSystemDecimalDelimiter();
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
     useEffect(() => {
@@ -246,35 +186,6 @@ function App() {
     }, [syncWindowTheme, theme]);
 
     useEffect(() => {
-        if (!showBurgerMenu) {
-            return;
-        }
-
-        const onMouseDown = (event: MouseEvent) => {
-            if (!burgerMenuRef.current) {
-                return;
-            }
-            if (!burgerMenuRef.current.contains(event.target as Node)) {
-                setShowBurgerMenu(false);
-            }
-        };
-
-        const onEscape = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setShowBurgerMenu(false);
-            }
-        };
-
-        document.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('keydown', onEscape);
-
-        return () => {
-            document.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('keydown', onEscape);
-        };
-    }, [showBurgerMenu]);
-
-    useEffect(() => {
         if (!showClearWorksheetConfirm) {
             return;
         }
@@ -291,59 +202,6 @@ function App() {
             document.removeEventListener('keydown', onDocumentKeyDown);
         };
     }, [showClearWorksheetConfirm]);
-
-    useEffect(() => {
-        if (!showPrecisionMenu) {
-            return;
-        }
-
-        const onMouseDown = (event: MouseEvent) => {
-            if (!precisionMenuRef.current) {
-                return;
-            }
-            if (!precisionMenuRef.current.contains(event.target as Node)) {
-                setShowPrecisionMenu(false);
-            }
-        };
-
-        const onEscape = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                setShowPrecisionMenu(false);
-            }
-        };
-
-        document.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('keydown', onEscape);
-
-        return () => {
-            document.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('keydown', onEscape);
-        };
-    }, [showPrecisionMenu]);
-
-    const withStatusSetters = {
-        setStatusText,
-        setIsStatusError,
-        setDevError,
-    };
-
-    const onRevertAISettingsDraft = () => {
-        revertAISettingsDraftToSaved(withStatusSetters);
-    };
-
-    const onTestAndSaveAISettings = async () => {
-        await testAndSaveAISettings(withStatusSetters);
-    };
-
-    const onSaveAIKeyToBackend = async (apiKey: string) => {
-        await saveAIKeyToBackend(apiKey, withStatusSetters);
-    };
-
-    const onClearAIKeyInBackend = async () => {
-        await clearAIKeyInBackend(withStatusSetters);
-    };
-
-    // --- Hoisted actions (stable: only use setState callbacks or stable fns) ---
 
     const changeFontScale = (direction: 1 | -1) => {
         setFontScale((current) => {
@@ -367,12 +225,6 @@ function App() {
         setStatusText('Ready');
         setIsStatusError(false);
         setDevError('');
-    };
-
-    const requestClearWorksheet = () => {
-        setShowPrecisionMenu(false);
-        setShowBurgerMenu(false);
-        setShowClearWorksheetConfirm(true);
     };
 
     const cancelClearWorksheet = () => {
@@ -406,48 +258,6 @@ function App() {
         setDevError('');
     };
 
-    const decreasePrecision = () => {
-        setPrecision((current) => {
-            if (current === 'full') {
-                return 'full';
-            }
-            if (current === 'auto') {
-                return 'full';
-            }
-            if (current === PRECISION_MIN) {
-                return 'auto';
-            }
-            return current - 1;
-        });
-    };
-
-    const increasePrecision = () => {
-        setPrecision((current) => {
-            if (current === 'full') {
-                return 'auto';
-            }
-            if (current === 'auto') {
-                return PRECISION_MIN;
-            }
-            if (current >= PRECISION_MAX) {
-                return current;
-            }
-            return current + 1;
-        });
-    };
-
-    const resetPrecision = () => {
-        setPrecision('auto');
-    };
-
-    const applyFinancialPrecision = () => {
-        setPrecision(FINANCIAL_PRECISION);
-    };
-
-    const applyFourPointPrecision = () => {
-        setPrecision(FOUR_POINT_PRECISION);
-    };
-
     const resetWindowLayout = () => {
         resetWindowLayoutFromContext();
         setStatusText('Window layout reset');
@@ -464,14 +274,12 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', requestClearWorksheet);
+        const unsubNew = EventsOn('menu:file:new', () => setShowClearWorksheetConfirm(true));
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
         const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
         const unsubOpenHelp = EventsOn('menu:help:open', () => {
-            setShowPrecisionMenu(false);
-            setShowBurgerMenu(false);
             setShowThemeStore(false);
             setShowSettings(false);
             setShowHelp(true);
@@ -995,21 +803,12 @@ function App() {
         ? Math.max(EDITOR_PADDING, EDITOR_PADDING + measureLineWidth(activeLineText.slice(0, identifierContext.startInLine)) - editorScrollLeft)
         : 0;
 
-    const startThemePreview = (candidate: SavedThemeEntry) => {
-        startThemePreviewInStore(candidate, theme, setTheme);
-    };
 
     const cancelThemePreview = () => {
         cancelThemePreviewInStore(setTheme);
     };
 
-    const acceptThemePreview = (candidate: SavedThemeEntry) => {
-        acceptThemePreviewInStore(candidate, setTheme);
-    };
 
-    const deleteSavedTheme = (themeId: string) => {
-        deleteSavedThemeInStore(themeId);
-    };
 
     const expandWindowForThemeStore = async () => {
         try {
@@ -1091,25 +890,12 @@ function App() {
         void expandWindowForThemeStore();
     };
 
-    const openHelpPanel = () => {
-        setShowPrecisionMenu(false);
-        setShowBurgerMenu(false);
-        setShowThemeStore(false);
-        setShowSettings(false);
-        setShowHelp(true);
-    };
-
     const closeThemeStoreInSidebar = () => {
         if (pendingThemePreview) {
             cancelThemePreview();
         }
         setShowThemeStore(false);
         void restoreWindowAfterThemeStore();
-    };
-
-    const runBurgerAction = (action: () => void) => {
-        setShowBurgerMenu(false);
-        action();
     };
 
     const helpDockClass = !showHelp
@@ -1122,6 +908,7 @@ function App() {
     const windowStyle = {
         '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
         '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
+        '--ui-font-scale': uiFontScale,
     } as CSSProperties;
 
     return (
@@ -1342,680 +1129,21 @@ function App() {
                     )}
                 </div>
             </div>
-            <div className={`status-bar${isStatusError ? ' error' : ''}`}>
-                <span className="status-text">
-                    {statusText}
-                    {IS_DEV && devError ? ` | dev: ${devError}` : ''}
-                </span>
-                {isAIQueryPending && (
-                    <span className="status-chip status-chip--busy" title="AI request is in progress">
-                        <span className="status-spinner" aria-hidden="true" />
-                        AI waiting...
-                    </span>
-                )}
-                <button
-                    type="button"
-                    className="status-chip status-chip-btn status-chip-btn--clear-first"
-                    title="Clear all expressions"
-                    aria-label="Clear all expressions"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={requestClearWorksheet}
-                >
-                    clear
-                </button>
-                <button
-                    type="button"
-                    className={`status-chip status-chip-btn${wordWrap ? ' status-chip-btn--active' : ''}`}
-                    title={wordWrap ? 'Word wrap: on' : 'Word wrap: off'}
-                    aria-label="Toggle word wrap"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setWordWrap((prev) => !prev)}
-                >
-                    wrap: {wordWrap ? 'on' : 'off'}
-                </button>
-                <div className="status-chip-wrap" ref={precisionMenuRef}>
-                    <button
-                        type="button"
-                        className={`status-chip status-chip-btn${showPrecisionMenu ? ' status-chip-btn--active' : ''}`}
-                        title={precision === 'full' ? 'Precision: full (no rounding)' : precision === 'auto' ? 'Precision: auto (10 decimal places)' : `Precision: ${precision} decimal place${precision === 1 ? '' : 's'}`}
-                        aria-label="Open precision selector"
-                        aria-haspopup="dialog"
-                        aria-expanded={showPrecisionMenu}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                            setShowBurgerMenu(false);
-                            setShowPrecisionMenu((prev) => !prev);
-                        }}
-                    >
-                        {precision === 'full' ? 'prec: full' : precision === 'auto' ? 'prec: auto' : `prec: ${precision}`}
-                    </button>
-                    {showPrecisionMenu && (
-                        <div className="precision-popover" role="dialog" aria-label="Precision selector">
-                            <div className="precision-popover-title">Display precision</div>
-                            <div className="precision-popover-desc">Applies to rendered result text.</div>
-                            <div className="precision-popover-row">
-                                <div className="precision-popover-row-info">
-                                    <div className="precision-popover-label">Decimals</div>
-                                    <div className="precision-popover-value">
-                                        {precision === 'full' ? 'Full — no rounding' : precision === 'auto' ? 'Auto — 10 dec. places' : `${precision} place${precision === 1 ? '' : 's'}`}
-                                    </div>
-                                </div>
-                                <div className="settings-stepper-group precision-popover-stepper">
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={decreasePrecision}
-                                        disabled={precision === 'full'}
-                                        aria-label="Decrease precision"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="settings-stepper-value">
-                                        {precision === 'full' ? 'Full' : precision === 'auto' ? 'Auto' : String(precision)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={increasePrecision}
-                                        disabled={precision === PRECISION_MAX}
-                                        aria-label="Increase precision"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="precision-popover-actions">
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => setPrecision('full')}
-                                    disabled={precision === 'full'}
-                                >
-                                    Full
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFinancialPrecision}
-                                    disabled={precision === FINANCIAL_PRECISION}
-                                >
-                                    Financial (2)
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFourPointPrecision}
-                                    disabled={precision === FOUR_POINT_PRECISION}
-                                >
-                                    Intermediate (4)
-                                </button>
-                                <button
-                                    type="button"
-                                    className="precision-popover-link"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={resetPrecision}
-                                    disabled={precision === 'auto'}
-                                >
-                                    Auto (10)
-                                </button>
-                            </div>
-                            <div className="precision-popover-row precision-popover-row--toggle">
-                                <div className="precision-popover-row-info">
-                                    <div className="precision-popover-label">Scientific mode</div>
-                                    <div className="precision-popover-value">Use 1e+7 and 1e-7 for extreme values.</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle scientific notation">
-                                    <input
-                                        type="checkbox"
-                                        checked={scientificNotation}
-                                        onChange={(e) => setScientificNotation(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                                                        </div>
-                            </div>
-                    )}
-                </div>
-                <div className="status-menu-wrap" ref={burgerMenuRef}>
-                    <button
-                        type="button"
-                        className="settings-btn status-menu-btn"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                            setShowPrecisionMenu(false);
-                            setShowBurgerMenu((prev) => !prev);
-                        }}
-                        aria-label="Menu"
-                        title="Menu"
-                    >
-                        ☰
-                    </button>
-                    {showBurgerMenu && (
-                        <div className="status-menu-popover" role="menu" aria-label="App menu">
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(requestClearWorksheet)}>New worksheet</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => WindowReload())}>Reload app</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(1))}>Increase font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(() => changeFontScale(-1))}>Decrease font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetFontSize)}>Reset font size</button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(resetWindowLayout)}>Reset window layout</button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => {
-                                    setShowHelp(false);
-                                    setShowSettings(true);
-                                    openThemeStoreInSidebar();
-                                })}
-                            >
-                                Open Theme Store
-                            </button>
-                            <button type="button" className="status-menu-item" onClick={() => runBurgerAction(openHelpPanel)}>Help</button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL(HELP_SITE_URL))}
-                            >
-                                Open Full Help Site
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => setShowAIDebug(true))}
-                            >
-                                AI Debug Log{aiDebugLog.length > 0 ? ` (${aiDebugLog.length})` : ''}
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => BrowserOpenURL('https://github.com/Zaitsev/run-calc'))}
-                            >
-                                GitHub
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item"
-                                onClick={() => runBurgerAction(() => alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'))}
-                            >
-                                About
-                            </button>
-                            <button
-                                type="button"
-                                className="status-menu-item status-menu-item--danger"
-                                onClick={() => runBurgerAction(() => Quit())}
-                            >
-                                Quit (your work is saved)
-                            </button>
-                        </div>
-                    )}
-                </div>
-                <button
-                    type="button"
-                    className="settings-btn"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        setShowPrecisionMenu(false);
-                        setShowBurgerMenu(false);
-                        if (showHelp) {
-                            setShowHelp(false);
-                            return;
-                        }
-                        openHelpPanel();
-                    }}
-                    aria-label="Help"
-                    title="Help"
-                >
-                    ?
-                </button>
-                <button
-                    type="button"
-                    className="settings-btn"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        setShowPrecisionMenu(false);
-                        setShowBurgerMenu(false);
-                        setShowHelp(false);
-                        setShowSettings(true);
-                        setShowThemeStore(false);
-                    }}
-                    aria-label="Settings"
-                    title="Settings"
-                >
-                    ⚙
-                </button>
-            </div>
+            <StatusBar />
 
-            <div
-                className={`settings-panel settings-panel--main${showSettings ? ' settings-panel--open' : ''}${showThemeStore ? ' settings-panel--theme-store' : ''}`}
-                role="dialog"
-                aria-label="Settings"
-                aria-hidden={!showSettings}
-                style={showThemeStore ? undefined : { width: `${settingsDrawerWidth}px` }}
-            >
-                    {!showThemeStore && (
-                        <div
-                            className="settings-resize-handle"
-                            role="separator"
-                            aria-label="Resize settings drawer"
-                            aria-orientation="vertical"
-                            tabIndex={0}
-                            onMouseDown={startSettingsDrawerResize}
-                            onDoubleClick={() => setSettingsDrawerWidth(DEFAULT_SETTINGS_DRAWER_WIDTH)}
-                            onKeyDown={(event) => {
-                                if (event.key === 'ArrowLeft') {
-                                    event.preventDefault();
-                                    setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current + 16));
-                                } else if (event.key === 'ArrowRight') {
-                                    event.preventDefault();
-                                    setSettingsDrawerWidth((current) => clampSettingsDrawerWidth(current - 16));
-                                } else if (event.key === 'Home') {
-                                    event.preventDefault();
-                                    setSettingsDrawerWidth(SETTINGS_DRAWER_MIN_WIDTH);
-                                } else if (event.key === 'End') {
-                                    event.preventDefault();
-                                    setSettingsDrawerWidth(clampSettingsDrawerWidth(SETTINGS_DRAWER_MAX_WIDTH));
-                                }
-                            }}
-                            title="Drag to resize"
-                        />
-                    )}
-                    <div className="settings-header">
-                        <button
-                            type="button"
-                            className="settings-back"
-                            onClick={() => {
-                                if (showThemeStore) {
-                                    closeThemeStoreInSidebar();
-                                    return;
-                                }
-                                setShowSettings(false);
-                            }}
-                            aria-label="Back"
-                        >
-                            &#8594;
-                        </button>
-                        <span className="settings-title">{showThemeStore ? 'Theme Store' : 'Settings'}</span>
-                    </div>
+            <SettingsPanel
+                showSettings={showSettings}
+                showThemeStore={showThemeStore}
+                setShowThemeStore={setShowThemeStore}
+                settingsDrawerWidth={settingsDrawerWidth}
+                setSettingsDrawerWidth={setSettingsDrawerWidth}
+                startSettingsDrawerResize={startSettingsDrawerResize}
+                onClose={() => setShowSettings(false)}
+                onOpenThemeStore={openThemeStoreInSidebar}
+                onCloseThemeStore={closeThemeStoreInSidebar}
+            />
 
-                    {showThemeStore ? (
-                        <div className="settings-body settings-body--theme-store">
-                            <ThemeStore
-                                onPreviewTheme={startThemePreview}
-                                onAcceptTheme={acceptThemePreview}
-                                onCancelThemePreview={cancelThemePreview}
-                                currentPreviewThemeId={pendingThemePreview?.id ?? null}
-                            />
-                        </div>
-                    ) : (
-                    <div className="settings-body">
-                        {/* ── AI ── */}
-                        <div className={`settings-ai-block${aiSettingsHasUnsavedChanges ? ' settings-ai-block--action-required' : ''}`}>
-                            <p className="settings-section-label settings-section-label--with-chip">
-                                <span>AI</span>
-                                {aiSettingsHasUnsavedChanges && (
-                                    <span className="settings-status-chip" aria-label="AI settings have unsaved changes">Unsaved</span>
-                                )}
-                            </p>
-                            <AISettingsPanel
-                                settings={aiSettingsDraft}
-                                keyStatus={aiKeyStatus}
-                                busy={aiSettingsBusy}
-                                hasUnsavedChanges={aiSettingsHasUnsavedChanges}
-                                showRevertChanges={aiSettingsActionFailed}
-                                applyErrorMessage={aiSettingsApplyError}
-                                onChange={(next) => {
-                                    setAISettingsDraft(next);
-                                }}
-                                onTestAndSave={onTestAndSaveAISettings}
-                                onRevertChanges={onRevertAISettingsDraft}
-                                onSaveKey={onSaveAIKeyToBackend}
-                                onClearKey={onClearAIKeyInBackend}
-                            />
-                        </div>
-
-                        {/* ── Appearance ── */}
-                        <p className="settings-section-label">Appearance</p>
-                        <div className="settings-card">
-                            <div className="settings-card-header">
-                                <div className="settings-card-title">App theme</div>
-                                <div className="settings-card-desc">Select which app theme to display</div>
-                            </div>
-                            <div className="saved-theme-list" role="list">
-                                <div className="saved-theme-group" role="group" aria-label="Browse themes">
-                                    <button
-                                        type="button"
-                                        className="saved-theme-item saved-theme-browse-btn"
-                                        onClick={openThemeStoreInSidebar}
-                                        role="listitem"
-                                    >
-                                        <span className="saved-theme-icon saved-theme-icon--browse" aria-hidden="true">+</span>
-                                        <span className="saved-theme-text">
-                                            <span className="saved-theme-name">Browse themes</span>
-                                            <span className="saved-theme-meta">Theme store</span>
-                                        </span>
-                                    </button>
-                                </div>
-
-                                <div className="saved-theme-group" role="group" aria-label="Default themes">
-                                    {([
-                                        { key: 'light', name: 'Light', meta: 'Default theme', icon: 'L' },
-                                        { key: 'dark', name: 'Dark', meta: 'Default theme', icon: 'D' },
-                                        { key: 'system', name: 'System', meta: 'Use OS setting', icon: 'S' },
-                                    ] as const).map((entry) => {
-                                        const isActive = theme.type === entry.key;
-                                        return (
-                                            <button
-                                                key={entry.key}
-                                                type="button"
-                                                className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
-                                                onClick={() => setTheme({ type: entry.key })}
-                                                role="listitem"
-                                            >
-                                                <span className="saved-theme-icon saved-theme-icon--builtin" aria-hidden="true">{entry.icon}</span>
-                                                <span className="saved-theme-text">
-                                                    <span className="saved-theme-name">{entry.name}</span>
-                                                    <span className="saved-theme-meta">{entry.meta}</span>
-                                                </span>
-                                                <span className="saved-theme-check" aria-hidden="true">v</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="saved-theme-group" role="group" aria-label="Downloaded themes">
-                                    {savedThemes.map((entry) => {
-                                        const isActive = theme.type === 'custom' && theme.customId === entry.id;
-                                        return (
-                                            <div key={entry.id} className="saved-theme-item-wrapper">
-                                                <button
-                                                    type="button"
-                                                    className={`saved-theme-item${isActive ? ' saved-theme-item--active' : ''}`}
-                                                    onClick={() => setTheme({
-                                                        type: 'custom',
-                                                        customColors: entry.colors,
-                                                        customId: entry.id,
-                                                        customThemeBase: entry.themeBase,
-                                                    })}
-                                                    role="listitem"
-                                                >
-                                                    {entry.iconUrl && <img src={entry.iconUrl} alt="" aria-hidden="true" className="saved-theme-icon" />}
-                                                    <span className="saved-theme-text">
-                                                        <span className="saved-theme-name">{entry.name}</span>
-                                                        {entry.publisher && <span className="saved-theme-meta">{entry.publisher}</span>}
-                                                    </span>
-                                                    <span className="saved-theme-check" aria-hidden="true">v</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="saved-theme-delete-btn"
-                                                    onClick={() => deleteSavedTheme(entry.id)}
-                                                    aria-label={`Delete saved theme ${entry.name}`}
-                                                    title={`Delete ${entry.name}`}
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── Editor ── */}
-                        <p className="settings-section-label">Editor</p>
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Font size</div>
-                                    <div className="settings-row-desc">Adjust the editor text size</div>
-                                </div>
-                                <div className="settings-stepper-group">
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => changeFontScale(-1)}
-                                        disabled={fontScale <= FONT_SCALE_MIN}
-                                        aria-label="Decrease font size"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="settings-stepper-value">
-                                        {Math.round(fontScale * 100)}%
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => changeFontScale(1)}
-                                        disabled={fontScale >= FONT_SCALE_MAX}
-                                        aria-label="Increase font size"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            {fontScale !== DEFAULT_FONT_SCALE && (
-                                <div className="settings-subaction">
-                                    <button
-                                        type="button"
-                                        className="settings-link-btn"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={resetFontSize}
-                                    >
-                                        Reset to default
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Word wrap</div>
-                                    <div className="settings-row-desc">Wrap long lines inside the editor</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle word wrap">
-                                    <input
-                                        type="checkbox"
-                                        checked={wordWrap}
-                                        onChange={(e) => setWordWrap(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* ── Calculation ── */}
-                        <p className="settings-section-label">Calculation</p>
-                        <div className="settings-card">
-                            <div className="settings-card-header">
-                                <div className="settings-card-title">Decimal delimiter</div>
-                                <div className="settings-card-desc">Choose how decimal values are written and parsed</div>
-                            </div>
-                            <div className="settings-options">
-                                {(['dot', 'comma', 'system'] as const).map((mode) => (
-                                    <label key={mode} className="settings-option">
-                                        <input
-                                            type="radio"
-                                            name="decimal-delimiter"
-                                            value={mode}
-                                            checked={decimalDelimiterMode === mode}
-                                            onChange={() => setDecimalDelimiterMode(mode)}
-                                        />
-                                        <span>
-                                            {mode === 'dot'
-                                                ? 'Dot (1.23)'
-                                                : mode === 'comma'
-                                                    ? 'Comma (1,23)'
-                                                    : `Use system setting (${systemDecimalDelimiter === ',' ? '1,23' : '1.23'})`}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Decimal precision</div>
-                                    <div className="settings-row-desc">Auto = 10 decimals · Full = no rounding · or pick 0–15</div>
-                                </div>
-                                <div className="settings-stepper-group">
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={decreasePrecision}
-                                        disabled={precision === 'full'}
-                                        aria-label="Decrease precision"
-                                    >
-                                        −
-                                    </button>
-                                    <span className="settings-stepper-value">
-                                        {precision === 'full' ? 'Full' : precision === 'auto' ? 'Auto' : String(precision)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-stepper"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={increasePrecision}
-                                        disabled={precision === PRECISION_MAX}
-                                        aria-label="Increase precision"
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="settings-subaction settings-subaction--presets">
-                                <button
-                                    type="button"
-                                    className="settings-link-btn"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFinancialPrecision}
-                                    disabled={precision === FINANCIAL_PRECISION}
-                                >
-                                    Financial (2)
-                                </button>
-                                <button
-                                    type="button"
-                                    className="settings-link-btn"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={applyFourPointPrecision}
-                                    disabled={precision === FOUR_POINT_PRECISION}
-                                >
-                                    Intermediate (4)
-                                </button>
-                                {precision !== 'auto' && (
-                                    <button
-                                        type="button"
-                                        className="settings-link-btn"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={resetPrecision}
-                                    >
-                                        Reset to default
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Scientific notation</div>
-                                    <div className="settings-row-desc">Display very large or small results as 1e+7 / 1e-7</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle scientific notation">
-                                    <input
-                                        type="checkbox"
-                                        checked={scientificNotation}
-                                        onChange={(e) => setScientificNotation(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* ── Window ── */}
-                        <p className="settings-section-label">Window</p>
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Window layout</div>
-                                    <div className="settings-row-desc">Restore default size and position</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    className="settings-action-btn"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => { resetWindowLayout(); setShowSettings(false); }}
-                                >
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Close button behavior</div>
-                                    <div className="settings-row-desc">Hide to tray on close (default) instead of quitting</div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle close button behavior">
-                                    <input
-                                        type="checkbox"
-                                        checked={minimiseToTrayOnClose}
-                                        onChange={(e) => setMinimiseToTrayOnClose(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="settings-card">
-                            <div className="settings-row">
-                                <div className="settings-row-info">
-                                    <div className="settings-row-title">Restore shortcut</div>
-                                    <div className="settings-row-desc">
-                                        {isMSIX
-                                            ? 'Not available in the Store version (Windows sandbox restriction)'
-                                            : runtimePlatform === 'darwin'
-                                                ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
-                                                : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
-                                    </div>
-                                </div>
-                                <label className="settings-toggle" aria-label="Toggle restore shortcut">
-                                    <input
-                                        type="checkbox"
-                                        checked={restoreShortcutEnabled}
-                                        disabled={isMSIX}
-                                        onChange={(e) => setRestoreShortcutEnabled(e.target.checked)}
-                                    />
-                                    <span className="settings-toggle-track" />
-                                </label>
-                            </div>
-                        </div>
-
-                    </div>
-                    )}
-                </div>
-
-            <div
-                className={`settings-panel settings-panel--ai-debug${showAIDebug ? ' settings-panel--open' : ''}`}
-                role="dialog"
-                aria-label="AI Debug Log"
-                aria-hidden={!showAIDebug}
-            >
-                <AIDebugDrawer
-                    entries={aiDebugLog}
-                    onClear={() => setAIDebugLog([])}
-                    onClose={() => setShowAIDebug(false)}
-                />
-            </div>
+            <AIDebugDrawer />
 
             {showHelp && (
                 <HelpPanelContainer
