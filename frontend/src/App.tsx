@@ -1160,29 +1160,8 @@ function App() {
                             const sourceChanged = previousLineSource !== nextLineSource;
 
                             if (sourceChanged) {
-                                const previousDeclaration = parseDeclaredVariable(previousLineSource);
-                                const nextDeclaration = parseDeclaredVariable(nextLineSource);
-
                                 setLastResult(null);
                                 clearLineEvaluationMetadata(activeLineIndex);
-
-                                // Editing a declaration should immediately mark dependent lines stale.
-                                setVariableVersions((prev) => {
-                                    let changed = false;
-                                    const next = { ...prev };
-
-                                    if (previousDeclaration) {
-                                        next[previousDeclaration.key] = (next[previousDeclaration.key] ?? 0) + 1;
-                                        changed = true;
-                                    }
-
-                                    if (nextDeclaration && (!previousDeclaration || previousDeclaration.key !== nextDeclaration.key)) {
-                                        next[nextDeclaration.key] = (next[nextDeclaration.key] ?? 0) + 1;
-                                        changed = true;
-                                    }
-
-                                    return changed ? next : prev;
-                                });
                             }
 
                             setContent(nextContent);
