@@ -1,5 +1,5 @@
 import React from 'react';
-import { useDisplaySettings, useEditorUI, useStatus, useUIState, useWindow } from '../contexts';
+import { useEditorUI, useStatus, useUIState } from '../contexts';
 import { AISettingsPanel } from '../AISettings';
 import { ThemeStore } from '../ThemeStore';
 import {
@@ -12,7 +12,6 @@ import {
     FONT_SCALE_STEP,
     FOUR_POINT_PRECISION,
     PRECISION_MAX,
-    PRECISION_MIN,
     SETTINGS_DRAWER_MAX_WIDTH,
     SETTINGS_DRAWER_MIN_WIDTH,
 } from '../constants';
