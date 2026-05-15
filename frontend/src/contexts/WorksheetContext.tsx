@@ -92,6 +92,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     };
 
     const [lastResult, setLastResultState] = useState<number | null>(fallbackWorksheet.lastResult);
+    const [content, setContentState] = useState(fallbackWorksheet.content);
     const [markedLines, setMarkedLines] = useState<ReadonlySet<number>>(new Set(fallbackWorksheet.markedLines));
     const [variableValues, setVariableValues] = useState<Record<string, unknown>>(fallbackWorksheet.variableValues);
 
@@ -99,18 +100,26 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
     const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
+    const hasPendingContentSyncRef = useRef(false);
+    const syncedWorksheetIdRef = useRef(fallbackWorksheet.id);
 
     // Sync local state from active worksheet when it changes
     useEffect(() => {
         if (!activeWorksheet) return;
+        const isWorksheetSwitch = syncedWorksheetIdRef.current !== activeWorksheet.id;
+        syncedWorksheetIdRef.current = activeWorksheet.id;
+        if (isWorksheetSwitch || !hasPendingContentSyncRef.current) {
+            setContentState(activeWorksheet.content);
+        }
         setLastResultState(activeWorksheet.lastResult);
         setMarkedLines(new Set(activeWorksheet.markedLines));
         setVariableValues(activeWorksheet.variableValues);
+        hasPendingContentSyncRef.current = false;
         // Clear session state when switching worksheets
         setVariableVersions({});
         setLineDependencies({});
         setLineDependencyVersions({});
-    }, [manager.activeId]);
+    }, [activeWorksheet]);
 
     // Persist state changes back to manager - debounced to avoid excessive updates
     const persistTimerRef = useRef<number | null>(null);
@@ -120,21 +129,24 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         }
         persistTimerRef.current = window.setTimeout(() => {
             manager.updateActiveWorksheet({
+                content,
                 lastResult,
                 markedLines: [...markedLines],
                 variableValues,
             });
+            hasPendingContentSyncRef.current = false;
         }, 200);
 
         return () => {
             if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
         };
-    }, [lastResult, markedLines, variableValues]);
+    }, [content, lastResult, markedLines, variableValues, manager]);
 
     const setContent = (next: React.SetStateAction<string>) => {
-        const currentContent = activeWorksheet?.content || fallbackWorksheet.content;
+        const currentContent = content;
         const newContent = typeof next === 'function' ? next(currentContent) : next;
-        manager.updateActiveWorksheet({ content: newContent });
+        hasPendingContentSyncRef.current = true;
+        setContentState(newContent);
     };
 
     const setLastResult = (v: number | null) => setLastResultState(v);
@@ -199,7 +211,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
 
     return (
         <WorksheetContext.Provider value={{
-            content: activeWorksheet?.content || fallbackWorksheet.content,
+            content,
             setContent,
             lastResult,
             setLastResult,

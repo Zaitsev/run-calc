@@ -306,7 +306,15 @@ function App() {
             return;
         }
 
-        const passwordHash = await hashWorksheetPassword(password);
+        let passwordHash: string;
+        try {
+            passwordHash = await hashWorksheetPassword(password);
+        } catch (error) {
+            setStatusText(error instanceof Error ? error.message : `Unable to lock worksheet: ${String(error)}`);
+            setIsStatusError(true);
+            setDevError('');
+            return;
+        }
         lockWorksheet(activeWorksheet.id, passwordHash);
         setStatusText('Worksheet locked');
         setIsStatusError(false);
@@ -328,7 +336,15 @@ function App() {
             return;
         }
 
-        const passwordHash = await hashWorksheetPassword(password);
+        let passwordHash: string;
+        try {
+            passwordHash = await hashWorksheetPassword(password);
+        } catch (error) {
+            setStatusText(error instanceof Error ? error.message : `Unable to unlock worksheet: ${String(error)}`);
+            setIsStatusError(true);
+            setDevError('');
+            return;
+        }
         if (passwordHash !== activeWorksheet.lockPasswordHash) {
             setStatusText('Incorrect password');
             setIsStatusError(true);
@@ -390,7 +406,7 @@ function App() {
             unsubOpenHelp();
             unsubAIProgress();
         };
-    }, [lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [changeFontScale, createWorksheet, handleAIProgressEvent, lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume, resetFontSize, resetWindowLayout]);
 
     useEffect(() => {
         const now = Date.now();

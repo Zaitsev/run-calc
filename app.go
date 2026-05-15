@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -253,12 +254,12 @@ func (a *App) unregisterRestoreHotkeyLocked() {
 
 // WorksheetExportPayload is the plaintext structure exported to encrypted file
 type WorksheetExportPayload struct {
-	Content         string                 `json:"content"`
-	LastResult      *float64               `json:"lastResult"`
-	MarkedLines     []int                  `json:"markedLines"`
-	VariableValues  map[string]interface{} `json:"variableValues"`
-	IsLocked        bool                   `json:"isLocked,omitempty"`
-	LockPasswordHash string                `json:"lockPasswordHash,omitempty"`
+	Content          string                 `json:"content"`
+	LastResult       *float64               `json:"lastResult"`
+	MarkedLines      []int                  `json:"markedLines"`
+	VariableValues   map[string]interface{} `json:"variableValues"`
+	IsLocked         bool                   `json:"isLocked,omitempty"`
+	LockPasswordHash string                 `json:"lockPasswordHash,omitempty"`
 }
 
 // WorksheetEncryptedFile is the on-disk format (JSON with base64-encoded ciphertext + nonce)
@@ -278,9 +279,18 @@ type SaveWorksheetResponse struct {
 
 // LoadWorksheetResponse is returned by LoadWorksheetFromFile
 type LoadWorksheetResponse struct {
-	OK     bool   `json:"ok"`
-	Error  string `json:"error,omitempty"`
+	OK      bool                    `json:"ok"`
+	Error   string                  `json:"error,omitempty"`
 	Payload *WorksheetExportPayload `json:"payload,omitempty"`
+}
+
+func generateWorksheetKeyID() (string, error) {
+	keyIDBytes := make([]byte, 16)
+	if _, err := rand.Read(keyIDBytes); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(keyIDBytes), nil
 }
 
 // GetDefaultWorksheetDirectory returns the default directory for saving worksheets
@@ -306,9 +316,9 @@ func (a *App) SelectWorksheetEncryptedSavePath(defaultFileName string) string {
 	}
 
 	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
-		Title:               "Save Worksheet (Encrypted)",
-		DefaultDirectory:    a.GetDefaultWorksheetDirectory(),
-		DefaultFilename:     defaultFileName,
+		Title:                "Save Worksheet (Encrypted)",
+		DefaultDirectory:     a.GetDefaultWorksheetDirectory(),
+		DefaultFilename:      defaultFileName,
 		CanCreateDirectories: true,
 		Filters: []wruntime.FileFilter{
 			{DisplayName: "Run-Calc Worksheet (*.rcalc)", Pattern: "*.rcalc"},
@@ -328,9 +338,9 @@ func (a *App) SelectWorksheetPlaintextExportPath(defaultFileName string) string 
 	}
 
 	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
-		Title:               "Export Worksheet (Plain Text)",
-		DefaultDirectory:    a.GetDefaultWorksheetDirectory(),
-		DefaultFilename:     defaultFileName,
+		Title:                "Export Worksheet (Plain Text)",
+		DefaultDirectory:     a.GetDefaultWorksheetDirectory(),
+		DefaultFilename:      defaultFileName,
 		CanCreateDirectories: true,
 		Filters: []wruntime.FileFilter{
 			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
@@ -415,8 +425,14 @@ func (a *App) SaveWorksheetToFile(worksheetJSON string, filePath string) SaveWor
 	// Encrypt the JSON payload
 	ciphertext := gcm.Seal(nil, nonce, []byte(worksheetJSON), nil)
 
-	// Generate keyID from file hash (user-friendly identifier)
-	keyID := filepath.Base(filePath) // Use filename as keyID for simplicity
+	// Generate a random key identifier that is stored in the encrypted file metadata.
+	keyID, err := generateWorksheetKeyID()
+	if err != nil {
+		return SaveWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("failed to generate encryption key identifier: %v", err),
+		}
+	}
 
 	// Store key in OS keyring
 	if err := storeOrCreateWorksheetKey(keyID, key); err != nil {
@@ -528,6 +544,25 @@ func (a *App) LoadWorksheetFromFile(filePath string) LoadWorksheetResponse {
 		}
 	}
 
+	if encFile.Version != 1 {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("unsupported worksheet file version: %d", encFile.Version),
+		}
+	}
+	if encFile.KeyID == "" {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: "invalid encrypted file format: missing key identifier",
+		}
+	}
+	if encFile.Ciphertext == "" || encFile.Nonce == "" {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: "invalid encrypted file format: missing ciphertext or nonce",
+		}
+	}
+
 	// Retrieve key from OS keyring
 	key, err := getOrCreateWorksheetKey(encFile.KeyID)
 	if err != nil {
@@ -568,6 +603,13 @@ func (a *App) LoadWorksheetFromFile(filePath string) LoadWorksheetResponse {
 		return LoadWorksheetResponse{
 			OK:    false,
 			Error: fmt.Sprintf("failed to create GCM: %v", err),
+		}
+	}
+
+	if len(nonce) != gcm.NonceSize() {
+		return LoadWorksheetResponse{
+			OK:    false,
+			Error: fmt.Sprintf("invalid encrypted file format: nonce must be %d bytes", gcm.NonceSize()),
 		}
 	}
 

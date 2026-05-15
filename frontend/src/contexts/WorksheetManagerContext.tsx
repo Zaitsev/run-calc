@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { WorksheetSnapshot } from '../types/app';
 import {
@@ -20,6 +20,7 @@ type WorksheetManagerContextValue = {
     lockWorksheet: (id: string, passwordHash: string) => void;
     lockProtectedWorksheets: () => void;
     unlockWorksheet: (id: string) => void;
+    updateWorksheet: (id: string, updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => void;
     updateActiveWorksheet: (updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => void;
 };
 
@@ -168,22 +169,23 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         if (activeId) localStorage.setItem(WORKSHEETS_ACTIVE_ID_STORAGE_KEY, activeId);
     }, [activeId]);
 
-    const createWorksheet = (name?: string) => {
+    const createWorksheet = useCallback((name?: string) => {
         const newId = generateWorksheetId();
-        const newName = name ?? getDefaultWorksheetName(worksheets.length);
-        const newWorksheet: WorksheetSnapshot = {
-            id: newId,
-            name: newName,
-            content: '',
-            lastResult: null,
-            markedLines: [],
-            variableValues: {},
-            isLocked: false,
-            lockPasswordHash: undefined,
-        };
-        setWorksheets(prev => [...prev, newWorksheet]);
+        setWorksheets((prev) => {
+            const newWorksheet: WorksheetSnapshot = {
+                id: newId,
+                name: name ?? getDefaultWorksheetName(prev.length),
+                content: '',
+                lastResult: null,
+                markedLines: [],
+                variableValues: {},
+                isLocked: false,
+                lockPasswordHash: undefined,
+            };
+            return [...prev, newWorksheet];
+        });
         setActiveId(newId);
-    };
+    }, []);
 
     const deleteWorksheet = (id: string) => {
         // Guard: do not allow deleting if it's the last worksheet
@@ -236,10 +238,10 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         );
     };
 
-    const updateActiveWorksheet = (updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
+    const updateWorksheet = useCallback((id: string, updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
         setWorksheets(prev =>
             prev.map(w =>
-                w.id === activeId
+                w.id === id
                     ? {
                         ...w,
                         ...updates,
@@ -247,7 +249,11 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
                     : w
             )
         );
-    };
+    }, []);
+
+    const updateActiveWorksheet = useCallback((updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
+        updateWorksheet(activeId, updates);
+    }, [activeId, updateWorksheet]);
 
     const contextValue = useMemo(() => ({
         worksheets,
@@ -259,8 +265,9 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         lockWorksheet,
         lockProtectedWorksheets,
         unlockWorksheet,
+        updateWorksheet,
         updateActiveWorksheet,
-    }), [worksheets, activeId]);
+    }), [worksheets, activeId, createWorksheet, updateWorksheet, updateActiveWorksheet]);
 
     return (
         <WorksheetManagerContext.Provider value={contextValue}>

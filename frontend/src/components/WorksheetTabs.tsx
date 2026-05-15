@@ -32,7 +32,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         switchWorksheet,
         lockWorksheet,
         unlockWorksheet,
-        updateActiveWorksheet,
+        updateWorksheet,
     } = useWorksheetManager();
 
     const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -258,8 +258,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                     }
                 }
 
-                // Update the active worksheet with loaded data
-                updateActiveWorksheet({
+                updateWorksheet(worksheetId, {
                     content: result.payload.content,
                     lastResult: result.payload.lastResult,
                     markedLines: result.payload.markedLines,
@@ -295,7 +294,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
             return;
         }
 
-        const password = await requestPassword({
+                const password = await requestPassword({
             title: 'Lock worksheet',
             message: `Set a password for worksheet "${worksheet.name}".`,
             mode: 'create',
@@ -303,7 +302,13 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         });
         if (!password) return;
 
-        const passwordHash = await hashWorksheetPassword(password);
+        let passwordHash: string;
+        try {
+            passwordHash = await hashWorksheetPassword(password);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : `Unable to lock worksheet: ${String(error)}`);
+            return;
+        }
         lockWorksheet(worksheetId, passwordHash);
         setContextMenu(null);
     };
@@ -312,7 +317,13 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         const worksheet = worksheets.find((w) => w.id === worksheetId);
         if (!worksheet?.isLocked || !worksheet.lockPasswordHash) return;
 
-        const isValid = await verifyPassword(worksheet.lockPasswordHash, `Enter password to unlock "${worksheet.name}":`);
+        let isValid: boolean;
+        try {
+            isValid = await verifyPassword(worksheet.lockPasswordHash, `Enter password to unlock "${worksheet.name}":`);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : `Unable to unlock worksheet: ${String(error)}`);
+            return;
+        }
         if (!isValid) {
             alert('Incorrect password.');
             return;
