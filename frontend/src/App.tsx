@@ -159,6 +159,8 @@ function App() {
     const visibleContent = isActiveWorksheetLocked ? '' : content;
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
     const inactivityByWorksheetRef = useRef<Record<string, number>>({});
+    const previousActiveWorksheetIdRef = useRef<string | null>(null);
+    const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
 
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
@@ -443,8 +445,28 @@ function App() {
     }, [activeId]);
 
     useEffect(() => {
-        inactivityByWorksheetRef.current[activeId] = Date.now();
+        const now = Date.now();
+        const previousActiveWorksheetId = previousActiveWorksheetIdRef.current;
+        if (previousActiveWorksheetId && previousActiveWorksheetId !== activeId) {
+            inactivityByWorksheetRef.current[previousActiveWorksheetId] = now;
+        }
+        inactivityByWorksheetRef.current[activeId] = now;
+        previousActiveWorksheetIdRef.current = activeId;
     }, [activeId]);
+
+    useEffect(() => {
+        const previousTimeout = previousAutoLockTimeoutMinutesRef.current;
+        previousAutoLockTimeoutMinutesRef.current = autoLockTimeoutMinutes;
+
+        if (previousTimeout > 0 || autoLockTimeoutMinutes <= 0) {
+            return;
+        }
+
+        const now = Date.now();
+        for (const worksheet of worksheets) {
+            inactivityByWorksheetRef.current[worksheet.id] = now;
+        }
+    }, [autoLockTimeoutMinutes, worksheets]);
 
     useEffect(() => {
         if (autoLockTimeoutMinutes <= 0) {
@@ -454,8 +476,8 @@ function App() {
         const timeoutMs = autoLockTimeoutMinutes * 60 * 1000;
         const intervalId = window.setInterval(() => {
             const now = Date.now();
-            const timedOutWorksheets = worksheets.filter((worksheet) => {
-                if (worksheet.isLocked || !worksheet.lockPasswordHash) {
+            const timedOutInactiveWorksheets = worksheets.filter((worksheet) => {
+                if (worksheet.id === activeId || worksheet.isLocked || !worksheet.lockPasswordHash) {
                     return false;
                 }
 
@@ -463,17 +485,17 @@ function App() {
                 return now - lastActivity >= timeoutMs;
             });
 
-            if (timedOutWorksheets.length === 0) {
+            if (timedOutInactiveWorksheets.length === 0) {
                 return;
             }
 
-            for (const worksheet of timedOutWorksheets) {
+            for (const worksheet of timedOutInactiveWorksheets) {
                 lockWorksheet(worksheet.id, worksheet.lockPasswordHash as string);
                 inactivityByWorksheetRef.current[worksheet.id] = now;
             }
 
-            const suffix = timedOutWorksheets.length === 1 ? '' : 's';
-            setStatusText(`Protected worksheet${suffix} auto-locked due to inactivity`);
+            const suffix = timedOutInactiveWorksheets.length === 1 ? '' : 's';
+            setStatusText(`Inactive protected worksheet${suffix} auto-locked due to inactivity`);
             setIsStatusError(false);
             setDevError('');
         }, 1000);

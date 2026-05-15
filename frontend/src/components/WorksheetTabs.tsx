@@ -340,7 +340,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
             return;
         }
         if (worksheet.isLocked) {
-            alert('Unlock worksheet first to remove its lock.');
+            alert('Unlock the worksheet to remove protection.');
             return;
         }
 

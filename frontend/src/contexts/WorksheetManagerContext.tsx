@@ -278,7 +278,20 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         removeWorksheetLock,
         updateWorksheet,
         updateActiveWorksheet,
-    }), [worksheets, activeId, createWorksheet, removeWorksheetLock, updateWorksheet, updateActiveWorksheet]);
+    }), [
+        worksheets,
+        activeId,
+        createWorksheet,
+        deleteWorksheet,
+        renameWorksheet,
+        switchWorksheet,
+        lockWorksheet,
+        lockProtectedWorksheets,
+        unlockWorksheet,
+        removeWorksheetLock,
+        updateWorksheet,
+        updateActiveWorksheet,
+    ]);
 
     return (
         <WorksheetManagerContext.Provider value={contextValue}>
