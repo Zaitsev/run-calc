@@ -35,7 +35,7 @@ function getDefaultWorksheetName(index: number): string {
     return `Worksheet ${index + 1}`;
 }
 
-function arraysEqual(left: readonly number[], right: readonly number[]): boolean {
+function numberArraysEqual(left: readonly number[], right: readonly number[]): boolean {
     if (left.length !== right.length) {
         return false;
     }
@@ -54,6 +54,9 @@ function recordsEqual(left: Record<string, unknown>, right: Record<string, unkno
         return false;
     }
     for (const [key, value] of leftEntries) {
+        if (!(key in right)) {
+            return false;
+        }
         if (!Object.is(value, right[key])) {
             return false;
         }
@@ -69,7 +72,7 @@ function worksheetSnapshotEqual(left: WorksheetSnapshot, right: WorksheetSnapsho
         left.lastResult === right.lastResult &&
         left.isLocked === right.isLocked &&
         left.lockPasswordHash === right.lockPasswordHash &&
-        arraysEqual(left.markedLines, right.markedLines) &&
+        numberArraysEqual(left.markedLines, right.markedLines) &&
         recordsEqual(left.variableValues, right.variableValues)
     );
 }

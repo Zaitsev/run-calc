@@ -48,12 +48,10 @@ async function derivePasswordKey(password: string, salt: Uint8Array, iterations:
 }
 
 function timingSafeEqual(left: Uint8Array, right: Uint8Array): boolean {
-    if (left.length !== right.length) {
-        return false;
-    }
-    let diff = 0;
-    for (let i = 0; i < left.length; i++) {
-        diff |= left[i] ^ right[i];
+    const maxLength = Math.max(left.length, right.length);
+    let diff = left.length ^ right.length;
+    for (let i = 0; i < maxLength; i++) {
+        diff |= (left[i] ?? 0) ^ (right[i] ?? 0);
     }
     return diff === 0;
 }
