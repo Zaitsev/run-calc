@@ -12,6 +12,7 @@ import {
     AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY,
     AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY,
     AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY,
+    DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE,
     DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP,
     DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES,
     DECIMAL_DELIMITER_STORAGE_KEY,
@@ -111,7 +112,13 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
     });
 
     const [autoLockOnWindowHide, setAutoLockOnWindowHideState] = useState(() =>
-        localStorage.getItem(AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY) === 'true'
+        {
+            const raw = localStorage.getItem(AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY);
+            if (raw === null) {
+                return DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE;
+            }
+            return raw === 'true';
+        }
     );
 
     const [autoLockOnSystemSleep, setAutoLockOnSystemSleepState] = useState(() => {

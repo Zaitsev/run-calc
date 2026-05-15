@@ -293,7 +293,7 @@ export function SettingsPanel({
                         <div className="settings-row settings-row--stack">
                             <div className="settings-row-info">
                                 <div className="settings-row-title">Inactivity auto-lock</div>
-                                <div className="settings-row-desc">Automatically lock the current protected worksheet after inactivity.</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets after inactivity.</div>
                             </div>
                             <div className="settings-slider-block">
                                 <input

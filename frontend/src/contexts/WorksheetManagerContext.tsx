@@ -20,6 +20,7 @@ type WorksheetManagerContextValue = {
     lockWorksheet: (id: string, passwordHash: string) => void;
     lockProtectedWorksheets: () => void;
     unlockWorksheet: (id: string) => void;
+    removeWorksheetLock: (id: string) => void;
     updateWorksheet: (id: string, updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => void;
     updateActiveWorksheet: (updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => void;
 };
@@ -102,11 +103,14 @@ function loadWorksheets(): { worksheets: WorksheetSnapshot[]; activeId: string }
                         ((w as any).lastResult === null || typeof (w as any).lastResult === 'number') &&
                         Array.isArray((w as any).markedLines) &&
                         typeof (w as any).variableValues === 'object';
-                }).map((w) => ({
-                    ...w,
-                    isLocked: typeof (w as any).isLocked === 'boolean' ? (w as any).isLocked : false,
-                    lockPasswordHash: typeof (w as any).lockPasswordHash === 'string' ? (w as any).lockPasswordHash : undefined,
-                }));
+                }).map((w) => {
+                    const lockPasswordHash = typeof (w as any).lockPasswordHash === 'string' ? (w as any).lockPasswordHash : undefined;
+                    return {
+                        ...w,
+                        isLocked: !!lockPasswordHash,
+                        lockPasswordHash,
+                    };
+                });
             }
         } catch { /* ignore */ }
     }
@@ -238,6 +242,12 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         );
     };
 
+    const removeWorksheetLock = useCallback((id: string) => {
+        setWorksheets((prev) =>
+            prev.map((w) => w.id === id ? { ...w, isLocked: false, lockPasswordHash: undefined } : w)
+        );
+    }, []);
+
     const updateWorksheet = useCallback((id: string, updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
         setWorksheets(prev =>
             prev.map(w =>
@@ -265,9 +275,10 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         lockWorksheet,
         lockProtectedWorksheets,
         unlockWorksheet,
+        removeWorksheetLock,
         updateWorksheet,
         updateActiveWorksheet,
-    }), [worksheets, activeId, createWorksheet, updateWorksheet, updateActiveWorksheet]);
+    }), [worksheets, activeId, createWorksheet, removeWorksheetLock, updateWorksheet, updateActiveWorksheet]);
 
     return (
         <WorksheetManagerContext.Provider value={contextValue}>

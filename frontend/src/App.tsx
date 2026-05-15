@@ -454,8 +454,8 @@ function App() {
         const timeoutMs = autoLockTimeoutMinutes * 60 * 1000;
         const intervalId = window.setInterval(() => {
             const now = Date.now();
-            const timedOutInactiveWorksheets = worksheets.filter((worksheet) => {
-                if (worksheet.id === activeId || worksheet.isLocked || !worksheet.lockPasswordHash) {
+            const timedOutWorksheets = worksheets.filter((worksheet) => {
+                if (worksheet.isLocked || !worksheet.lockPasswordHash) {
                     return false;
                 }
 
@@ -463,17 +463,17 @@ function App() {
                 return now - lastActivity >= timeoutMs;
             });
 
-            if (timedOutInactiveWorksheets.length === 0) {
+            if (timedOutWorksheets.length === 0) {
                 return;
             }
 
-            for (const worksheet of timedOutInactiveWorksheets) {
+            for (const worksheet of timedOutWorksheets) {
                 lockWorksheet(worksheet.id, worksheet.lockPasswordHash as string);
                 inactivityByWorksheetRef.current[worksheet.id] = now;
             }
 
-            const suffix = timedOutInactiveWorksheets.length === 1 ? '' : 's';
-            setStatusText(`Inactive protected worksheet${suffix} auto-locked due to inactivity`);
+            const suffix = timedOutWorksheets.length === 1 ? '' : 's';
+            setStatusText(`Protected worksheet${suffix} auto-locked due to inactivity`);
             setIsStatusError(false);
             setDevError('');
         }, 1000);

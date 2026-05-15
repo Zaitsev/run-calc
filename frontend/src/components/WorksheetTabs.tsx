@@ -32,6 +32,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         switchWorksheet,
         lockWorksheet,
         unlockWorksheet,
+        removeWorksheetLock,
         updateWorksheet,
     } = useWorksheetManager();
 
@@ -294,7 +295,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
             return;
         }
 
-                const password = await requestPassword({
+        const password = await requestPassword({
             title: 'Lock worksheet',
             message: `Set a password for worksheet "${worksheet.name}".`,
             mode: 'create',
@@ -330,6 +331,20 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         }
 
         unlockWorksheet(worksheetId);
+        setContextMenu(null);
+    };
+
+    const handleRemoveWorksheetLock = (worksheetId: string) => {
+        const worksheet = worksheets.find((w) => w.id === worksheetId);
+        if (!worksheet?.lockPasswordHash) {
+            return;
+        }
+        if (worksheet.isLocked) {
+            alert('Unlock worksheet first to remove its lock.');
+            return;
+        }
+
+        removeWorksheetLock(worksheetId);
         setContextMenu(null);
     };
 
@@ -468,6 +483,22 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                         }}
                     >
                         {contextMenuWorksheet?.isLocked ? 'Unlock worksheet' : 'Lock worksheet'}
+                    </button>
+                    <button
+                        type="button"
+                        className="worksheet-tab-menu-item"
+                        role="menuitem"
+                        disabled={!contextMenuWorksheet?.lockPasswordHash || !!contextMenuWorksheet.isLocked}
+                        onClick={() => {
+                            if (!contextMenuWorksheet) return;
+                            handleRemoveWorksheetLock(contextMenuWorksheet.id);
+                        }}
+                    >
+                        {!contextMenuWorksheet?.lockPasswordHash
+                            ? 'No worksheet lock to remove'
+                            : contextMenuWorksheet.isLocked
+                              ? 'Unlock first to remove lock'
+                              : 'Remove worksheet lock'}
                     </button>
                     <button
                         type="button"

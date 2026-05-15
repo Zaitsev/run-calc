@@ -52,6 +52,7 @@ export const WORKSHEETS_TAB_POSITION_STORAGE_KEY = 'calc.worksheets.tabPosition'
 export const DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES = 5;
 export const MIN_AUTO_LOCK_TIMEOUT_MINUTES = 0;
 export const MAX_AUTO_LOCK_TIMEOUT_MINUTES = 30;
+export const DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE = true;
 export const DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP = true;
 export const AUTO_LOCK_SLEEP_GAP_MS = 120000;
 export const AUTO_LOCK_SLEEP_CHECK_INTERVAL_MS = 30000;
