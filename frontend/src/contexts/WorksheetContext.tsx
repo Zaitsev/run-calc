@@ -76,12 +76,12 @@ function remapLineIndex(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function WorksheetProvider({ children }: { children: ReactNode }) {
-    const manager = useWorksheetManager();
-    const activeWorksheet = manager.worksheets.find(w => w.id === manager.activeId);
+    const { worksheets, activeId, updateActiveWorksheet } = useWorksheetManager();
+    const activeWorksheet = worksheets.find(w => w.id === activeId);
 
     // Provide a default context even during hydration, to avoid null renders
     const fallbackWorksheet: WorksheetSnapshot = activeWorksheet || {
-        id: manager.activeId || 'temp',
+        id: activeId || 'temp',
         name: 'Worksheet',
         content: '',
         lastResult: null,
@@ -128,7 +128,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
             window.clearTimeout(persistTimerRef.current);
         }
         persistTimerRef.current = window.setTimeout(() => {
-            manager.updateActiveWorksheet({
+            updateActiveWorksheet({
                 content,
                 lastResult,
                 markedLines: [...markedLines],
@@ -140,7 +140,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         return () => {
             if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
         };
-    }, [content, lastResult, markedLines, variableValues, manager]);
+    }, [content, lastResult, markedLines, variableValues, updateActiveWorksheet]);
 
     const setContent = (next: React.SetStateAction<string>) => {
         const currentContent = content;

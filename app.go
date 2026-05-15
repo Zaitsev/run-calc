@@ -494,6 +494,10 @@ func (a *App) ExportWorksheetPlaintextToFile(worksheetJSON string, filePath stri
 		}
 	}
 
+	// Plaintext exports must not include worksheet lock metadata.
+	payload.IsLocked = false
+	payload.LockPasswordHash = ""
+
 	plaintextJSON, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return SaveWorksheetResponse{

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { WorksheetTabPosition, WorksheetSnapshot } from '../types/app';
 import { useWorksheetManager } from '../contexts';
 import { usePasswordDialog } from '../hooks/usePasswordDialog';
-import { hashWorksheetPassword } from '../utils/worksheetLock';
+import { hashWorksheetPassword, verifyWorksheetPassword } from '../utils/worksheetLock';
 import {
     SaveWorksheetToFile,
     LoadWorksheetFromFile,
@@ -107,8 +107,7 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
         if (!password) {
             return false;
         }
-        const inputHash = await hashWorksheetPassword(password);
-        return inputHash === storedHash;
+        return verifyWorksheetPassword(password, storedHash);
     };
 
     const verifyForLockedWorksheetIfNeeded = async (worksheet: WorksheetSnapshot, promptMessage: string): Promise<boolean> => {
@@ -145,8 +144,6 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                 lastResult: worksheet.lastResult ?? null,
                 markedLines: worksheet.markedLines,
                 variableValues: worksheet.variableValues,
-                isLocked: worksheet.isLocked,
-                lockPasswordHash: worksheet.lockPasswordHash,
             };
 
             const canProceed = await verifyForLockedWorksheetIfNeeded(

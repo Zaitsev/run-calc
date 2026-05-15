@@ -35,6 +35,45 @@ function getDefaultWorksheetName(index: number): string {
     return `Worksheet ${index + 1}`;
 }
 
+function arraysEqual(left: readonly number[], right: readonly number[]): boolean {
+    if (left.length !== right.length) {
+        return false;
+    }
+    for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function recordsEqual(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+    if (leftEntries.length !== rightEntries.length) {
+        return false;
+    }
+    for (const [key, value] of leftEntries) {
+        if (!Object.is(value, right[key])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function worksheetSnapshotEqual(left: WorksheetSnapshot, right: WorksheetSnapshot): boolean {
+    return (
+        left.id === right.id &&
+        left.name === right.name &&
+        left.content === right.content &&
+        left.lastResult === right.lastResult &&
+        left.isLocked === right.isLocked &&
+        left.lockPasswordHash === right.lockPasswordHash &&
+        arraysEqual(left.markedLines, right.markedLines) &&
+        recordsEqual(left.variableValues, right.variableValues)
+    );
+}
+
 function migrateFromLegacyStorage(): WorksheetSnapshot | null {
     const legacyContent = localStorage.getItem(WORKSHEET_CONTENT_STORAGE_KEY);
     if (!legacyContent && !localStorage.getItem(MARKED_LINES_STORAGE_KEY) && !localStorage.getItem(VARIABLE_VALUES_STORAGE_KEY)) {
@@ -173,6 +212,15 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         if (activeId) localStorage.setItem(WORKSHEETS_ACTIVE_ID_STORAGE_KEY, activeId);
     }, [activeId]);
 
+    useEffect(() => {
+        if (worksheets.length === 0) {
+            return;
+        }
+        if (!worksheets.some((worksheet) => worksheet.id === activeId)) {
+            setActiveId(worksheets[0].id);
+        }
+    }, [worksheets, activeId]);
+
     const createWorksheet = useCallback((name?: string) => {
         const newId = generateWorksheetId();
         setWorksheets((prev) => {
@@ -191,17 +239,16 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
         setActiveId(newId);
     }, []);
 
-    const deleteWorksheet = (id: string) => {
-        // Guard: do not allow deleting if it's the last worksheet
-        if (worksheets.length <= 1) return;
-        
-        setWorksheets(prev => prev.filter(w => w.id !== id));
-        
-        // If the deleted worksheet was active, switch to the first remaining
-        if (activeId === id) {
-            setActiveId(worksheets.find(w => w.id !== id)?.id ?? '');
-        }
-    };
+    const deleteWorksheet = useCallback((id: string) => {
+        setWorksheets((prev) => {
+            if (prev.length <= 1) {
+                return prev;
+            }
+
+            const remaining = prev.filter((w) => w.id !== id);
+            return remaining.length === prev.length ? prev : remaining;
+        });
+    }, []);
 
     const renameWorksheet = (id: string, name: string) => {
         const trimmedName = name.trim();
@@ -249,16 +296,33 @@ export function WorksheetManagerProvider({ children }: { children: ReactNode }) 
     }, []);
 
     const updateWorksheet = useCallback((id: string, updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {
-        setWorksheets(prev =>
-            prev.map(w =>
-                w.id === id
-                    ? {
-                        ...w,
-                        ...updates,
-                    }
-                    : w
-            )
-        );
+        const updateKeys = Object.keys(updates);
+        if (updateKeys.length === 0) {
+            return;
+        }
+
+        setWorksheets((prev) => {
+            let changed = false;
+            const next = prev.map((w) => {
+                if (w.id !== id) {
+                    return w;
+                }
+
+                const updatedWorksheet: WorksheetSnapshot = {
+                    ...w,
+                    ...updates,
+                };
+
+                if (worksheetSnapshotEqual(w, updatedWorksheet)) {
+                    return w;
+                }
+
+                changed = true;
+                return updatedWorksheet;
+            });
+
+            return changed ? next : prev;
+        });
     }, []);
 
     const updateActiveWorksheet = useCallback((updates: Partial<Omit<WorksheetSnapshot, 'id' | 'name'>>) => {

@@ -48,7 +48,7 @@ import { inferCustomThemeMode } from './utils/colorUtils';
 import { buildIntelligenceSuggestions, buildSuggestionCatalog, collectKnownVariableNames, getIdentifierContextAtPosition } from './utils/editorIntelligence';
 import { formatNumber, getPrecisionScale, resolveDecimalDelimiter } from './utils/formatting';
 import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
-import { hashWorksheetPassword } from './utils/worksheetLock';
+import { hashWorksheetPassword, verifyWorksheetPassword } from './utils/worksheetLock';
 import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
 
 
@@ -338,17 +338,16 @@ function App() {
             return;
         }
 
-        let passwordHash: string;
         try {
-            passwordHash = await hashWorksheetPassword(password);
+            const isValid = await verifyWorksheetPassword(password, activeWorksheet.lockPasswordHash);
+            if (!isValid) {
+                setStatusText('Incorrect password');
+                setIsStatusError(true);
+                setDevError('');
+                return;
+            }
         } catch (error) {
             setStatusText(error instanceof Error ? error.message : `Unable to unlock worksheet: ${String(error)}`);
-            setIsStatusError(true);
-            setDevError('');
-            return;
-        }
-        if (passwordHash !== activeWorksheet.lockPasswordHash) {
-            setStatusText('Incorrect password');
             setIsStatusError(true);
             setDevError('');
             return;

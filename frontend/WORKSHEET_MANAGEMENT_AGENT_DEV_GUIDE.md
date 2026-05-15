@@ -88,13 +88,13 @@ This is the implemented secure worksheet file flow across frontend and backend.
 4. Backend retrieves key from OS secure storage by keyId.
 5. Backend decrypts ciphertext via AES-256-GCM.
 6. Backend validates decrypted JSON payload and returns plaintext worksheet data.
-7. Frontend applies payload through updateActiveWorksheet.
+7. Frontend applies payload to the selected worksheet through updateWorksheet.
 
 ### Platform key storage
 
 - Windows: Credential Manager via DPAPI (secure_worksheet_windows.go)
 - macOS: Keychain (secure_worksheet_darwin.go)
-- Linux: libsecret first, PBKDF2 passphrase-file fallback (secure_worksheet_linux.go)
+- Linux: Secret Service (libsecret) only; worksheet save/load fails with a clear error if secure storage is unavailable (secure_worksheet_linux.go)
 
 ### Agent boundaries for security work
 
@@ -102,14 +102,14 @@ This is the implemented secure worksheet file flow across frontend and backend.
 - Do not bypass OS key storage from frontend.
 - Keep frontend limited to invoking bound methods and handling success/failure UI.
 - If file format fields change, update both save and load paths together and preserve backward compatibility.
-- Be careful with keyId behavior (currently based on filename in app.go). Any keyId strategy change needs explicit migration planning.
+- Be careful with keyId behavior (currently a generated random identifier stored in the encrypted file). Any keyId strategy change needs explicit migration planning.
 
 ### Security regression checks
 
 1. Save worksheet, confirm file on disk is encrypted JSON (not plaintext content).
 2. Load same file, confirm payload restores content and values.
 3. Rename file and verify expected behavior around key lookup still works.
-4. Confirm permissions on created directories/files remain restricted.
+4. On Linux, confirm clear error is returned when Secret Service is unavailable.
 5. Confirm clear error is returned when key retrieval fails or file is corrupt.
 
 ## Safe Edit Rules
