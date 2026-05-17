@@ -29,6 +29,7 @@
   },
   "include": [
     "src",
+    "wailsjs",
     "../site/src/content/helpContent.ts"
   ],
   "references": [

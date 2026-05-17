@@ -43,6 +43,7 @@ export function OverviewPage() {
                 </p>
                 <div className="hero-cta-row">
                     <a className="hero-btn hero-btn--primary" href="/operations">See how it works</a>
+                    <a className="hero-btn hero-btn--secondary" href="/worksheets">Manage worksheets</a>
                     <a className="hero-btn hero-btn--secondary" href="/shortcuts">View shortcuts</a>
                     <a className="hero-btn hero-btn--secondary" href="/functions">Browse functions</a>
                     <a className="hero-btn hero-btn--secondary" href="/byok">Set up BYOK</a>
@@ -84,6 +85,7 @@ export function OverviewPage() {
                 <h2 className="icon-heading"><Map size={20} />Explore the docs</h2>
                 <ul>
                     <li><a href="/operations"><strong>Operations</strong></a>: expression syntax, variables, comments, functions, and AI flow.</li>
+                    <li><a href="/worksheets"><strong>Worksheets</strong></a>: create, switch, rename, close, and save encrypted worksheet tabs.</li>
                     <li><a href="/shortcuts"><strong>Shortcuts</strong></a>: keyboard commands to work faster with less friction.</li>
                     <li><a href="/functions"><strong>Functions</strong></a>: grouped reference for all functions exposed in Run-Calc.</li>
                     <li><a href="/byok"><strong>AI key Setup</strong></a>: where to create API keys for each provider and what to paste into Run-Calc.</li>

@@ -28,6 +28,293 @@
     transition: margin 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.worksheet-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    padding: 6px 8px 0;
+    background: color-mix(in srgb, var(--window-bg) 70%, var(--statusBar-background) 30%);
+    border-bottom: 1px solid var(--editorGroup-border);
+    z-index: 10;
+}
+
+.worksheet-tabs--bottom {
+    align-items: flex-start;
+    padding: 0 8px 6px;
+    border-top: 1px solid var(--editorGroup-border);
+    border-bottom: none;
+}
+
+.worksheet-tabs--left {
+    align-items: center;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 38px;
+    border-right: 1px solid var(--editorGroup-border);
+    border-bottom: none;
+    padding: 8px 4px;
+    gap: 4px;
+}
+
+.worksheet-tabs-list {
+    display: flex;
+    align-items: flex-end;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.worksheet-tabs-list::-webkit-scrollbar {
+    display: none;
+}
+
+.worksheet-tabs--left .worksheet-tabs-list {
+    flex-direction: column;
+    align-items: center;
+    overflow-x: visible;
+    overflow-y: auto;
+    width: 100%;
+    gap: 4px;
+}
+
+/* Add button */
+.worksheet-tabs-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    right: 0;
+    z-index: 4;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border: 1px solid transparent;
+    background: color-mix(in srgb, var(--window-bg) 70%, var(--statusBar-background) 30%);
+    color: var(--descriptionForeground);
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+    cursor: pointer;
+    margin: 0 2px 4px;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background 0.1s, color 0.1s;
+}
+
+.worksheet-tabs-add:hover {
+    background: color-mix(in srgb, var(--editor-foreground) 12%, transparent);
+    color: var(--editor-foreground);
+}
+
+.worksheet-tabs--left .worksheet-tabs-add {
+    position: static;
+    margin: 0;
+}
+
+/* Tab — inactive */
+.worksheet-tab {
+    position: relative;
+    border: 1px solid color-mix(in srgb, var(--editorGroup-border) 74%, var(--editor-foreground) 14%);
+    border-bottom: none;
+    background: transparent;
+    color: color-mix(in srgb, var(--editor-foreground) 55%, transparent);
+    border-radius: 8px 8px 0 0;
+    min-height: 34px;
+    padding: 0 8px 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-bottom: -1px;
+    flex: 1 1 0;
+    min-width: 60px;
+    max-width: 200px;
+    overflow: hidden;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
+}
+
+.worksheet-tab:hover {
+    background: color-mix(in srgb, var(--editor-background) 55%, transparent);
+    color: var(--editor-foreground);
+    border-color: color-mix(in srgb, var(--editorGroup-border) 70%, transparent);
+}
+
+/* Active tab — merges with content area */
+.worksheet-tab--active {
+    background: var(--editor-background);
+    border-color: var(--editorGroup-border);
+    color: var(--editor-foreground);
+    z-index: 2;
+}
+
+/* Curved notch where active tab meets the bar */
+.worksheet-tab--active::before,
+.worksheet-tab--active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.worksheet-tab--active::before {
+    left: -12px;
+    border-bottom-right-radius: 8px;
+    box-shadow: 4px 0 0 0 var(--editor-background);
+}
+
+.worksheet-tab--active::after {
+    right: -12px;
+    border-bottom-left-radius: 8px;
+    box-shadow: -4px 0 0 0 var(--editor-background);
+}
+
+/* Left-sidebar tabs — keep pill style, no notch */
+.worksheet-tabs--left .worksheet-tab {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    min-height: 80px;
+    width: 28px;
+    max-width: 28px;
+    padding: 8px 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    margin-bottom: 0;
+}
+
+.worksheet-tabs--left .worksheet-tab--active {
+    background: color-mix(in srgb, var(--radio-accent) 18%, var(--editor-background));
+    border-color: var(--radio-accent);
+}
+
+.worksheet-tabs--left .worksheet-tab--active::before,
+.worksheet-tabs--left .worksheet-tab--active::after {
+    display: none;
+}
+
+.worksheet-tab-lock {
+    font-size: 11px;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.worksheet-tab-name {
+    display: inline-block;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.worksheet-tabs--left .worksheet-tab-name {
+    white-space: normal;
+    overflow: visible;
+}
+
+.worksheet-tab-rename {
+    width: 100%;
+    min-width: 0;
+    border: none;
+    border-bottom: 1px solid var(--radio-accent);
+    border-radius: 0;
+    background: transparent;
+    color: var(--editor-foreground);
+    font-size: 12px;
+    padding: 1px 2px;
+    outline: none;
+}
+
+.worksheet-tab--renaming {
+    overflow: visible;
+    z-index: 5;
+}
+
+.worksheet-tabs--left .worksheet-tab-rename {
+    width: 22px;
+    min-height: 72px;
+    writing-mode: vertical-rl;
+    border-bottom: none;
+    border: 1px solid var(--radio-accent);
+    border-radius: 4px;
+    background: var(--editor-background);
+}
+
+.worksheet-tab-menu {
+    position: fixed;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--sideBar-border);
+    background: var(--sideBar-background);
+    box-shadow: var(--drawer-shadow);
+}
+
+.worksheet-tab-menu-item {
+    border: none;
+    background: transparent;
+    color: var(--sideBarTitle-foreground);
+    text-align: left;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+
+.worksheet-tab-menu-item:hover:not(:disabled) {
+    background: var(--btn-hover-bg);
+}
+
+.worksheet-tab-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.worksheet-tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: transparent;
+    color: var(--descriptionForeground);
+    border-radius: 50%;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background 0.1s, opacity 0.1s;
+}
+
+.worksheet-tab:hover .worksheet-tab-close,
+.worksheet-tab--active .worksheet-tab-close {
+    opacity: 0.55;
+}
+
+.worksheet-tab-close:hover {
+    opacity: 1 !important;
+    background: color-mix(in srgb, var(--editor-foreground) 15%, transparent);
+    color: var(--editor-foreground);
+}
+
+.worksheet-tab-menu-divider {
+    height: 1px;
+    background: var(--sideBar-border);
+    margin: 4px 0;
+}
+
 .window--help-right .editor-container {
     margin-right: var(--help-panel-side-size);
 }
@@ -347,6 +634,10 @@
     isolation: isolate;
 }
 
+.editor-overlay--locked {
+    z-index: 2;
+}
+
 .editor-overlay::before {
     content: '';
     position: absolute;
@@ -365,9 +656,78 @@
     z-index: 1;
 }
 
+.editor-lock-screen {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    width: min(420px, calc(100% - 40px));
+    padding: 22px 24px;
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--editorGroup-border) 68%, transparent);
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--editor-background) 88%, transparent),
+            color-mix(in srgb, var(--statusBar-background) 28%, var(--editor-background))
+        );
+    box-shadow: 0 18px 50px color-mix(in srgb, var(--editorGroup-border) 22%, transparent);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+}
+
+.editor-lock-screen-icon {
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 10px;
+}
+
+.editor-lock-screen-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--editor-foreground);
+    margin-bottom: 8px;
+}
+
+.editor-lock-screen-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--editor-foreground) 76%, transparent);
+}
+
+.editor-lock-screen-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.editor-lock-screen-btn {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--gutter-var-color);
+    color: var(--button-primary-foreground);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.editor-lock-screen-btn:hover {
+    opacity: 0.92;
+}
+
+.editor-lock-screen-btn:active {
+    transform: translateY(1px);
+}
+
 @media (max-width: 720px) {
     .editor-overlay::before {
         background-size: min(82vmin, calc(100vw - 32px)) auto;
+    }
+
+    .editor-lock-screen {
+        width: min(360px, calc(100% - 28px));
+        padding: 18px 18px;
     }
 }
 
@@ -602,6 +962,55 @@
     margin: 0 0 24px 0;
     font-size: 14px;
     line-height: 1.5;
+}
+
+.password-modal {
+    min-width: min(420px, calc(100vw - 24px));
+}
+
+.password-modal-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.password-modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--editor-foreground);
+}
+
+.password-modal-input {
+    width: 100%;
+    border: 1px solid var(--editorGroup-border);
+    border-radius: 6px;
+    background: var(--input-background, var(--editor-background));
+    color: var(--editor-foreground);
+    padding: 10px 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.password-modal-input:focus {
+    outline: 1px solid color-mix(in srgb, var(--radio-accent) 70%, transparent);
+    border-color: color-mix(in srgb, var(--radio-accent) 70%, transparent);
+}
+
+.password-modal-input::-ms-reveal,
+.password-modal-input::-ms-clear {
+    color: var(--editor-foreground);
+    background-color: transparent;
+}
+
+.password-modal-error {
+    margin-bottom: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--editorError-foreground);
 }
 
 .recalc-modal-actions {
@@ -997,6 +1406,77 @@
     outline: none;
 }
 
+.help-resize-handle {
+    position: absolute;
+    border: none;
+    background: transparent;
+    z-index: 2;
+    padding: 0;
+}
+
+.help-resize-handle::after {
+    content: '';
+    position: absolute;
+    border-radius: 999px;
+    transition: background 0.12s ease;
+}
+
+.help-resize-handle--right {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    transform: translateX(-50%);
+    cursor: ew-resize;
+}
+
+.help-resize-handle--left {
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    transform: translateX(50%);
+    cursor: ew-resize;
+}
+
+.help-resize-handle--right::after,
+.help-resize-handle--left::after {
+    left: 50%;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--sideBar-border) 28%, transparent);
+}
+
+.help-resize-handle--bottom {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    transform: translateY(-50%);
+    cursor: ns-resize;
+}
+
+.help-resize-handle--bottom::after {
+    top: 50%;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    transform: translateY(-50%);
+    background: color-mix(in srgb, var(--sideBar-border) 28%, transparent);
+}
+
+.help-resize-handle:hover::after,
+.help-resize-handle:focus-visible::after,
+.is-resizing-help-panel .help-resize-handle::after {
+    background: color-mix(in srgb, var(--radio-accent) 72%, var(--sideBar-border));
+}
+
+.help-resize-handle:focus-visible {
+    outline: none;
+}
+
 @media (max-width: 1024px) {
     .settings-panel--theme-store {
         width: min(520px, calc(100vw - 28px));
@@ -1022,6 +1502,21 @@
 .is-resizing-settings-drawer * {
     cursor: ew-resize !important;
     user-select: none !important;
+}
+
+.is-resizing-help-panel,
+.is-resizing-help-panel * {
+    user-select: none !important;
+}
+
+.is-resizing-help-panel-ns,
+.is-resizing-help-panel-ns * {
+    cursor: ns-resize !important;
+}
+
+.is-resizing-help-panel-ew,
+.is-resizing-help-panel-ew * {
+    cursor: ew-resize !important;
 }
 
 .settings-header {
@@ -1589,6 +2084,31 @@ html[data-theme="dark"] .settings-provider-icon--invert {
 .settings-row-desc--error {
     margin-top: 6px;
     color: var(--statusBarItem-errorBackground);
+    font-weight: 600;
+}
+
+.settings-slider-block {
+    width: 100%;
+}
+
+.settings-range {
+    width: 100%;
+    accent-color: var(--radio-accent);
+    cursor: pointer;
+}
+
+.settings-slider-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 0.75em;
+    color: var(--descriptionForeground);
+    gap: 8px;
+}
+
+.settings-slider-meta span:nth-child(2) {
+    color: var(--sideBarTitle-foreground);
     font-weight: 600;
 }
 

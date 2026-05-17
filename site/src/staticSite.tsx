@@ -9,6 +9,7 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
 import { ThemesPage } from './pages/ThemesPage';
 import { WhatsNewPage } from './pages/WhatsNewPage';
+import { WorksheetsPage } from './pages/WorksheetsPage';
 
 export type StaticPage = {
     fileName: string;
@@ -35,6 +36,12 @@ export const staticPages: StaticPage[] = [
         title: 'Run-Calc Keyboard Shortcuts',
         description: 'Run-Calc keyboard shortcuts for editing, evaluating, navigation, and fast worksheet workflows.',
         Component: ShortcutsPage,
+    },
+    {
+        fileName: 'worksheets.html',
+        title: 'Run-Calc Worksheets Help',
+        description: 'Learn how to create, rename, switch, delete, and save independent worksheet tabs in Run-Calc.',
+        Component: WorksheetsPage,
     },
     {
         fileName: 'functions.html',

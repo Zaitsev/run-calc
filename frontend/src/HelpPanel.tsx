@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime';
 import { helpContent } from '@site/content/helpContent';
 
-export type HelpPage = 'operations' | 'shortcuts' | 'new';
+export type HelpPage = 'operations' | 'shortcuts' | 'worksheets' | 'new';
 
 interface HelpPanelProps {
     helpSiteUrl: string;
@@ -63,6 +63,15 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                 >
                     New
                 </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeHelpPage === 'worksheets'}
+                    className={`settings-help-tab${activeHelpPage === 'worksheets' ? ' settings-help-tab--active' : ''}`}
+                    onClick={() => setActiveHelpPage('worksheets')}
+                >
+                    Worksheets
+                </button>
             </div>
             <div className="settings-help-content" role="tabpanel">
                 {activeHelpPage === 'operations' && (
@@ -83,6 +92,13 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     <ul>
                         {helpContent.new.map((item, index) => (
                             index === 0 ? <li key={item}><strong>{item}</strong></li> : <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                )}
+                {activeHelpPage === 'worksheets' && (
+                    <ul>
+                        {helpContent.worksheets.map((item) => (
+                            <li key={item}>{item}</li>
                         ))}
                     </ul>
                 )}

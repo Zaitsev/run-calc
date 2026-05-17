@@ -1,4 +1,4 @@
-import { KeyboardEvent, WheelEvent as ReactWheelEvent, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { KeyboardEvent, WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import {
     EventsOn,
     WindowGetSize,
@@ -19,6 +19,7 @@ import { HelpPanelContainer } from './components/HelpPanelContainer';
 import { SettingsPanel } from './components/SettingsPanel';
 import { StaleBanner } from './components/StaleBanner';
 import { StatusBar } from './components/StatusBar';
+import { WorksheetTabs } from './components/WorksheetTabs';
 import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
 import {
@@ -36,8 +37,9 @@ import {
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
-import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet } from './contexts';
+import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet, useWorksheetManager } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
+import { usePasswordDialog } from './hooks/usePasswordDialog';
 import type {
     PrecisionMode,
     SuggestionItem
@@ -46,11 +48,13 @@ import { inferCustomThemeMode } from './utils/colorUtils';
 import { buildIntelligenceSuggestions, buildSuggestionCatalog, collectKnownVariableNames, getIdentifierContextAtPosition } from './utils/editorIntelligence';
 import { formatNumber, getPrecisionScale, resolveDecimalDelimiter } from './utils/formatting';
 import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
+import { hashWorksheetPassword, verifyWorksheetPassword } from './utils/worksheetLock';
 import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
 
 
 
 function App() {
+    const { worksheets, activeId, createWorksheet, lockWorksheet, lockProtectedWorksheets, unlockWorksheet } = useWorksheetManager();
     const {
         content,
         setContent,
@@ -68,7 +72,7 @@ function App() {
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale } = useDisplaySettings();
+    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -96,6 +100,8 @@ function App() {
         setShowThemeStore,
         helpPanelPosition,
         setHelpPanelPosition,
+        worksheetTabPosition,
+        setWorksheetTabPosition,
         showIntelligenceHint,
         setShowIntelligenceHint,
         showClearWorksheetConfirm,
@@ -105,6 +111,13 @@ function App() {
         settingsDrawerWidth,
         setSettingsDrawerWidth,
         startSettingsDrawerResize,
+        helpPanelSideSize,
+        helpPanelBottomSize,
+        setHelpPanelSideSize,
+        setHelpPanelBottomSize,
+        startHelpPanelResize,
+        clampHelpPanelSideSize,
+        clampHelpPanelBottomSize,
         intelligenceShowTimerRef,
         intelligenceHideTimerRef,
         lastEscapeKeyAtRef,
@@ -120,6 +133,7 @@ function App() {
         cancelThemePreview: cancelThemePreviewInStore,
     } = useThemeStore();
     const { isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
+    const { requestPassword, dialog: passwordDialog } = usePasswordDialog();
     const {
         aiContextMode,
         aiSettings,
@@ -139,8 +153,14 @@ function App() {
         theme.type === 'dark' ||
         (theme.type === 'custom' && (theme.customThemeBase ?? inferCustomThemeMode(theme.customColors)) === 'dark') ||
         (theme.type === 'system' && prefersDark);
+    const activeWorksheet = worksheets.find((worksheet) => worksheet.id === activeId) ?? null;
     const isContentEmpty = content.trim() === '';
+    const isActiveWorksheetLocked = !!activeWorksheet?.isLocked;
+    const visibleContent = isActiveWorksheetLocked ? '' : content;
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
+    const inactivityByWorksheetRef = useRef<Record<string, number>>({});
+    const previousActiveWorksheetIdRef = useRef<string | null>(null);
+    const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
 
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
@@ -265,6 +285,94 @@ function App() {
         setDevError('');
     };
 
+    const lockActiveWorksheet = async () => {
+        if (!activeWorksheet || activeWorksheet.isLocked) {
+            return;
+        }
+
+        if (activeWorksheet.lockPasswordHash) {
+            lockWorksheet(activeWorksheet.id, activeWorksheet.lockPasswordHash);
+            setStatusText('Worksheet locked');
+            setIsStatusError(false);
+            setDevError('');
+            return;
+        }
+
+        const password = await requestPassword({
+            title: 'Lock worksheet',
+            message: `Set a password for worksheet "${activeWorksheet.name}".`,
+            mode: 'create',
+            confirmLabel: 'Lock',
+        });
+        if (!password) {
+            return;
+        }
+
+        let passwordHash: string;
+        try {
+            passwordHash = await hashWorksheetPassword(password);
+        } catch (error) {
+            setStatusText(error instanceof Error ? error.message : `Unable to lock worksheet: ${String(error)}`);
+            setIsStatusError(true);
+            setDevError('');
+            return;
+        }
+        lockWorksheet(activeWorksheet.id, passwordHash);
+        setStatusText('Worksheet locked');
+        setIsStatusError(false);
+        setDevError('');
+    };
+
+    const unlockActiveWorksheet = async () => {
+        if (!activeWorksheet?.isLocked || !activeWorksheet.lockPasswordHash) {
+            return;
+        }
+
+        const password = await requestPassword({
+            title: 'Unlock worksheet',
+            message: `Enter the password for worksheet "${activeWorksheet.name}".`,
+            mode: 'single',
+            confirmLabel: 'Unlock',
+        });
+        if (!password) {
+            return;
+        }
+
+        try {
+            const isValid = await verifyWorksheetPassword(password, activeWorksheet.lockPasswordHash);
+            if (!isValid) {
+                setStatusText('Incorrect password');
+                setIsStatusError(true);
+                setDevError('');
+                return;
+            }
+        } catch (error) {
+            setStatusText(error instanceof Error ? error.message : `Unable to unlock worksheet: ${String(error)}`);
+            setIsStatusError(true);
+            setDevError('');
+            return;
+        }
+
+        unlockWorksheet(activeWorksheet.id);
+        setStatusText('Worksheet unlocked');
+        setIsStatusError(false);
+        setDevError('');
+    };
+
+    const lockProtectedWorksheetsIfEnabled = useCallback(() => {
+        if (!autoLockOnWindowHide) {
+            return;
+        }
+        lockProtectedWorksheets();
+    }, [autoLockOnWindowHide, lockProtectedWorksheets]);
+
+    const lockProtectedWorksheetsOnSystemResume = useCallback(() => {
+        if (!autoLockOnSystemSleep) {
+            return;
+        }
+        lockProtectedWorksheets();
+    }, [autoLockOnSystemSleep, lockProtectedWorksheets]);
+
     // --- Menu / keyboard event subscriptions ---
 
     useEffect(() => {
@@ -274,7 +382,9 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubNew = EventsOn('menu:file:new', () => setShowClearWorksheetConfirm(true));
+        const unsubWindowHidden = EventsOn('window:hidden', lockProtectedWorksheetsIfEnabled);
+        const unsubSystemResume = EventsOn('system:resume', lockProtectedWorksheetsOnSystemResume);
+        const unsubNew = EventsOn('menu:file:new', () => createWorksheet());
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
         const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
@@ -287,6 +397,8 @@ function App() {
         const unsubAIProgress = EventsOn('ai:progress', handleAIProgressEvent);
         return () => {
             unsubThemeStore();
+            unsubWindowHidden();
+            unsubSystemResume();
             unsubNew();
             unsubResetWindow();
             unsubIncrease();
@@ -295,7 +407,102 @@ function App() {
             unsubOpenHelp();
             unsubAIProgress();
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [changeFontScale, createWorksheet, handleAIProgressEvent, lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume, resetFontSize, resetWindowLayout]);
+
+    useEffect(() => {
+        const now = Date.now();
+        const existingIds = new Set(worksheets.map((worksheet) => worksheet.id));
+
+        for (const worksheet of worksheets) {
+            if (inactivityByWorksheetRef.current[worksheet.id] === undefined) {
+                inactivityByWorksheetRef.current[worksheet.id] = now;
+            }
+        }
+
+        for (const worksheetId of Object.keys(inactivityByWorksheetRef.current)) {
+            if (!existingIds.has(worksheetId)) {
+                delete inactivityByWorksheetRef.current[worksheetId];
+            }
+        }
+    }, [worksheets]);
+
+    useEffect(() => {
+        const onActivity = () => {
+            inactivityByWorksheetRef.current[activeId] = Date.now();
+        };
+
+        const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'];
+        events.forEach((eventName) => {
+            window.addEventListener(eventName, onActivity);
+        });
+
+        return () => {
+            events.forEach((eventName) => {
+                window.removeEventListener(eventName, onActivity);
+            });
+        };
+    }, [activeId]);
+
+    useEffect(() => {
+        const now = Date.now();
+        const previousActiveWorksheetId = previousActiveWorksheetIdRef.current;
+        if (previousActiveWorksheetId && previousActiveWorksheetId !== activeId) {
+            inactivityByWorksheetRef.current[previousActiveWorksheetId] = now;
+        }
+        inactivityByWorksheetRef.current[activeId] = now;
+        previousActiveWorksheetIdRef.current = activeId;
+    }, [activeId]);
+
+    useEffect(() => {
+        const previousTimeout = previousAutoLockTimeoutMinutesRef.current;
+        previousAutoLockTimeoutMinutesRef.current = autoLockTimeoutMinutes;
+
+        if (previousTimeout > 0 || autoLockTimeoutMinutes <= 0) {
+            return;
+        }
+
+        const now = Date.now();
+        for (const worksheet of worksheets) {
+            inactivityByWorksheetRef.current[worksheet.id] = now;
+        }
+    }, [autoLockTimeoutMinutes, worksheets]);
+
+    useEffect(() => {
+        if (autoLockTimeoutMinutes <= 0) {
+            return;
+        }
+
+        const timeoutMs = autoLockTimeoutMinutes * 60 * 1000;
+        const intervalId = window.setInterval(() => {
+            const now = Date.now();
+            const timedOutInactiveWorksheets = worksheets.filter((worksheet) => {
+                if (worksheet.id === activeId || worksheet.isLocked || !worksheet.lockPasswordHash) {
+                    return false;
+                }
+
+                const lastActivity = inactivityByWorksheetRef.current[worksheet.id] ?? now;
+                return now - lastActivity >= timeoutMs;
+            });
+
+            if (timedOutInactiveWorksheets.length === 0) {
+                return;
+            }
+
+            for (const worksheet of timedOutInactiveWorksheets) {
+                lockWorksheet(worksheet.id, worksheet.lockPasswordHash as string);
+                inactivityByWorksheetRef.current[worksheet.id] = now;
+            }
+
+            const suffix = timedOutInactiveWorksheets.length === 1 ? '' : 's';
+            setStatusText(`Inactive protected worksheet${suffix} auto-locked due to inactivity`);
+            setIsStatusError(false);
+            setDevError('');
+        }, 1000);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [autoLockTimeoutMinutes, worksheets, activeId, lockWorksheet, setStatusText, setIsStatusError, setDevError]);
 
     // --- Editor helpers ---
 
@@ -570,12 +777,56 @@ function App() {
             lastEscapeKeyAtRef.current = now;
             if (elapsed <= DOUBLE_ESCAPE_HIDE_WINDOW_MS) {
                 event.preventDefault();
+                lockProtectedWorksheetsIfEnabled();
                 WindowHide();
             }
             return;
         }
 
         const shortcutAction = getPrimaryShortcutAction(event);
+        if (shortcutAction === 'new-worksheet') {
+            event.preventDefault();
+            createWorksheet();
+            return;
+        }
+
+        if (shortcutAction === 'lock-active-worksheet') {
+            event.preventDefault();
+            void lockActiveWorksheet();
+            return;
+        }
+
+        if (isActiveWorksheetLocked) {
+            if (shortcutAction === 'toggle-word-wrap') {
+                event.preventDefault();
+                setWordWrap((prev) => !prev);
+                return;
+            }
+
+            if (shortcutAction === 'increase-font-size') {
+                event.preventDefault();
+                changeFontScale(1);
+                return;
+            }
+
+            if (shortcutAction === 'decrease-font-size') {
+                event.preventDefault();
+                changeFontScale(-1);
+                return;
+            }
+
+            if (shortcutAction === 'reset-font-size') {
+                event.preventDefault();
+                resetFontSize();
+                return;
+            }
+
+            if (shortcutAction === 'insert-line-below' || shortcutAction === 'toggle-mark-line' || event.key === 'Enter' || event.key === 'Tab') {
+                event.preventDefault();
+            }
+            return;
+        }
+
         if (shortcutAction === 'insert-line-below') {
             event.preventDefault();
             insertLineBelowCurrent();
@@ -766,9 +1017,29 @@ function App() {
         });
     };
 
+    const renderLockedOverlay = () => {
+        return (
+            <div className="editor-lock-screen" role="status" aria-live="polite">
+                <div className="editor-lock-screen-icon" aria-hidden="true">🔒</div>
+                <div className="editor-lock-screen-title">Worksheet locked</div>
+                <div className="editor-lock-screen-body">This worksheet is hidden while locked. Use the button below to unlock it, or right-click the worksheet tab if you want to manage it from the tab menu. Ctrl/Cmd + L locks the current worksheet when it is open.</div>
+                <div className="editor-lock-screen-actions">
+                    <button
+                        type="button"
+                        className="editor-lock-screen-btn"
+                        onClick={() => void unlockActiveWorksheet()}
+                    >
+                        Unlock
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const activeLineIndex = content.slice(0, caretPos).split('\n').length - 1;
     const activeLineError = lineErrors.get(activeLineIndex) ?? '';
     const activeLineText = contentLines[activeLineIndex] ?? '';
+    const visibleContentLines = isActiveWorksheetLocked ? [''] : contentLines;
     const measureLineWidth = (text: string): number => {
         try {
             const canvas = document.createElement('canvas');
@@ -909,26 +1180,38 @@ function App() {
         '--window-logo-image': `url(${isDarkTheme ? appLogoDark : appLogo})`,
         '--logo-layer-opacity': isContentEmpty ? '1' : (isDarkTheme ? '0.02' : '0.025'),
         '--ui-font-scale': uiFontScale,
+        '--help-panel-side-size': `${helpPanelSideSize}px`,
+        '--help-panel-bottom-size': `${helpPanelBottomSize}px`,
     } as CSSProperties;
 
     return (
         <div id="app" className={`window${helpDockClass}`} style={windowStyle}>
+            {passwordDialog}
+            {worksheets.length > 0 && worksheetTabPosition === 'top' && (
+                <WorksheetTabs placement="top" />
+            )}
             <div className="editor-container">
+                {worksheets.length > 0 && worksheetTabPosition === 'left' && (
+                    <WorksheetTabs placement="left" />
+                )}
                 <div className="gutter" ref={gutterRef}>
                     <div className="gutter-lines" style={{paddingTop: EDITOR_TOP_PADDING_PX, paddingBottom: EDITOR_BOTTOM_PADDING_PX}}>
-                        {contentLines.map((_, i) => (
+                        {visibleContentLines.map((_, i) => (
                             <div
                                 key={i}
-                                className={`gutter-line${(lineRowHeights[i] ?? lineHeightPx) > lineHeightPx + 1 ? ' gutter-line--wrapped' : ''}${markedLines.has(i) ? ' gutter-line--marked' : ''}${lineErrors.has(i) ? ' gutter-line--error' : ''}${!lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${!lineErrors.has(i) && staleLineDetails.has(i) ? ' gutter-line--stale' : ''}${declarationLines.has(i) ? ' gutter-line--var' : ''}${aiTriggerLines.has(i) ? ' gutter-line--ai' : ''}`}
+                                className={`gutter-line${!isActiveWorksheetLocked && (lineRowHeights[i] ?? lineHeightPx) > lineHeightPx + 1 ? ' gutter-line--wrapped' : ''}${!isActiveWorksheetLocked && markedLines.has(i) ? ' gutter-line--marked' : ''}${!isActiveWorksheetLocked && lineErrors.has(i) ? ' gutter-line--error' : ''}${!isActiveWorksheetLocked && !lineErrors.has(i) && (truncatedZeroLines.has(i) || truncatedLines.has(i)) ? ' gutter-line--truncated' : ''}${!isActiveWorksheetLocked && !lineErrors.has(i) && staleLineDetails.has(i) ? ' gutter-line--stale' : ''}${!isActiveWorksheetLocked && declarationLines.has(i) ? ' gutter-line--var' : ''}${!isActiveWorksheetLocked && aiTriggerLines.has(i) ? ' gutter-line--ai' : ''}`}
                                 style={{height: lineRowHeights[i] ?? lineHeightPx}}
                                 onClick={() => {
+                                    if (isActiveWorksheetLocked) {
+                                        return;
+                                    }
                                     setMarkedLines((prev) => {
                                         const next = new Set(prev);
                                         if (next.has(i)) next.delete(i); else next.add(i);
                                         return next;
                                     });
                                 }}
-                                title={
+                                title={isActiveWorksheetLocked ? 'Worksheet locked' : (
                                     lineErrors.get(i)
                                     ?? (truncatedZeroLines.has(i)
                                         ? `Result rounded to 0 — actual: ${formatNumber(truncatedZeroLines.get(i)!, decimalDelimiter, 'auto', false)} (precision: ${precision})`
@@ -940,30 +1223,29 @@ function App() {
                                                 ? 'AI prompt line'
                                             : (declarationLines.has(i)
                                                 ? 'Variable declaration'
-                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line'))))))
-                                }
+                                                : (markedLines.has(i) ? 'Remove mark' : 'Mark line'))))))) }
                             >
-                                <span className="gutter-line-number" aria-hidden="true">{i + 1}</span>
+                                <span className="gutter-line-number" aria-hidden="true">{isActiveWorksheetLocked ? '' : i + 1}</span>
                                 <span className="gutter-line-indicator" aria-hidden="true">
-                                    {lineErrors.has(i) && (
+                                    {!isActiveWorksheetLocked && lineErrors.has(i) && (
                                         <span className="gutter-error-icon">!</span>
                                     )}
-                                    {!lineErrors.has(i) && truncatedZeroLines.has(i) && (
+                                    {!isActiveWorksheetLocked && !lineErrors.has(i) && truncatedZeroLines.has(i) && (
                                         <span className="gutter-truncated-icon">~0</span>
                                     )}
-                                    {!lineErrors.has(i) && !truncatedZeroLines.has(i) && truncatedLines.has(i) && (
+                                    {!isActiveWorksheetLocked && !lineErrors.has(i) && !truncatedZeroLines.has(i) && truncatedLines.has(i) && (
                                         <span className="gutter-truncated-icon">≈</span>
                                     )}
-                                    {!lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && staleLineDetails.has(i) && (
+                                    {!isActiveWorksheetLocked && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && staleLineDetails.has(i) && (
                                         <span className="gutter-stale-icon">↻</span>
                                     )}
-                                    {!lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && aiTriggerLines.has(i) && (
+                                    {!isActiveWorksheetLocked && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && aiTriggerLines.has(i) && (
                                         <span className="gutter-ai-icon">?</span>
                                     )}
-                                    {markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && !declarationLines.has(i) && (
+                                    {!isActiveWorksheetLocked && markedLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && !declarationLines.has(i) && (
                                         <span className="gutter-mark">&#9670;</span>
                                     )}
-                                    {declarationLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && (
+                                    {!isActiveWorksheetLocked && declarationLines.has(i) && !lineErrors.has(i) && !truncatedZeroLines.has(i) && !truncatedLines.has(i) && !staleLineDetails.has(i) && (
                                         <span className="gutter-var">@</span>
                                     )}
                                 </span>
@@ -982,7 +1264,8 @@ function App() {
                         ref={editorRef}
                         className={`editor${wordWrap ? ' editor--wrap' : ''}`}
                         spellCheck={false}
-                        value={content}
+                        readOnly={isActiveWorksheetLocked}
+                        value={visibleContent}
                         onChange={(e) => {
                             const rawNextContent = e.target.value;
                             const rawCaretPos = e.target.selectionStart;
@@ -1078,11 +1361,12 @@ function App() {
                             fontSize: `${fontScale}em`,
                             paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
                             paddingBottom: `${EDITOR_BOTTOM_PADDING_PX}px`,
+                            pointerEvents: isActiveWorksheetLocked ? 'none' : 'auto',
                         }}
                     />
                     <div
                         ref={overlayRef}
-                        className={`editor-overlay${wordWrap ? ' editor-overlay--wrap' : ''}`}
+                        className={`editor-overlay${wordWrap ? ' editor-overlay--wrap' : ''}${isActiveWorksheetLocked ? ' editor-overlay--locked' : ''}`}
                         aria-hidden="true"
                         style={{
                             fontSize: `${fontScale}em`,
@@ -1091,9 +1375,9 @@ function App() {
                             paddingRight: `${EDITOR_SIDE_PADDING_PX + editorScrollbarWidth}px`,
                         }}
                     >
-                        {renderOverlayLines()}
+                        {isActiveWorksheetLocked ? renderLockedOverlay() : renderOverlayLines()}
                     </div>
-                    {activeLineError && (
+                    {!isActiveWorksheetLocked && activeLineError && (
                         <div
                             className="line-error-floating"
                             style={{top: activeLineErrorTop, left: activeLineErrorLeft}}
@@ -1102,7 +1386,7 @@ function App() {
                             {activeLineError}
                         </div>
                     )}
-                    {isAIQueryPending && aiPendingLineIndex !== null && aiProgressMessage && (
+                    {!isActiveWorksheetLocked && isAIQueryPending && aiPendingLineIndex !== null && aiProgressMessage && (
                         <div
                             className="line-ai-progress"
                             style={{top: aiProgressTop, left: EDITOR_PADDING - editorScrollLeft}}
@@ -1112,7 +1396,7 @@ function App() {
                             <span>AI: {aiProgressMessage}</span>
                         </div>
                     )}
-                    {showIntelligenceHint && intelligenceSuggestions.length > 0 && (
+                    {!isActiveWorksheetLocked && showIntelligenceHint && intelligenceSuggestions.length > 0 && (
                         <div
                             className="editor-intelligence"
                             style={{top: intelligenceTop, left: intelligenceLeft}}
@@ -1129,6 +1413,9 @@ function App() {
                     )}
                 </div>
             </div>
+            {worksheets.length > 0 && worksheetTabPosition === 'bottom' && (
+                <WorksheetTabs placement="bottom" />
+            )}
             <StatusBar />
 
             <SettingsPanel
@@ -1138,6 +1425,8 @@ function App() {
                 settingsDrawerWidth={settingsDrawerWidth}
                 setSettingsDrawerWidth={setSettingsDrawerWidth}
                 startSettingsDrawerResize={startSettingsDrawerResize}
+                worksheetTabPosition={worksheetTabPosition}
+                setWorksheetTabPosition={setWorksheetTabPosition}
                 onClose={() => setShowSettings(false)}
                 onOpenThemeStore={openThemeStoreInSidebar}
                 onCloseThemeStore={closeThemeStoreInSidebar}
@@ -1149,6 +1438,13 @@ function App() {
                 <HelpPanelContainer
                     helpPanelPosition={helpPanelPosition}
                     setHelpPanelPosition={setHelpPanelPosition}
+                    helpPanelSideSize={helpPanelSideSize}
+                    setHelpPanelSideSize={setHelpPanelSideSize}
+                    helpPanelBottomSize={helpPanelBottomSize}
+                    setHelpPanelBottomSize={setHelpPanelBottomSize}
+                    startHelpPanelResize={startHelpPanelResize}
+                    clampHelpPanelSideSize={clampHelpPanelSideSize}
+                    clampHelpPanelBottomSize={clampHelpPanelBottomSize}
                     onClose={() => setShowHelp(false)}
                 />
             )}

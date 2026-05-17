@@ -1,5 +1,6 @@
 export { StatusProvider, useStatus } from './StatusContext';
 export { DisplaySettingsProvider, useDisplaySettings } from './DisplaySettingsContext';
+export { WorksheetManagerProvider, useWorksheetManager } from './WorksheetManagerContext';
 export { WorksheetProvider, useWorksheet } from './WorksheetContext';
 export { EditorUIProvider, useEditorUI } from './EditorUIContext';
 export { UIStateProvider, useUIState } from './UIStateContext';

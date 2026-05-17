@@ -37,9 +37,25 @@ export const LAST_RESULT_STORAGE_KEY = 'calc.editor.lastResult';
 export const VARIABLE_VALUES_STORAGE_KEY = 'calc.editor.variableValues';
 export const ACCEPTED_THEMES_STORAGE_KEY = 'calc.themes.accepted';
 export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
+export const HELP_PANEL_SIDE_SIZE_STORAGE_KEY = 'calc.help.sideSize';
+export const HELP_PANEL_BOTTOM_SIZE_STORAGE_KEY = 'calc.help.bottomSize';
 export const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
 export const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
+export const AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY = 'calc.lock.autoLockTimeoutMinutes';
+export const AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY = 'calc.lock.autoLockOnWindowHide';
+export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystemSleep';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
+export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
+export const WORKSHEETS_ACTIVE_ID_STORAGE_KEY = 'calc.worksheets.activeId';
+export const WORKSHEETS_TAB_POSITION_STORAGE_KEY = 'calc.worksheets.tabPosition';
+
+export const DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES = 5;
+export const MIN_AUTO_LOCK_TIMEOUT_MINUTES = 0;
+export const MAX_AUTO_LOCK_TIMEOUT_MINUTES = 30;
+export const DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE = true;
+export const DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP = true;
+export const AUTO_LOCK_SLEEP_GAP_MS = 120000;
+export const AUTO_LOCK_SLEEP_CHECK_INTERVAL_MS = 30000;
 
 // Timing
 export const DOUBLE_ESCAPE_HIDE_WINDOW_MS = 420;
@@ -52,6 +68,16 @@ export const SETTINGS_DRAWER_MIN_WIDTH = 360;
 export const SETTINGS_DRAWER_MAX_WIDTH = 1520;
 export const SETTINGS_DRAWER_MIN_EDITOR_WIDTH = 380;
 export const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
+
+// Help panel sizing
+export const DEFAULT_HELP_PANEL_SIDE_SIZE = 320;
+export const HELP_PANEL_SIDE_MIN_SIZE = 260;
+export const HELP_PANEL_SIDE_MAX_SIZE = 860;
+export const HELP_PANEL_SIDE_MIN_EDITOR_WIDTH = 320;
+export const DEFAULT_HELP_PANEL_BOTTOM_SIZE = 420;
+export const HELP_PANEL_BOTTOM_MIN_SIZE = 220;
+export const HELP_PANEL_BOTTOM_MAX_SIZE = 760;
+export const HELP_PANEL_BOTTOM_MIN_EDITOR_HEIGHT = 160;
 
 // Precision
 export const PRECISION_MIN = 0;

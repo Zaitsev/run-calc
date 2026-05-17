@@ -6,9 +6,13 @@ export function ClearAIAPIKey(arg1:main.AISettings):Promise<main.AIKeyStatus>;
 
 export function EvaluateExprProgram(arg1:string,arg2:Record<string, any>):Promise<main.ExprEvalResponse>;
 
+export function ExportWorksheetPlaintextToFile(arg1:string,arg2:string):Promise<main.SaveWorksheetResponse>;
+
 export function GetAIKeyStatusForSettings(arg1:main.AISettings):Promise<main.AIKeyStatus>;
 
 export function GetAISettings():Promise<main.AISettingsResponse>;
+
+export function GetDefaultWorksheetDirectory():Promise<string>;
 
 export function Greet(arg1:string):Promise<string>;
 
@@ -16,13 +20,23 @@ export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
 
 export function IsRunningAsMSIX():Promise<boolean>;
 
+export function LoadWorksheetFromFile(arg1:string):Promise<main.LoadWorksheetResponse>;
+
 export function OpenThemeStore():Promise<void>;
 
 export function RunAIQuery(arg1:main.AIRunRequest):Promise<main.AIRunResponse>;
 
 export function SaveAISettings(arg1:main.AISettings):Promise<main.AISettingsResponse>;
 
+export function SaveWorksheetToFile(arg1:string,arg2:string):Promise<main.SaveWorksheetResponse>;
+
 export function SearchThemes(arg1:string):Promise<Array<main.OpenVSXExtension>>;
+
+export function SelectWorksheetEncryptedSavePath(arg1:string):Promise<string>;
+
+export function SelectWorksheetLoadPath():Promise<string>;
+
+export function SelectWorksheetPlaintextExportPath(arg1:string):Promise<string>;
 
 export function SetAIAPIKey(arg1:string,arg2:main.AISettings):Promise<main.AIKeyStatus>;
 

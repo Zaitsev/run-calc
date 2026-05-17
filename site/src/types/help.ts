@@ -1,4 +1,4 @@
-export type HelpPageKey = 'operations' | 'shortcuts' | 'new';
+export type HelpPageKey = 'operations' | 'shortcuts' | 'new' | 'worksheets';
 
 export type HelpContentMap = Record<HelpPageKey, string[]>;
 

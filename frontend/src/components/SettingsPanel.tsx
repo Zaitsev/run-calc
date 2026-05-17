@@ -2,6 +2,7 @@ import React from 'react';
 import { useEditorUI, useStatus, useThemeContext, useUIState } from '../contexts';
 import { AISettingsPanel } from '../AISettings';
 import { ThemeStore } from '../ThemeStore';
+import type { WorksheetTabPosition } from '../types/app';
 import {
     DEFAULT_FONT_SCALE,
     DEFAULT_UI_FONT_SCALE,
@@ -24,6 +25,8 @@ interface SettingsPanelProps {
     settingsDrawerWidth: number;
     setSettingsDrawerWidth: React.Dispatch<React.SetStateAction<number>>;
     startSettingsDrawerResize: (e: React.MouseEvent<HTMLDivElement>) => void;
+    worksheetTabPosition: WorksheetTabPosition;
+    setWorksheetTabPosition: (position: WorksheetTabPosition) => void;
     onClose: () => void;
     onOpenThemeStore: () => void;
     onCloseThemeStore: () => void;
@@ -36,6 +39,8 @@ export function SettingsPanel({
     settingsDrawerWidth,
     setSettingsDrawerWidth,
     startSettingsDrawerResize,
+    worksheetTabPosition,
+    setWorksheetTabPosition,
     onClose,
     onOpenThemeStore,
     onCloseThemeStore,
@@ -83,6 +88,12 @@ export function SettingsPanel({
 
     const onClearAIKeyInBackend = async () => {
         await ai.clearAIKeyInBackend(withStatusSetters);
+    };
+
+    const formatAutoLockTimeout = (minutes: number) => {
+        if (minutes <= 0) return 'Off';
+        if (minutes === 1) return '1 minute';
+        return `${minutes} minutes`;
     };
 
     return (
@@ -250,6 +261,86 @@ export function SettingsPanel({
                                     type="checkbox"
                                     checked={display.wordWrap}
                                     onChange={(e) => display.setWordWrap(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="settings-card-title">Worksheet tabs position</div>
+                            <div className="settings-card-desc">Choose where worksheet tabs are displayed</div>
+                        </div>
+                        <div className="settings-options">
+                            {(['top', 'bottom', 'left'] as const).map((position) => (
+                                <label key={position} className="settings-option">
+                                    <input
+                                        type="radio"
+                                        name="worksheet-tabs-position"
+                                        value={position}
+                                        checked={worksheetTabPosition === position}
+                                        onChange={() => setWorksheetTabPosition(position)}
+                                    />
+                                    <span>
+                                        {position === 'top' ? 'Top' : position === 'bottom' ? 'Bottom' : 'Left'}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <p className="settings-section-label">Privacy</p>
+                    <div className="settings-card">
+                        <div className="settings-row settings-row--stack">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Inactivity auto-lock</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets after inactivity.</div>
+                            </div>
+                            <div className="settings-slider-block">
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={30}
+                                    step={1}
+                                    className="settings-range"
+                                    value={display.autoLockTimeoutMinutes}
+                                    onChange={(event) => display.setAutoLockTimeoutMinutes(Number(event.target.value))}
+                                    aria-label="Auto-lock timeout in minutes"
+                                />
+                                <div className="settings-slider-meta">
+                                    <span>Off</span>
+                                    <span>{formatAutoLockTimeout(display.autoLockTimeoutMinutes)}</span>
+                                    <span>30 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Lock on minimize or hide</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets when the window is hidden or minimized.</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle lock on minimize or hide">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoLockOnWindowHide}
+                                    onChange={(e) => display.setAutoLockOnWindowHide(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Lock on system sleep/resume</div>
+                                <div className="settings-row-desc">Automatically lock protected worksheets after the computer wakes from sleep.</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle lock on system sleep/resume">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoLockOnSystemSleep}
+                                    onChange={(e) => display.setAutoLockOnSystemSleep(e.target.checked)}
                                 />
                                 <span className="settings-toggle-track" />
                             </label>

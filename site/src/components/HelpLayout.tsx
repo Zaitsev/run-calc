@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react';
 
-export type SitePageKey = 'overview' | 'operations' | 'shortcuts' | 'functions' | 'byok' | 'themes' | 'whats-new' | 'privacy';
+export type SitePageKey = 'overview' | 'operations' | 'shortcuts' | 'worksheets' | 'functions' | 'byok' | 'themes' | 'whats-new' | 'privacy';
 
 type HelpLayoutProps = PropsWithChildren<{
     title: string;
@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
     { key: 'overview', label: 'Overview', href: '/' },
     { key: 'operations', label: 'Operations', href: '/operations' },
     { key: 'shortcuts', label: 'Shortcuts', href: '/shortcuts' },
+    { key: 'worksheets', label: 'Worksheets', href: '/worksheets' },
     { key: 'functions', label: 'Functions', href: '/functions' },
     { key: 'byok', label: 'AI Key Setup', href: '/byok' },
     { key: 'themes', label: 'Themes', href: '/themes' },

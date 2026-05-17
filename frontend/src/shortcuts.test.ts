@@ -46,6 +46,11 @@ describe('getPrimaryShortcutAction', () => {
         expect(getPrimaryShortcutAction(event({key: 'M', metaKey: true}))).toBe('toggle-mark-line');
     });
 
+    it('matches lock shortcut', () => {
+        expect(getPrimaryShortcutAction(event({key: 'l', ctrlKey: true}))).toBe('lock-active-worksheet');
+        expect(getPrimaryShortcutAction(event({key: 'L', metaKey: true, code: 'KeyL'}))).toBe('lock-active-worksheet');
+    });
+
     it('matches word wrap shortcut', () => {
         expect(getPrimaryShortcutAction(event({key: 'z', altKey: true}))).toBe('toggle-word-wrap');
         expect(getPrimaryShortcutAction(event({key: 'Z', altKey: true, code: 'KeyZ'}))).toBe('toggle-word-wrap');

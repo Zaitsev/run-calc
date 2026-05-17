@@ -1,4 +1,6 @@
 export type PrimaryShortcutAction =
+    | 'new-worksheet'
+    | 'lock-active-worksheet'
     | 'insert-line-below'
     | 'toggle-mark-line'
     | 'toggle-word-wrap'
@@ -40,6 +42,14 @@ export function getPrimaryShortcutAction(event: ShortcutKeyLike): PrimaryShortcu
 
     if (event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter') {
         return 'insert-line-below';
+    }
+
+    if (event.key === 'n' || event.key === 'N' || event.code === 'KeyN') {
+        return 'new-worksheet';
+    }
+
+    if (event.key === 'l' || event.key === 'L' || event.code === 'KeyL') {
+        return 'lock-active-worksheet';
     }
 
     if (event.key === 'm' || event.key === 'M') {

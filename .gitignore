@@ -8,3 +8,5 @@ build/certs/*
 !build/certs/.gitkeep
 calc.exe
 .firebase.json
+.playwright-test-results
+.playwright-mcp
