@@ -171,3 +171,336 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         }
     });
 });
+
+describe('buildEvaluationHooks evaluateCurrentLine', () => {
+    it('moves caret to the next line after evaluating a non-final line', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        evaluateExprMock.mockResolvedValue({
+            ok: true,
+            value: 58,
+            isNumber: true,
+            numberValue: 58,
+            variables: { a: 275 },
+        } as EvalResult);
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef = {
+            current: {
+                get selectionStart() {
+                    return selectionStart;
+                },
+                set selectionStart(value: number) {
+                    selectionStart = value;
+                },
+                get selectionEnd() {
+                    return selectionEnd;
+                },
+                set selectionEnd(value: number) {
+                    selectionEnd = value;
+                },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        let content = [
+            '42/42*58',
+            '2+5',
+            'a = 5*55',
+            'a = 275',
+        ].join('\n');
+        editorRef.current!.value = content;
+
+        let caretPos = 0;
+        selectionStart = 0;
+        selectionEnd = 0;
+
+        const originalRAF = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            callback(0);
+            return 0;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content,
+                lastResult: null,
+                variableValues: { a: 275 },
+                variableVersions: {},
+                lineDependencies: {},
+                lineDependencyVersions: {},
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                setContent: (next) => {
+                    content = next;
+                    editorRef.current!.value = next;
+                },
+                setCaretPos: (next) => {
+                    caretPos = next;
+                },
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setVariableVersions: () => ({}),
+                setLineDependencies: () => ({}),
+                setLineDependencyVersions: () => ({}),
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText: () => {},
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            expect(content).toBe([
+                '42/42*58 = 58',
+                '2+5',
+                'a = 5*55',
+                'a = 275',
+            ].join('\n'));
+
+            const expectedCaret = '42/42*58 = 58\n'.length;
+            expect(caretPos).toBe(expectedCaret);
+            expect(editorRef.current!.selectionStart).toBe(expectedCaret);
+            expect(editorRef.current!.selectionEnd).toBe(expectedCaret);
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+
+    it('keeps caret on the next line when textarea value updates a frame later', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        evaluateExprMock.mockResolvedValue({
+            ok: true,
+            value: 58,
+            isNumber: true,
+            numberValue: 58,
+            variables: {},
+        } as EvalResult);
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef = {
+            current: {
+                get selectionStart() {
+                    return selectionStart;
+                },
+                set selectionStart(value: number) {
+                    selectionStart = value;
+                },
+                get selectionEnd() {
+                    return selectionEnd;
+                },
+                set selectionEnd(value: number) {
+                    selectionEnd = value;
+                },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        let content = [
+            '42/42*58',
+            '2+5',
+            'a = 5*55',
+            'a = 275',
+        ].join('\n');
+        editorRef.current!.value = content;
+
+        let caretPos = 0;
+        const queuedRaf: FrameRequestCallback[] = [];
+        const originalRAF = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            queuedRaf.push(callback);
+            return queuedRaf.length;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content,
+                lastResult: null,
+                variableValues: {},
+                variableVersions: {},
+                lineDependencies: {},
+                lineDependencyVersions: {},
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                setContent: (next) => {
+                    content = next;
+                },
+                setCaretPos: (next) => {
+                    caretPos = next;
+                },
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setVariableVersions: () => ({}),
+                setLineDependencies: () => ({}),
+                setLineDependencyVersions: () => ({}),
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText: () => {},
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            expect(queuedRaf.length).toBe(1);
+            const firstFrame = queuedRaf.shift();
+            firstFrame?.(0);
+
+            // Simulate React applying textarea value between animation frames.
+            editorRef.current!.value = content;
+
+            expect(queuedRaf.length).toBe(1);
+            const secondFrame = queuedRaf.shift();
+            secondFrame?.(0);
+
+            const expectedCaret = '42/42*58 = 58\n'.length;
+            expect(caretPos).toBe(expectedCaret);
+            expect(editorRef.current!.selectionStart).toBe(expectedCaret);
+            expect(editorRef.current!.selectionEnd).toBe(expectedCaret);
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+
+    it('appends a newline and places caret at the end when evaluating the final line', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        evaluateExprMock.mockResolvedValue({
+            ok: true,
+            value: 7,
+            isNumber: true,
+            numberValue: 7,
+            variables: {},
+        } as EvalResult);
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef = {
+            current: {
+                get selectionStart() {
+                    return selectionStart;
+                },
+                set selectionStart(value: number) {
+                    selectionStart = value;
+                },
+                get selectionEnd() {
+                    return selectionEnd;
+                },
+                set selectionEnd(value: number) {
+                    selectionEnd = value;
+                },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        let content = '3+4';
+        editorRef.current!.value = content;
+
+        let caretPos = 0;
+        selectionStart = 0;
+        selectionEnd = 0;
+
+        const originalRAF = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            callback(0);
+            return 0;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content,
+                lastResult: null,
+                variableValues: {},
+                variableVersions: {},
+                lineDependencies: {},
+                lineDependencyVersions: {},
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                setContent: (next) => {
+                    content = next;
+                    editorRef.current!.value = next;
+                },
+                setCaretPos: (next) => {
+                    caretPos = next;
+                },
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setVariableVersions: () => ({}),
+                setLineDependencies: () => ({}),
+                setLineDependencyVersions: () => ({}),
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText: () => {},
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            expect(content).toBe('3+4 = 7\n');
+            expect(caretPos).toBe(content.length);
+            expect(editorRef.current!.selectionStart).toBe(content.length);
+            expect(editorRef.current!.selectionEnd).toBe(content.length);
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+});

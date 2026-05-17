@@ -76,9 +76,12 @@ function applyContentAndCaret(
     setContent(nextContent);
     setCaretPos(nextCaret);
     requestAnimationFrame(() => {
-        if (!editorRef.current) return;
-        editorRef.current.selectionStart = nextCaret;
-        editorRef.current.selectionEnd = nextCaret;
+        requestAnimationFrame(() => {
+            if (!editorRef.current) return;
+            const clampedCaret = Math.min(nextCaret, editorRef.current.value.length);
+            editorRef.current.selectionStart = clampedCaret;
+            editorRef.current.selectionEnd = clampedCaret;
+        });
     });
 }
 
