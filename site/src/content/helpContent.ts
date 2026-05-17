@@ -16,7 +16,11 @@ export const helpContent: HelpContentMap = {
         'If a line is invalid, it is marked in red with a gutter ! so it is easy to spot and fix.',
         'If you edit a line that already has = result, Run-Calc removes the old result so you can recalculate cleanly.',
         'When a variable changes, dependent lines are marked stale until you run them again.',
-        'Status messages are written in plain language with practical examples for faster troubleshooting.'
+        'Status messages are written in plain language with practical examples for faster troubleshooting.',
+        '## Copying results',
+        'Hover over any evaluated line to reveal a copy icon (⧉) next to the result.',
+        'Click the icon to copy the result value to the clipboard. The status bar confirms the copy.',
+        'Only numeric results are copyable — error lines do not show the icon.',
     ],
     shortcuts: [
         'Enter: Evaluate current line, or move to the next line when the current line is empty/comment-only or caret is in trailing comment text. On the last line, Enter creates a new line and moves the caret to it when no evaluation error occurs.',
