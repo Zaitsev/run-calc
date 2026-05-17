@@ -46,6 +46,7 @@ export const AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY = 'calc.lock.autoLockTimeoutM
 export const AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY = 'calc.lock.autoLockOnWindowHide';
 export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystemSleep';
 export const COPY_MODE_STORAGE_KEY = 'calc.editor.copyMode';
+export const VARIABLE_FIRST_INLINING_STORAGE_KEY = 'calc.editor.variableFirstInlining';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
 export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
 export const WORKSHEETS_ACTIVE_ID_STORAGE_KEY = 'calc.worksheets.activeId';

@@ -283,6 +283,22 @@ export function SettingsPanel({
                         </div>
                     </div>
                     <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Variable-first inlining</div>
+                                <div className="settings-row-desc">When typing an operator on a new line, inject the variable name instead of its result</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle variable-first inlining">
+                                <input
+                                    type="checkbox"
+                                    checked={display.variableFirstInlining}
+                                    onChange={(e) => display.setVariableFirstInlining(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
                         <div className="settings-card-header">
                             <div className="settings-card-title">Worksheet tabs position</div>
                             <div className="settings-card-desc">Choose where worksheet tabs are displayed</div>

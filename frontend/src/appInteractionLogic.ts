@@ -1,4 +1,5 @@
-import { splitLineComment } from './lineExpression';
+import { splitLineComment, getExpressionSource } from './lineExpression';
+import { parseDeclaredVariable } from './utils/worksheetEditing';
 
 type DecimalDelimiter = '.' | ',';
 type PrecisionMode = 'auto' | 'full' | number;
@@ -44,11 +45,25 @@ export function buildEvaluationExpression(
     lastResult: number | null,
     decimalDelimiter: DecimalDelimiter,
     formatNumber: (value: number, decimalDelimiter: DecimalDelimiter) => string,
+    previousLineSource?: string,
+    variableFirstInlining?: boolean,
 ): string {
     if (!trimmedLine.match(/^[+\-*/]/) || lastResult === null) {
         return editableLine;
     }
 
+    // If variable-first inlining is enabled and previous line is a variable assignment,
+    // use the variable name instead of the result
+    if (variableFirstInlining && previousLineSource) {
+        const prevLineExpr = getExpressionSource(previousLineSource);
+        const declaredVar = parseDeclaredVariable(prevLineExpr);
+        if (declaredVar) {
+            // Use the variable label (with optional @ prefix)
+            return `${declaredVar.label}${trimmedLine}`;
+        }
+    }
+
+    // Otherwise, use the original behavior: inject the last result
     return `${formatNumber(lastResult, decimalDelimiter)}${trimmedLine}`;
 }
 

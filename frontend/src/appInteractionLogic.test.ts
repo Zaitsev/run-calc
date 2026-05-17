@@ -40,6 +40,26 @@ describe('app interaction helpers', () => {
         expect(buildEvaluationExpression('+2', '+2', null, '.', format)).toBe('+2');
     });
 
+    it('uses variable name instead of result when variable-first inlining is enabled', () => {
+        const format = (value: number, delimiter: '.' | ',') =>
+            delimiter === ',' ? String(value).replace('.', ',') : String(value);
+
+        // Variable assignment: should use variable name
+        expect(buildEvaluationExpression('+', '+', 5, '.', format, 'a=5', true)).toBe('a+');
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', true)).toBe('a+2');
+        expect(buildEvaluationExpression('*3', '*3', 10, '.', format, 'price=100', true)).toBe('price*3');
+        expect(buildEvaluationExpression('-1', '-1', 42, '.', format, '@arr=[1,2,3]', true)).toBe('@arr-1');
+        
+        // Regular expression: should still use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '2+3 = 5', true)).toBe('5+2');
+        
+        // When disabled: should use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', false)).toBe('5+2');
+        
+        // Without previous line: should use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '', true)).toBe('5+2');
+    });
+
     it('maps syntax and math failures to user-friendly messages', () => {
         expect(getFriendlyEvalErrorMessage('mismatched input )')).toContain('typing mistake');
         expect(getFriendlyEvalErrorMessage('division by zero')).toContain('Division by zero');

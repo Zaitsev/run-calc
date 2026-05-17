@@ -43,6 +43,7 @@ type EvalDeps = {
     decimalDelimiter: DecimalDelimiter;
     precision: PrecisionMode;
     scientificNotation: boolean;
+    variableFirstInlining: boolean;
     // setters
     setContent: (v: string) => void;
     setCaretPos: (v: number) => void;
@@ -89,7 +90,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
     const {
         content, lastResult, variableValues, variableVersions, lineDependencies: _ld, lineDependencyVersions: _ldv,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
-        decimalDelimiter, precision, scientificNotation,
+        decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
         setVariableValues, setVariableVersions, setLineDependencies, setLineDependencyVersions,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
@@ -282,9 +283,22 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
 
         const trimmed = editableLine.trim();
+        
+        // Extract previous line content for variable-first inlining feature
+        let previousLineSource = '';
+        if (lineStart > 0) {
+            const prevLineEnd = lineStart - 1;  // Account for the newline
+            const prevBounds = getLineBounds(content, Math.max(0, lineStart - 2));
+            const prevLineStart = prevBounds.lineStart;
+            const prevLineText = content.slice(prevLineStart, prevLineEnd);
+            previousLineSource = getExpressionSource(prevLineText);
+        }
+        
         const expression = buildEvaluationExpression(
             editableLine, trimmed, lastResult, decimalDelimiter,
             (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
+            previousLineSource,
+            variableFirstInlining,
         );
 
         try {

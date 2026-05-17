@@ -8,6 +8,7 @@ import {
 import { AIDebugDrawer } from './AIDebugDrawer';
 import './App.css';
 import {
+    buildEvaluationExpression,
     buildStaleLineDetails,
     isAITriggerSourceLine,
     reformatComputedLineResult
@@ -78,7 +79,7 @@ function App() {
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes, copyMode } = useDisplaySettings();
+    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes, copyMode, variableFirstInlining } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -783,7 +784,7 @@ function App() {
     const { evaluateCurrentLine, reevaluateAllExpressions, clearStaleStates } = buildEvaluationHooks({
         content, lastResult, variableValues, variableVersions, lineDependencies, lineDependencyVersions,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
-        decimalDelimiter, precision, scientificNotation,
+        decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
         setVariableValues,
         setVariableVersions,
@@ -949,7 +950,25 @@ function App() {
         }
 
         event.preventDefault();
-        insertAtSelection(`${formatNumber(lastResult, decimalDelimiter, 'auto', false)}${event.key}`);
+        let previousLineSource = '';
+        if (lineStart > 0) {
+            const prevLineEnd = lineStart - 1;
+            const prevBounds = getLineBounds(content, Math.max(0, lineStart - 2));
+            const prevLineText = content.slice(prevBounds.lineStart, prevLineEnd);
+            previousLineSource = getExpressionSource(prevLineText);
+        }
+
+        const nextExpression = buildEvaluationExpression(
+            event.key,
+            event.key,
+            lastResult,
+            decimalDelimiter,
+            (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
+            previousLineSource,
+            variableFirstInlining,
+        );
+
+        insertAtSelection(nextExpression);
     };
 
     const onEditorWheel = (event: ReactWheelEvent<HTMLTextAreaElement>) => {

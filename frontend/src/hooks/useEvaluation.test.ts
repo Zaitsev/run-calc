@@ -118,6 +118,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
                 decimalDelimiter: '.',
                 precision: 'auto',
                 scientificNotation: false,
+                variableFirstInlining: true,
                 setContent: (next) => {
                     content = next;
                 },
@@ -244,6 +245,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 decimalDelimiter: '.',
                 precision: 'auto',
                 scientificNotation: false,
+                variableFirstInlining: true,
                 setContent: (next) => {
                     content = next;
                     editorRef.current!.value = next;
@@ -356,6 +358,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 decimalDelimiter: '.',
                 precision: 'auto',
                 scientificNotation: false,
+                variableFirstInlining: true,
                 setContent: (next) => {
                     content = next;
                 },
@@ -468,6 +471,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 decimalDelimiter: '.',
                 precision: 'auto',
                 scientificNotation: false,
+                variableFirstInlining: true,
                 setContent: (next) => {
                     content = next;
                     editorRef.current!.value = next;
