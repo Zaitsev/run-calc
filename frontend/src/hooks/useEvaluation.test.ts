@@ -503,8 +503,99 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
             expect(caretPos).toBe(content.length);
             expect(editorRef.current!.selectionStart).toBe(content.length);
             expect(editorRef.current!.selectionEnd).toBe(content.length);
+
         } finally {
             globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+
+    it('synthesizes stale entries for untracked lines that reference a changed variable', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef2 = {
+            current: {
+                get selectionStart() { return selectionStart; },
+                set selectionStart(value: number) { selectionStart = value; },
+                get selectionEnd() { return selectionEnd; },
+                set selectionEnd(value: number) { selectionEnd = value; },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        // Worksheet loaded from storage: a was 1, b depends on a, lineDependencyVersions empty (fresh session).
+        let content2 = ['a = 5 = 1', 'b = a + 1 = 2'].join('\n');
+        editorRef2.current!.value = content2;
+        selectionStart = 0;
+        selectionEnd = 0;
+
+        let variableVersions2: Record<string, number> = {};
+        let lineDependencyVersions2: Record<number, Record<string, number>> = {};
+
+        const originalRAF2 = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            callback(0);
+            return 0;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content: content2,
+                lastResult: null,
+                variableValues: { a: 1, b: 2 },
+                variableVersions: variableVersions2,
+                lineDependencies: {},
+                lineDependencyVersions: lineDependencyVersions2,
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                variableFirstInlining: false,
+                setContent: (next) => { content2 = next; editorRef2.current!.value = next; },
+                setCaretPos: () => {},
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setVariableVersions: (next) => {
+                    variableVersions2 = typeof next === 'function' ? next(variableVersions2) : next;
+                },
+                setLineDependencies: () => {},
+                setLineDependencyVersions: (next) => {
+                    lineDependencyVersions2 = typeof next === 'function' ? next(lineDependencyVersions2) : next;
+                },
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText: () => {},
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef: editorRef2,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            // a changed from 1 to 5 so variableVersions.a should be bumped to 1
+            expect(variableVersions2['a']).toBe(1);
+            // line 1 (b = a + 1) was untracked; it should get a stale snapshot with the old version (0)
+            expect(lineDependencyVersions2[1]).toEqual({ a: 0 });
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF2;
         }
     });
 });

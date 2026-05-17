@@ -333,10 +333,34 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             const dependencySnapshot: Record<string, number> = {};
             dependencies.forEach((name) => { dependencySnapshot[name] = nextVariableVersions[name] ?? 0; });
 
+            // For lines not yet tracked in this session, synthesize stale entries for
+            // any that reference a changed variable. This covers worksheets loaded from storage
+            // where lineDependencyVersions starts empty.
+            const synthesizedStaleEntries: Record<number, Record<string, number>> = {};
+            if (changedVariableKeys.size > 0) {
+                const allLines = content.split('\n');
+                allLines.forEach((lineText, idx) => {
+                    if (idx === lineIndex) return;
+                    if (_ldv[idx] !== undefined) return;
+                    const deps = extractExpressionDependencies(lineText);
+                    const staleSnap: Record<string, number> = {};
+                    let hasChangedDep = false;
+                    deps.forEach((dep) => {
+                        if (changedVariableKeys.has(dep)) {
+                            staleSnap[dep] = variableVersions[dep] ?? 0;
+                            hasChangedDep = true;
+                        }
+                    });
+                    if (hasChangedDep) {
+                        synthesizedStaleEntries[idx] = staleSnap;
+                    }
+                });
+            }
+
             setVariableValues(nextVariables);
             setVariableVersions((prev) => ({ ...prev, ...nextVariableVersions }));
             setLineDependencies((prev) => ({ ...prev, [lineIndex]: dependencies }));
-            setLineDependencyVersions((prev) => ({ ...prev, [lineIndex]: dependencySnapshot }));
+            setLineDependencyVersions((prev) => ({ ...prev, ...synthesizedStaleEntries, [lineIndex]: dependencySnapshot }));
             setStatusText('Calculated');
             setIsStatusError(false);
             setDevError('');

@@ -115,10 +115,13 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setMarkedLines(new Set(activeWorksheet.markedLines));
         setVariableValues(activeWorksheet.variableValues);
         hasPendingContentSyncRef.current = false;
-        // Clear session state when switching worksheets
-        setVariableVersions({});
-        setLineDependencies({});
-        setLineDependencyVersions({});
+
+        // Session evaluation metadata should only reset when worksheet ownership changes.
+        if (isWorksheetSwitch) {
+            setVariableVersions({});
+            setLineDependencies({});
+            setLineDependencyVersions({});
+        }
     }, [activeWorksheet]);
 
     // Persist state changes back to manager - debounced to avoid excessive updates
