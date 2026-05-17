@@ -78,7 +78,7 @@ function App() {
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes } = useDisplaySettings();
+    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes, copyMode } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -1510,6 +1510,20 @@ function App() {
                         onKeyUp={updateCaretPosFromEditor}
                         onKeyDown={onKeyDown}
                         onWheel={onEditorWheel}
+                        onCopy={(e) => {
+                            if (copyMode !== 'expressions-only') return;
+                            const el = e.currentTarget;
+                            const start = el.selectionStart ?? 0;
+                            const end = el.selectionEnd ?? 0;
+                            if (start === end) return;
+                            const selected = el.value.slice(start, end);
+                            const transformed = selected
+                                .split('\n')
+                                .map((line) => getExpressionSource(line))
+                                .join('\n');
+                            e.preventDefault();
+                            void navigator.clipboard.writeText(transformed);
+                        }}
                         onScroll={() => {
                             const el = editorRef.current;
                             if (!el) return;

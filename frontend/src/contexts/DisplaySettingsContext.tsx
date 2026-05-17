@@ -12,6 +12,7 @@ import {
     AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY,
     AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY,
     AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY,
+    COPY_MODE_STORAGE_KEY,
     DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE,
     DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP,
     DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES,
@@ -58,6 +59,8 @@ type DisplaySettingsContextValue = {
     setAutoLockOnWindowHide: (value: boolean) => void;
     autoLockOnSystemSleep: boolean;
     setAutoLockOnSystemSleep: (value: boolean) => void;
+    copyMode: 'as-is' | 'expressions-only';
+    setCopyMode: (mode: 'as-is' | 'expressions-only') => void;
     formatNumber: (value: number, delimiter?: '.' | ',', prec?: PrecisionMode, sci?: boolean) => string;
     /** Call this to trigger a re-format pass on worksheet content when precision/delimiter changes.
      *  Accepts a setContent-like updater from WorksheetContext. */
@@ -129,6 +132,12 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         return raw === 'true';
     });
 
+    const [copyMode, setCopyModeState] = useState<'as-is' | 'expressions-only'>(() => {
+        const raw = localStorage.getItem(COPY_MODE_STORAGE_KEY);
+        if (raw === 'expressions-only') return 'expressions-only';
+        return 'as-is';
+    });
+
     const precisionIncreasedRef = useRef(false);
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
 
@@ -171,6 +180,12 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         localStorage.setItem(AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY, String(autoLockOnSystemSleep));
     }, [autoLockOnSystemSleep]);
+
+    useEffect(() => {
+        localStorage.setItem(COPY_MODE_STORAGE_KEY, copyMode);
+    }, [copyMode]);
+
+    const setCopyMode = (mode: 'as-is' | 'expressions-only') => setCopyModeState(mode);
 
     const setDecimalDelimiterMode = (mode: DecimalDelimiterMode) => setDecimalDelimiterModeState(mode);
     const setScientificNotation = (v: boolean) => setScientificNotationState(v);
@@ -261,6 +276,8 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
             setAutoLockOnWindowHide,
             autoLockOnSystemSleep,
             setAutoLockOnSystemSleep,
+            copyMode,
+            setCopyMode,
             formatNumber: fmtNumber,
             reformatContent,
             precisionIncreasedRef,

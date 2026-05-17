@@ -267,6 +267,22 @@ export function SettingsPanel({
                         </div>
                     </div>
                     <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Copy mode</div>
+                                <div className="settings-row-desc">When copying selected text, strip results and keep only expressions</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle copy mode">
+                                <input
+                                    type="checkbox"
+                                    checked={display.copyMode === 'expressions-only'}
+                                    onChange={(e) => display.setCopyMode(e.target.checked ? 'expressions-only' : 'as-is')}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
                         <div className="settings-card-header">
                             <div className="settings-card-title">Worksheet tabs position</div>
                             <div className="settings-card-desc">Choose where worksheet tabs are displayed</div>
