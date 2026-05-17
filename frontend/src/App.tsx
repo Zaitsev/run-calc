@@ -1,4 +1,4 @@
-import { KeyboardEvent, WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { KeyboardEvent, WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
     EventsOn,
     WindowGetSize,
@@ -161,8 +161,28 @@ function App() {
     const inactivityByWorksheetRef = useRef<Record<string, number>>({});
     const previousActiveWorksheetIdRef = useRef<string | null>(null);
     const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
+    const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
+    const hoveredLineIndexRef = useRef<number | null>(null);
+    const [clipboardNumericText, setClipboardNumericText] = useState<string | null>(null);
 
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
+
+    useEffect(() => {
+        const tryReadClipboard = async () => {
+            try {
+                const text = await navigator.clipboard?.readText?.() ?? '';
+                const trimmed = text.trim();
+                const num = parseFloat(trimmed.replace(',', '.'));
+                setClipboardNumericText(
+                    Number.isFinite(num) && trimmed !== '' && !/[\s\n]/.test(trimmed) ? trimmed : null,
+                );
+            } catch {
+                setClipboardNumericText(null);
+            }
+        };
+        window.addEventListener('focus', tryReadClipboard);
+        return () => window.removeEventListener('focus', tryReadClipboard);
+    }, []);
 
     useEffect(() => {
         const previousPrecision = previousPrecisionRef.current;
@@ -846,6 +866,15 @@ function App() {
             return;
         }
 
+        if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            const activeLine = contentLines[activeLineIndex] ?? '';
+            if (clipboardNumericText && activeLine.trim() === '') {
+                event.preventDefault();
+                insertAtSelection(clipboardNumericText);
+                return;
+            }
+        }
+
         if (shortcutAction === 'toggle-mark-line') {
             event.preventDefault();
             toggleMarkLine();
@@ -1015,6 +1044,123 @@ function App() {
                 </div>
             );
         });
+    };
+
+    const handleEditorAreaMouseMove = (event: React.MouseEvent) => {
+        const editorEl = editorRef.current;
+        if (!editorEl) return;
+        const rect = editorEl.getBoundingClientRect();
+        const relY = event.clientY - rect.top + editorScrollTop - EDITOR_TOP_PADDING_PX;
+        let found: number | null = null;
+        for (let idx = 0; idx < contentLines.length; idx++) {
+            const lineTop = getLineTop(idx);
+            const lineH = lineRowHeights[idx] ?? lineHeightPx;
+            if (relY >= lineTop && relY < lineTop + lineH) {
+                found = idx;
+                break;
+            }
+        }
+        if (hoveredLineIndexRef.current !== found) {
+            hoveredLineIndexRef.current = found;
+            setHoveredLineIndex(found);
+        }
+    };
+
+    const handleEditorAreaMouseLeave = () => {
+        hoveredLineIndexRef.current = null;
+        setHoveredLineIndex(null);
+    };
+
+    const renderResultActionsLayer = () => {
+        const i = hoveredLineIndex;
+        if (i === null) return null;
+        const line = contentLines[i];
+        if (!line) return null;
+        const {body: lineBody} = splitLineComment(line);
+        const isVariableLine = declarationLines.has(i);
+        const eqIdx = isVariableLine ? lineBody.lastIndexOf(' = ') : lineBody.indexOf(' = ');
+        if (eqIdx === -1) return null;
+        const resultText = lineBody.slice(eqIdx + 3).trim();
+        if (resultText.length === 0 || resultText === 'error') return null;
+        const top = EDITOR_TOP_PADDING_PX + getLineTop(i) - editorScrollTop;
+        const height = lineRowHeights[i] ?? lineHeightPx;
+        const textWidth = measureLineWidth(lineBody.trimEnd());
+        const left = Math.max(EDITOR_SIDE_PADDING_PX, EDITOR_SIDE_PADDING_PX + textWidth - editorScrollLeft + 6);
+        return (
+            <div className="result-actions-layer" aria-hidden="true">
+                <button
+                    type="button"
+                    className="result-copy-btn"
+                    title="Copy result"
+                    aria-label="Copy result"
+                    style={{top, left, height}}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => void copyResultToClipboard(resultText)}
+                >
+                    ⧉
+                </button>
+            </div>
+        );
+    };
+
+    const renderPasteLayer = () => {
+        if (!clipboardNumericText) return null;
+        const i = activeLineIndex;
+        const line = contentLines[i] ?? '';
+        if (line.trim() !== '') return null;
+        const top = EDITOR_TOP_PADDING_PX + getLineTop(i) - editorScrollTop;
+        const height = lineRowHeights[i] ?? lineHeightPx;
+        const left = Math.max(2, EDITOR_SIDE_PADDING_PX - editorScrollLeft);
+        return (
+            <div className="result-actions-layer" aria-hidden="true">
+                <button
+                    type="button"
+                    className="result-copy-btn result-paste-btn"
+                    title={`Paste ${clipboardNumericText}`}
+                    aria-label={`Paste ${clipboardNumericText}`}
+                    style={{top, left, height}}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => insertAtSelection(clipboardNumericText)}
+                >
+                    ⎘ {clipboardNumericText}
+                </button>
+            </div>
+        );
+    };
+
+    const fallbackCopyText = (value: string): boolean => {
+        try {
+            const temp = document.createElement('textarea');
+            temp.value = value;
+            temp.setAttribute('readonly', '');
+            temp.style.position = 'fixed';
+            temp.style.top = '-1000px';
+            temp.style.opacity = '0';
+            document.body.appendChild(temp);
+            temp.select();
+            const copied = document.execCommand('copy');
+            document.body.removeChild(temp);
+            return copied;
+        } catch {
+            return false;
+        }
+    };
+
+    const copyResultToClipboard = async (value: string) => {
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+            } else if (!fallbackCopyText(value)) {
+                throw new Error('Clipboard unavailable');
+            }
+            setClipboardNumericText(value);
+            setStatusText('Result copied to clipboard');
+            setIsStatusError(false);
+            setDevError('');
+        } catch {
+            setStatusText('Unable to copy result');
+            setIsStatusError(true);
+        }
     };
 
     const renderLockedOverlay = () => {
@@ -1253,7 +1399,7 @@ function App() {
                         ))}
                     </div>
                 </div>
-                <div className="editor-area">
+                <div className="editor-area" onMouseMove={handleEditorAreaMouseMove} onMouseLeave={handleEditorAreaMouseLeave}>
                     <StaleBanner
                         staleCount={staleLineDetails.size}
                         isReevaluatingAll={isReevaluatingAll}
@@ -1377,6 +1523,8 @@ function App() {
                     >
                         {isActiveWorksheetLocked ? renderLockedOverlay() : renderOverlayLines()}
                     </div>
+                    {!isActiveWorksheetLocked && renderResultActionsLayer()}
+                    {!isActiveWorksheetLocked && renderPasteLayer()}
                     {!isActiveWorksheetLocked && activeLineError && (
                         <div
                             className="line-error-floating"

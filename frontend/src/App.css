@@ -757,6 +757,38 @@
     color: var(--result-variable-color);
 }
 
+.result-actions-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    overflow: hidden;
+}
+
+.result-copy-btn {
+    position: absolute;
+    pointer-events: auto;
+    padding: 0 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--editor-foreground) 8%, transparent);
+    color: color-mix(in srgb, var(--editor-foreground) 55%, transparent);
+    font: inherit;
+    font-size: 0.72em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.result-copy-btn:hover,
+.result-copy-btn:focus-visible {
+    background: color-mix(in srgb, var(--editor-foreground) 15%, transparent);
+    color: var(--editor-foreground);
+    border-color: color-mix(in srgb, var(--editor-foreground) 20%, transparent);
+}
+
 .syntax-token--variable-decl {
     color: var(--syntax-variable-declaration);
 }
