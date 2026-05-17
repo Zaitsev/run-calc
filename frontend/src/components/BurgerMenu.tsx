@@ -1,5 +1,5 @@
 import { BrowserOpenURL, WindowReload, Quit } from '../../wailsjs/runtime/runtime';
-import { HELP_SITE_URL } from '../constants';
+import { APP_VERSION, HELP_SITE_URL } from '../constants';
 
 type Props = {
     aiDebugLogCount: number;
@@ -39,7 +39,7 @@ export function BurgerMenu({
                 AI Debug Log{aiDebugLogCount > 0 ? ` (${aiDebugLogCount})` : ''}
             </button>
             <button type="button" className="status-menu-item" onClick={() => { onClose(); BrowserOpenURL('https://github.com/Zaitsev/run-calc'); }}>GitHub</button>
-            <button type="button" className="status-menu-item" onClick={() => { onClose(); alert('Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.'); }}>About</button>
+            <button type="button" className="status-menu-item" onClick={() => { onClose(); alert(`Run-Calc is a fast and light-weight desktop calculator that feels like a notepad, not a form.\nType naturally, press Enter, and get instant inline results.\nEasy use AI to everyday operations.\n\nVersion ${APP_VERSION}`); }}>About</button>
             <button type="button" className="status-menu-item status-menu-item--danger" onClick={() => { onClose(); Quit(); }}>Quit (your work is saved)</button>
         </div>
     );

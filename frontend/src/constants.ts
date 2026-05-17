@@ -3,6 +3,7 @@ export const OPERATOR_KEY_RE = /^[+\-*/]$/;
 
 // App / Help
 export const IS_DEV = import.meta.env.DEV;
+export const APP_VERSION = '6.0.0';
 export const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3001' : 'https://run-calc.taalgem.nl/');
 
 // Window state
