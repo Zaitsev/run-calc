@@ -8,6 +8,7 @@ export type SavedThemeEntry = AcceptedThemeEntry;
 export type DecimalDelimiter = '.' | ',';
 export type DecimalDelimiterMode = 'dot' | 'comma' | 'system';
 export type HelpPanelPosition = 'left' | 'right' | 'bottom';
+export type HelpPage = 'operations' | 'shortcuts' | 'worksheets' | 'new';
 export type WorksheetTabPosition = 'top' | 'bottom' | 'left';
 export type SuggestionKind = 'variable' | 'function' | 'constant';
 

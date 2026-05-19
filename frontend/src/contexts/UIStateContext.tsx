@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode, MouseEvent as ReactMouseEvent } from 'react';
-import type { HelpPanelPosition, WorksheetTabPosition } from '../types/app';
+import type { HelpPage, HelpPanelPosition, WorksheetTabPosition } from '../types/app';
 import {
+    APP_VERSION,
     HELP_PANEL_POSITION_STORAGE_KEY,
+    HELP_LAST_SEEN_VERSION_STORAGE_KEY,
     HELP_PANEL_SIDE_SIZE_STORAGE_KEY,
     HELP_PANEL_BOTTOM_SIZE_STORAGE_KEY,
     SETTINGS_DRAWER_WIDTH_STORAGE_KEY,
@@ -26,6 +28,9 @@ type UIStateContextValue = {
     setShowSettings: (v: boolean) => void;
     showHelp: boolean;
     setShowHelp: (v: boolean) => void;
+    helpActivePage: HelpPage;
+    setHelpActivePage: (page: HelpPage) => void;
+    openHelpPanel: (page?: HelpPage) => void;
     helpPanelPosition: HelpPanelPosition;
     setHelpPanelPosition: (v: HelpPanelPosition) => void;
     worksheetTabPosition: WorksheetTabPosition;
@@ -71,6 +76,7 @@ const UIStateContext = createContext<UIStateContextValue | null>(null);
 export function UIStateProvider({ children }: { children: ReactNode }) {
     const [showSettings, setShowSettings] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
+    const [helpActivePage, setHelpActivePage] = useState<HelpPage>('operations');
     const [helpPanelPosition, setHelpPanelPositionState] = useState<HelpPanelPosition>(() => {
         const raw = localStorage.getItem(HELP_PANEL_POSITION_STORAGE_KEY);
         if (raw === 'left' || raw === 'right' || raw === 'bottom') return raw;
@@ -117,6 +123,22 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
 
     const setHelpPanelPosition = (v: HelpPanelPosition) => setHelpPanelPositionState(v);
     const setWorksheetTabPosition = (v: WorksheetTabPosition) => setWorksheetTabPositionState(v);
+    const openHelpPanel = (page: HelpPage = 'operations') => {
+        setShowThemeStore(false);
+        setShowSettings(false);
+        setHelpActivePage(page);
+        setShowHelp(true);
+    };
+
+    useEffect(() => {
+        const lastSeenVersion = localStorage.getItem(HELP_LAST_SEEN_VERSION_STORAGE_KEY);
+        if (lastSeenVersion === APP_VERSION) {
+            return;
+        }
+
+        openHelpPanel('new');
+        localStorage.setItem(HELP_LAST_SEEN_VERSION_STORAGE_KEY, APP_VERSION);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         localStorage.setItem(HELP_PANEL_POSITION_STORAGE_KEY, helpPanelPosition);
@@ -293,6 +315,9 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
         <UIStateContext.Provider value={{
             showSettings, setShowSettings,
             showHelp, setShowHelp,
+            helpActivePage,
+            setHelpActivePage,
+            openHelpPanel,
             helpPanelPosition, setHelpPanelPosition,
             worksheetTabPosition, setWorksheetTabPosition,
             showThemeStore, setShowThemeStore,

@@ -52,14 +52,18 @@ export const helpContent: HelpContentMap = {
         'Variables and results are isolated: a variable defined in one worksheet is not visible in another.',
     ],
     new: [
-        'Version 6.0.0 - Worksheets Release',
+        '## Version 6.1.0 - Modern Copy-Paste',
+        `You can now copy evaluated results directly from the editor with the new hover copy button.`,
+        'Worksheet copying mode is now configurable in Settings and Status Bar, so you can copy either the selected text "as-is" or the expressions only (without results).',
+        'Variable-first inlining now inserts the variable name when the previous line is a variable assignment.',
+        '## Version 6.0.0 - Worksheets Release',
         'Worksheets are now a core part of Run-Calc: use independent tabs for separate calculations and variable scopes.',
         'This release adds worksheet locking with password protection, hidden content while locked, and unlock controls in the lock screen.',
         'Auto-lock options are included for inactivity timeout, minimize/hide, and system sleep/resume to protect worksheet data.',
         'Evaluated numeric results can now be copied directly from the editor with the hover copy button.',
-        'Version 0.5.1 - First Test-Drive Release',
+        '## Version 0.5.1 - First Test-Drive Release',
         'This is the initial test-drive version of Run-Calc. All core features are included and ready for feedback.',
-        'Features: inline expression evaluation, AI mode with structured output, pipeline analytics, comprehensive math functions, themed editor, help system, and worksheet persistence.',
+        'Features include inline expression evaluation, AI mode with structured output, pipeline analytics, comprehensive math functions, themed editor, help system, and worksheet persistence.',
         'Please report any issues or suggestions to help us improve the app for general release.'
     ],
 };
@@ -99,7 +103,7 @@ export const operationsVisualGuide: OperationVisualStep[] = [
         notes: [
             'Think of | as "then do this" for data.',
             'Inside filter/map, # is the current item in the list.'
-        ] 
+        ]
     },
     {
         id: 'ask-ai',

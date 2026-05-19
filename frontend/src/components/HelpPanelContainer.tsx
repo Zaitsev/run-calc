@@ -1,11 +1,13 @@
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react';
 import { HelpPanel } from '../HelpPanel';
-import type { HelpPanelPosition } from '../types/app';
+import type { HelpPage, HelpPanelPosition } from '../types/app';
 import { DEFAULT_HELP_PANEL_BOTTOM_SIZE, DEFAULT_HELP_PANEL_SIDE_SIZE, HELP_SITE_URL } from '../constants';
 
 type Props = {
     helpPanelPosition: HelpPanelPosition;
     setHelpPanelPosition: (v: HelpPanelPosition) => void;
+    helpActivePage: HelpPage;
+    setHelpActivePage: (page: HelpPage) => void;
     helpPanelSideSize: number;
     setHelpPanelSideSize: Dispatch<SetStateAction<number>>;
     helpPanelBottomSize: number;
@@ -19,6 +21,8 @@ type Props = {
 export function HelpPanelContainer({
     helpPanelPosition,
     setHelpPanelPosition,
+    helpActivePage,
+    setHelpActivePage,
     helpPanelSideSize,
     setHelpPanelSideSize,
     helpPanelBottomSize,
@@ -112,7 +116,11 @@ export function HelpPanelContainer({
                 </div>
             </div>
             <div className="settings-body">
-                <HelpPanel helpSiteUrl={HELP_SITE_URL} />
+                <HelpPanel
+                    helpSiteUrl={HELP_SITE_URL}
+                    activeHelpPage={helpActivePage}
+                    onActiveHelpPageChange={setHelpActivePage}
+                />
             </div>
         </div>
     );

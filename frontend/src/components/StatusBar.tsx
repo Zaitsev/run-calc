@@ -24,6 +24,7 @@ export function StatusBar() {
         setShowSettings,
         showHelp,
         setShowHelp,
+        openHelpPanel,
         setShowThemeStore,
         showBurgerMenu,
         setShowBurgerMenu,
@@ -170,12 +171,10 @@ export function StatusBar() {
         setPrecision(FOUR_POINT_PRECISION);
     };
 
-    const openHelpPanel = () => {
+    const openHelpDrawer = () => {
         setShowPrecisionMenu(false);
         setShowBurgerMenu(false);
-        setShowThemeStore(false);
-        setShowSettings(false);
-        setShowHelp(true);
+        openHelpPanel();
     };
 
     const openThemeStore = () => {
@@ -281,7 +280,7 @@ export function StatusBar() {
                         onResetFontSize={() => { setShowBurgerMenu(false); resetFontSize(); }}
                         onResetWindowLayout={() => { setShowBurgerMenu(false); handleResetWindowLayout(); }}
                         onOpenThemeStore={() => { setShowBurgerMenu(false); openThemeStore(); }}
-                        onOpenHelp={() => { setShowBurgerMenu(false); openHelpPanel(); }}
+                        onOpenHelp={() => { setShowBurgerMenu(false); openHelpDrawer(); }}
                         onOpenAIDebug={() => { setShowBurgerMenu(false); setShowAIDebug(true); }}
                     />
                 )}
@@ -297,7 +296,7 @@ export function StatusBar() {
                         setShowHelp(false);
                         return;
                     }
-                    openHelpPanel();
+                    openHelpDrawer();
                 }}
                 aria-label="Help"
                 title="Help"

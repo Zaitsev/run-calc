@@ -21,7 +21,7 @@ export function HelpList({ items }: HelpListProps) {
     return (
         <>
             {segments.map((seg, i) => (
-                <div key={i}>
+                <div className="help-subsection" key={i}>
                     {seg.header && <h3 className="help-subsection-header">{seg.header}</h3>}
                     {seg.items.length > 0 && (
                         <ul>

@@ -1,17 +1,34 @@
-import { useState } from 'react';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime';
 import { helpContent } from '@site/content/helpContent';
-
-export type HelpPage = 'operations' | 'shortcuts' | 'worksheets' | 'new';
+import type { HelpPage } from './types/app';
 
 interface HelpPanelProps {
     helpSiteUrl: string;
+    activeHelpPage: HelpPage;
+    onActiveHelpPageChange: (page: HelpPage) => void;
+}
+
+type HelpSegment = { header?: string; items: string[] };
+
+function toHelpSegments(items: string[]): HelpSegment[] {
+    return items.reduce<HelpSegment[]>((acc, item) => {
+        if (item.startsWith('## ')) {
+            acc.push({ header: item.slice(3), items: [] });
+            return acc;
+        }
+
+        if (acc.length === 0) {
+            acc.push({ items: [] });
+        }
+
+        acc[acc.length - 1].items.push(item);
+        return acc;
+    }, []);
 }
 
 const APP_DOWNLOAD_URL = 'https://github.com/Zaitsev/run-calc/releases';
 
-export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
-    const [activeHelpPage, setActiveHelpPage] = useState<HelpPage>('operations');
+export function HelpPanel({ helpSiteUrl, activeHelpPage, onActiveHelpPageChange }: HelpPanelProps) {
 
     return (
         <div className="settings-card">
@@ -41,7 +58,7 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     role="tab"
                     aria-selected={activeHelpPage === 'operations'}
                     className={`settings-help-tab${activeHelpPage === 'operations' ? ' settings-help-tab--active' : ''}`}
-                    onClick={() => setActiveHelpPage('operations')}
+                    onClick={() => onActiveHelpPageChange('operations')}
                 >
                     Operations
                 </button>
@@ -50,7 +67,7 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     role="tab"
                     aria-selected={activeHelpPage === 'shortcuts'}
                     className={`settings-help-tab${activeHelpPage === 'shortcuts' ? ' settings-help-tab--active' : ''}`}
-                    onClick={() => setActiveHelpPage('shortcuts')}
+                    onClick={() => onActiveHelpPageChange('shortcuts')}
                 >
                     Shortcuts
                 </button>
@@ -59,7 +76,7 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     role="tab"
                     aria-selected={activeHelpPage === 'new'}
                     className={`settings-help-tab${activeHelpPage === 'new' ? ' settings-help-tab--active' : ''}`}
-                    onClick={() => setActiveHelpPage('new')}
+                    onClick={() => onActiveHelpPageChange('new')}
                 >
                     New
                 </button>
@@ -68,7 +85,7 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     role="tab"
                     aria-selected={activeHelpPage === 'worksheets'}
                     className={`settings-help-tab${activeHelpPage === 'worksheets' ? ' settings-help-tab--active' : ''}`}
-                    onClick={() => setActiveHelpPage('worksheets')}
+                    onClick={() => onActiveHelpPageChange('worksheets')}
                 >
                     Worksheets
                 </button>
@@ -91,11 +108,18 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                     </ul>
                 )}
                 {activeHelpPage === 'new' && (
-                    <ul>
-                        {helpContent.new.map((item, index) => (
-                            index === 0 ? <li key={item}><strong>{item}</strong></li> : <li key={item}>{item}</li>
-                        ))}
-                    </ul>
+                    toHelpSegments(helpContent.new).map((segment, index) => (
+                        <div className="settings-help-section" key={`${segment.header ?? 'section'}-${index}`}>
+                            {segment.header && <h3 className="settings-help-section-title">{segment.header}</h3>}
+                            {segment.items.length > 0 && (
+                                <ul>
+                                    {segment.items.map((item) => (
+                                        <li key={item}>{item}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    ))
                 )}
                 {activeHelpPage === 'worksheets' && (
                     <ul>
