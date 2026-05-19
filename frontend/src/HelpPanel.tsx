@@ -110,7 +110,7 @@ export function HelpPanel({ helpSiteUrl, activeHelpPage, onActiveHelpPageChange 
                 {activeHelpPage === 'new' && (
                     toHelpSegments(helpContent.new).map((segment, index) => (
                         <div className="settings-help-section" key={`${segment.header ?? 'section'}-${index}`}>
-                            {segment.header && <div className="settings-help-section-title">{segment.header}</div>}
+                            {segment.header && <h3 className="settings-help-section-title">{segment.header}</h3>}
                             {segment.items.length > 0 && (
                                 <ul>
                                     {segment.items.map((item) => (
