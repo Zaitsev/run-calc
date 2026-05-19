@@ -285,6 +285,22 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
+                                <div className="settings-row-title">Auto-eval stale lines</div>
+                                <div className="settings-row-desc">Automatically run Re-evaluate All when shadow verification marks stale results</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle auto eval">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoEval}
+                                    onChange={(e) => display.setAutoEval(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
                                 <div className="settings-row-title">Variable-first inlining</div>
                                 <div className="settings-row-desc">When typing an operator on a new line, inject the variable name instead of its result</div>
                             </div>

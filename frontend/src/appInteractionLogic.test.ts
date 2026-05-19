@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {
     buildEvaluationExpression,
     buildStaleLineDetails,
+    SHADOW_STALE_MARKER,
     getCopyableNumericResultText,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
@@ -76,21 +77,14 @@ describe('app interaction helpers', () => {
         expect(getFriendlyEvalErrorMessage('some unexpected backend issue')).toContain('Cannot evaluate');
     });
 
-    it('builds stale-line details when variable versions no longer match snapshots', () => {
+    it('labels shadow verification stale markers', () => {
         const stale = buildStaleLineDetails(
             {
-                1: {price: 1, tax: 3},
-                3: {price: 1},
-            },
-            {
-                price: 2,
-                tax: 3,
+                2: {[SHADOW_STALE_MARKER]: -1},
             },
         );
 
-        expect(stale.size).toBe(2);
-        expect(stale.get(1)).toEqual(['price']);
-        expect(stale.get(3)).toEqual(['price']);
+        expect(stale.get(2)).toEqual(['shadow verification']);
     });
 
     it('strips markdown code fences from AI code blocks before insertion', () => {

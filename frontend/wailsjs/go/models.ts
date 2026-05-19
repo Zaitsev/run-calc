@@ -360,6 +360,24 @@ export namespace main {
 		}
 	}
 	
+	export class RandomStateSnapshot {
+	    state: string;
+	    hasSpare: boolean;
+	    spare: number;
+	    seeded: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RandomStateSnapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.hasSpare = source["hasSpare"];
+	        this.spare = source["spare"];
+	        this.seeded = source["seeded"];
+	    }
+	}
 	export class SaveWorksheetResponse {
 	    ok: boolean;
 	    error?: string;

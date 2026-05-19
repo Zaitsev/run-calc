@@ -12,10 +12,6 @@ type WorksheetContextValue = {
     setMarkedLines: React.Dispatch<React.SetStateAction<ReadonlySet<number>>>;
     variableValues: Record<string, unknown>;
     setVariableValues: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
-    variableVersions: Record<string, number>;
-    setVariableVersions: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-    lineDependencies: Record<number, string[]>;
-    setLineDependencies: React.Dispatch<React.SetStateAction<Record<number, string[]>>>;
     lineDependencyVersions: Record<number, Record<string, number>>;
     setLineDependencyVersions: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
     clearWorksheet: (editorFocusCb?: () => void) => void;
@@ -147,8 +143,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const [variableValues, setVariableValues] = useState<Record<string, unknown>>(fallbackWorksheet.variableValues);
 
     // Session-only state (not persisted)
-    const [variableVersions, setVariableVersions] = useState<Record<string, number>>({});
-    const [lineDependencies, setLineDependencies] = useState<Record<number, string[]>>({});
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const hasPendingContentSyncRef = useRef(false);
     const syncedWorksheetIdRef = useRef(fallbackWorksheet.id);
@@ -187,8 +181,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         hasPendingContentSyncRef.current = false;
 
         if (shouldResetMetadata) {
-            setVariableVersions({});
-            setLineDependencies({});
             setLineDependencyVersions({});
         }
     }, [activeWorksheet]);
@@ -228,8 +220,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setLastResultState(null);
         setMarkedLines(new Set());
         setVariableValues({});
-        setVariableVersions({});
-        setLineDependencies({});
         setLineDependencyVersions({});
         editorFocusCb?.();
     };
@@ -267,12 +257,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     };
 
     const clearLineEvaluationMetadata = (lineIndex: number) => {
-        setLineDependencies((prev) => {
-            if (!(lineIndex in prev)) return prev;
-            const next = { ...prev };
-            delete next[lineIndex];
-            return next;
-        });
         setLineDependencyVersions((prev) => {
             if (!(lineIndex in prev)) return prev;
             const next = { ...prev };
@@ -291,10 +275,6 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
             setMarkedLines,
             variableValues,
             setVariableValues,
-            variableVersions,
-            setVariableVersions,
-            lineDependencies,
-            setLineDependencies,
             lineDependencyVersions,
             setLineDependencyVersions,
             clearWorksheet,

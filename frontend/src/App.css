@@ -521,6 +521,10 @@
     background: transparent;
 }
 
+.stale-banner-btn--active {
+    background: color-mix(in srgb, var(--gutter-stale-color) 24%, transparent);
+}
+
 .stale-banner-btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;

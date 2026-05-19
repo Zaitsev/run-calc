@@ -41,14 +41,6 @@ export function formatEvaluatedLine(lineSource: string, resultText: string): str
     return appendLineComment(base, comment);
 }
 
-export function areValuesEquivalent(left: unknown, right: unknown): boolean {
-    if (Object.is(left, right)) return true;
-    if (typeof left === 'object' && left !== null && typeof right === 'object' && right !== null) {
-        try { return JSON.stringify(left) === JSON.stringify(right); } catch { return false; }
-    }
-    return false;
-}
-
 export function formatExprValue(
     value: unknown,
     isNumber: boolean,

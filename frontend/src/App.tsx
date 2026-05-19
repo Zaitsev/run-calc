@@ -65,15 +65,25 @@ function App() {
         setMarkedLines,
         variableValues,
         setVariableValues,
-        variableVersions,
-        setVariableVersions,
-        lineDependencies,
-        setLineDependencies,
         lineDependencyVersions,
         setLineDependencyVersions,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
-    const { decimalDelimiterMode, precision, scientificNotation, wordWrap, setWordWrap, uiFontScale, autoLockOnWindowHide, autoLockOnSystemSleep, autoLockTimeoutMinutes, copyMode, variableFirstInlining } = useDisplaySettings();
+    const {
+        decimalDelimiterMode,
+        precision,
+        scientificNotation,
+        wordWrap,
+        setWordWrap,
+        uiFontScale,
+        autoLockOnWindowHide,
+        autoLockOnSystemSleep,
+        autoLockTimeoutMinutes,
+        copyMode,
+        autoEval,
+        setAutoEval,
+        variableFirstInlining,
+    } = useDisplaySettings();
     const {
         fontScale,
         setFontScale,
@@ -162,12 +172,16 @@ function App() {
     const isActiveWorksheetLocked = !!activeWorksheet?.isLocked;
     const visibleContent = isActiveWorksheetLocked ? '' : content;
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
+    const worksheetRevisionRef = useRef(0);
+    const shadowVerifyTimerRef = useRef<number | null>(null);
     const inactivityByWorksheetRef = useRef<Record<string, number>>({});
     const previousActiveWorksheetIdRef = useRef<string | null>(null);
     const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
     const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
     const hoveredLineIndexRef = useRef<number | null>(null);
     const [clipboardNumericText, setClipboardNumericText] = useState<string | null>(null);
+    const [autoEvalEnterSequence, setAutoEvalEnterSequence] = useState(0);
+    const processedAutoEvalEnterSequenceRef = useRef(0);
 
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
@@ -197,6 +211,10 @@ function App() {
 
         void reevaluateAllExpressions();
     }, [precision]);
+
+    useEffect(() => {
+        worksheetRevisionRef.current += 1;
+    }, [activeId, content]);
 
 
     // Re-format already-computed numeric result suffixes when display settings change.
@@ -623,16 +641,6 @@ function App() {
     };
 
     const clearLineEvaluationMetadata = (lineIndex: number) => {
-        setLineDependencies((prev) => {
-            if (!(lineIndex in prev)) {
-                return prev;
-            }
-
-            const next = {...prev};
-            delete next[lineIndex];
-            return next;
-        });
-
         setLineDependencyVersions((prev) => {
             if (!(lineIndex in prev)) {
                 return prev;
@@ -801,19 +809,105 @@ function App() {
         });
     };
 
-    const { evaluateCurrentLine, reevaluateAllExpressions, clearStaleStates } = buildEvaluationHooks({
-        content, lastResult, variableValues, variableVersions, lineDependencies, lineDependencyVersions,
+    const { evaluateCurrentLine, reevaluateAllExpressions, verifyWorksheetShadow } = buildEvaluationHooks({
+        content, lastResult, variableValues, lineDependencyVersions,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
         decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
         setVariableValues,
-        setVariableVersions,
-        setLineDependencies,
         setLineDependencyVersions,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
+        worksheetRevisionRef,
     });
+
+    useEffect(() => {
+        if (isActiveWorksheetLocked) {
+            if (shadowVerifyTimerRef.current !== null) {
+                window.clearTimeout(shadowVerifyTimerRef.current);
+                shadowVerifyTimerRef.current = null;
+            }
+            return;
+        }
+
+        if (shadowVerifyTimerRef.current !== null) {
+            window.clearTimeout(shadowVerifyTimerRef.current);
+        }
+
+        const revisionAtSchedule = worksheetRevisionRef.current;
+        shadowVerifyTimerRef.current = window.setTimeout(() => {
+            shadowVerifyTimerRef.current = null;
+            if (worksheetRevisionRef.current !== revisionAtSchedule) {
+                return;
+            }
+            void verifyWorksheetShadow();
+        }, 180);
+
+        return () => {
+            if (shadowVerifyTimerRef.current !== null) {
+                window.clearTimeout(shadowVerifyTimerRef.current);
+                shadowVerifyTimerRef.current = null;
+            }
+        };
+    }, [
+        activeId,
+        content,
+        decimalDelimiter,
+        precision,
+        scientificNotation,
+        isActiveWorksheetLocked,
+    ]);
+
+    useEffect(() => {
+        if (autoEvalEnterSequence === 0) {
+            return;
+        }
+        if (autoEvalEnterSequence <= processedAutoEvalEnterSequenceRef.current) {
+            return;
+        }
+        if (!autoEval || isActiveWorksheetLocked || isAIQueryPending || isReevaluatingAll) {
+            return;
+        }
+
+        processedAutoEvalEnterSequenceRef.current = autoEvalEnterSequence;
+
+        let cancelled = false;
+        const runAutoEval = async () => {
+            const mismatchedCount = await verifyWorksheetShadow();
+            if (cancelled) {
+                return;
+            }
+            if ((mismatchedCount ?? 0) > 0) {
+                await reevaluateAllExpressions();
+            }
+        };
+
+        void runAutoEval();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        autoEval,
+        autoEvalEnterSequence,
+        isAIQueryPending,
+        isActiveWorksheetLocked,
+        isReevaluatingAll,
+        reevaluateAllExpressions,
+        verifyWorksheetShadow,
+    ]);
+
+    const handleEnterEvaluation = async () => {
+        await evaluateCurrentLine();
+
+        // Auto-eval runs only after explicit Enter evaluation.
+        if (!autoEval || isActiveWorksheetLocked) {
+            return;
+        }
+
+        setAutoEvalEnterSequence((current) => current + 1);
+    };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
         const shortcutAction = getPrimaryShortcutAction(event);
@@ -868,7 +962,7 @@ function App() {
 
         if (event.key === 'Enter') {
             event.preventDefault();
-            void evaluateCurrentLine();
+            void handleEnterEvaluation();
             setShowIntelligenceHint(false);
             return;
         }
@@ -1034,8 +1128,8 @@ function App() {
     }, [content]);
 
     const staleLineDetails = useMemo(() => {
-        return buildStaleLineDetails(lineDependencyVersions, variableVersions);
-    }, [lineDependencyVersions, variableVersions]);
+        return buildStaleLineDetails(lineDependencyVersions);
+    }, [lineDependencyVersions]);
 
     const renderOverlayLines = () => {
         return contentLines.map((line, i) => {
@@ -1448,7 +1542,8 @@ function App() {
                         staleCount={staleLineDetails.size}
                         isReevaluatingAll={isReevaluatingAll}
                         onReevaluateAll={() => void reevaluateAllExpressions()}
-                        onClearStale={clearStaleStates}
+                        autoEvalEnabled={autoEval}
+                        onToggleAutoEval={() => setAutoEval(!autoEval)}
                     />
                     <textarea
                         ref={editorRef}
@@ -1527,7 +1622,6 @@ function App() {
                             });
 
                             setMarkedLines((prev) => remapMarkedLinesForEdit(prev, content, nextContent));
-                            setLineDependencies((prev) => remapLineRecordForEdit(prev, content, nextContent));
                             setLineDependencyVersions((prev) => remapLineRecordForEdit(prev, content, nextContent));
                         }}
                         onSelect={updateCaretPosFromEditor}

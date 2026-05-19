@@ -2,10 +2,11 @@ type Props = {
     staleCount: number;
     isReevaluatingAll: boolean;
     onReevaluateAll: () => void;
-    onClearStale: () => void;
+    autoEvalEnabled: boolean;
+    onToggleAutoEval: () => void;
 };
 
-export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, onClearStale }: Props) {
+export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, autoEvalEnabled, onToggleAutoEval }: Props) {
     if (staleCount === 0) return null;
     return (
         <div className="stale-banner" role="status" aria-live="polite">
@@ -13,21 +14,24 @@ export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, on
                 {`Stale results detected on ${staleCount} line${staleCount === 1 ? '' : 's'}.`}
             </span>
             <div className="stale-banner-actions">
+                {!autoEvalEnabled && (
+                    <button
+                        type="button"
+                        className="stale-banner-btn"
+                        onClick={onReevaluateAll}
+                        disabled={isReevaluatingAll}
+                    >
+                        {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
+                    </button>
+                )}
                 <button
                     type="button"
-                    className="stale-banner-btn"
-                    onClick={onReevaluateAll}
+                    className={`stale-banner-btn stale-banner-btn--ghost${autoEvalEnabled ? ' stale-banner-btn--active' : ''}`}
+                    onClick={onToggleAutoEval}
                     disabled={isReevaluatingAll}
+                    aria-pressed={autoEvalEnabled}
                 >
-                    {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
-                </button>
-                <button
-                    type="button"
-                    className="stale-banner-btn stale-banner-btn--ghost"
-                    onClick={onClearStale}
-                    disabled={isReevaluatingAll}
-                >
-                    Clear Stale
+                    Auto-eval: {autoEvalEnabled ? 'on' : 'off'}
                 </button>
             </div>
         </div>

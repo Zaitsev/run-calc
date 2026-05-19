@@ -17,7 +17,7 @@ import { BurgerMenu } from './BurgerMenu';
 export function StatusBar() {
     const { statusText, isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
     const { isAIQueryPending, aiDebugLog } = useAI();
-    const { wordWrap, setWordWrap, precision, setPrecision, scientificNotation, setScientificNotation, copyMode, setCopyMode } = useDisplaySettings();
+    const { wordWrap, setWordWrap, precision, setPrecision, scientificNotation, setScientificNotation, copyMode, setCopyMode, autoEval, setAutoEval } = useDisplaySettings();
     const { setFontScale, precisionMenuRef, burgerMenuRef } = useEditorUI();
     const {
         showSettings,
@@ -226,6 +226,16 @@ export function StatusBar() {
                 onClick={() => setCopyMode(copyMode === 'expressions-only' ? 'as-is' : 'expressions-only')}
             >
                 copy: {copyMode === 'expressions-only' ? 'expr' : 'raw'}
+            </button>
+            <button
+                type="button"
+                className={`status-chip status-chip-btn${autoEval ? ' status-chip-btn--active' : ''}`}
+                title={autoEval ? 'Auto-eval stale lines: on' : 'Auto-eval stale lines: off'}
+                aria-label="Toggle auto eval"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setAutoEval(!autoEval)}
+            >
+                auto-eval: {autoEval ? 'on' : 'off'}
             </button>
             <div className="status-chip-wrap" ref={precisionMenuRef}>
                 <button

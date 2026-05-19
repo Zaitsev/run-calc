@@ -4,6 +4,7 @@ import { parseDeclaredVariable } from './utils/worksheetEditing';
 type DecimalDelimiter = '.' | ',';
 type PrecisionMode = 'auto' | 'full' | number;
 const NUMERIC_TEXT_REGEX = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
+export const SHADOW_STALE_MARKER = '__shadow_verification__';
 
 type FormatNumberFn = (
     value: number,
@@ -201,7 +202,6 @@ export function getFriendlyEvalErrorMessage(message: string): string {
 
 export function buildStaleLineDetails(
     lineDependencyVersions: Record<number, Record<string, number>>,
-    variableVersions: Record<string, number>,
 ): Map<number, string[]> {
     const details = new Map<number, string[]>();
     Object.entries(lineDependencyVersions).forEach(([lineKey, snapshot]) => {
@@ -211,10 +211,9 @@ export function buildStaleLineDetails(
         }
 
         const staleVariables: string[] = [];
-        Object.entries(snapshot).forEach(([variableName, version]) => {
-            const currentVersion = variableVersions[variableName] ?? 0;
-            if (currentVersion !== version) {
-                staleVariables.push(variableName);
+        Object.entries(snapshot).forEach(([variableName]) => {
+            if (variableName === SHADOW_STALE_MARKER) {
+                staleVariables.push('shadow verification');
             }
         });
 
