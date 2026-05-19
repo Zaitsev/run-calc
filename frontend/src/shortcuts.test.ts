@@ -20,6 +20,7 @@ function event(input: TestShortcutEvent) {
 }
 
 type TestEscapeEvent = TestShortcutEvent & {
+    defaultPrevented?: boolean;
     shiftKey?: boolean;
 };
 
@@ -29,6 +30,7 @@ function escapeEvent(input: TestEscapeEvent) {
         ctrlKey: input.ctrlKey ?? false,
         metaKey: input.metaKey ?? false,
         altKey: input.altKey ?? false,
+        defaultPrevented: input.defaultPrevented ?? false,
         shiftKey: input.shiftKey ?? false,
         code: input.code,
     };
@@ -134,6 +136,10 @@ describe('shouldHideWindowOnDoubleEscape', () => {
     });
 
     it('ignores modified or non-Escape keys and keeps timestamp', () => {
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', defaultPrevented: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
         expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', ctrlKey: true}), 1000, 1100, 420)).toEqual({
             shouldHideWindow: false,
             nextLastEscapeKeyAt: 1000,

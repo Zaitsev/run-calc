@@ -25,6 +25,7 @@ type ShortcutWheelLike = PrimaryShortcutModifierLike & {
 };
 
 type EscapeShortcutLike = ShortcutKeyLike & {
+    defaultPrevented: boolean;
     shiftKey: boolean;
 };
 
@@ -107,7 +108,7 @@ export function shouldHideWindowOnDoubleEscape(
     now: number,
     thresholdMs: number,
 ): { shouldHideWindow: boolean; nextLastEscapeKeyAt: number } {
-    if (event.key !== 'Escape' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    if (event.defaultPrevented || event.key !== 'Escape' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
         return {
             shouldHideWindow: false,
             nextLastEscapeKeyAt: lastEscapeKeyAt,
