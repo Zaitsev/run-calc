@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {getFontResizeDirectionFromWheel, getPrimaryShortcutAction} from './editorShortcuts';
+import {getFontResizeDirectionFromWheel, getPrimaryShortcutAction, shouldHideWindowOnDoubleEscape} from './editorShortcuts';
 
 type TestShortcutEvent = {
     key: string;
@@ -15,6 +15,23 @@ function event(input: TestShortcutEvent) {
         ctrlKey: input.ctrlKey ?? false,
         metaKey: input.metaKey ?? false,
         altKey: input.altKey ?? false,
+        code: input.code,
+    };
+}
+
+type TestEscapeEvent = TestShortcutEvent & {
+    defaultPrevented?: boolean;
+    shiftKey?: boolean;
+};
+
+function escapeEvent(input: TestEscapeEvent) {
+    return {
+        key: input.key,
+        ctrlKey: input.ctrlKey ?? false,
+        metaKey: input.metaKey ?? false,
+        altKey: input.altKey ?? false,
+        defaultPrevented: input.defaultPrevented ?? false,
+        shiftKey: input.shiftKey ?? false,
         code: input.code,
     };
 }
@@ -98,5 +115,50 @@ describe('getFontResizeDirectionFromWheel', () => {
         expect(getFontResizeDirectionFromWheel(wheelEvent({deltaY: -1}))).toBeNull();
         expect(getFontResizeDirectionFromWheel(wheelEvent({ctrlKey: true, altKey: true, deltaY: -1}))).toBeNull();
         expect(getFontResizeDirectionFromWheel(wheelEvent({metaKey: true, deltaY: 0}))).toBeNull();
+    });
+});
+
+describe('shouldHideWindowOnDoubleEscape', () => {
+    it('hides only on second plain Escape within threshold', () => {
+        const first = shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape'}), 0, 1000, 420);
+        expect(first.shouldHideWindow).toBe(false);
+        expect(first.nextLastEscapeKeyAt).toBe(1000);
+
+        const second = shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape'}), first.nextLastEscapeKeyAt, 1300, 420);
+        expect(second.shouldHideWindow).toBe(true);
+        expect(second.nextLastEscapeKeyAt).toBe(1300);
+    });
+
+    it('does not hide when outside threshold', () => {
+        const result = shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape'}), 1000, 2000, 420);
+        expect(result.shouldHideWindow).toBe(false);
+        expect(result.nextLastEscapeKeyAt).toBe(2000);
+    });
+
+    it('ignores modified or non-Escape keys and keeps timestamp', () => {
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', defaultPrevented: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', ctrlKey: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', metaKey: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', altKey: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Escape', shiftKey: true}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
+        expect(shouldHideWindowOnDoubleEscape(escapeEvent({key: 'Enter'}), 1000, 1100, 420)).toEqual({
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: 1000,
+        });
     });
 });

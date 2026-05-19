@@ -151,30 +151,6 @@
     z-index: 2;
 }
 
-/* Curved notch where active tab meets the bar */
-.worksheet-tab--active::before,
-.worksheet-tab--active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    width: 12px;
-    height: 12px;
-    pointer-events: none;
-    z-index: 3;
-}
-
-.worksheet-tab--active::before {
-    left: -12px;
-    border-bottom-right-radius: 8px;
-    box-shadow: 4px 0 0 0 var(--editor-background);
-}
-
-.worksheet-tab--active::after {
-    right: -12px;
-    border-bottom-left-radius: 8px;
-    box-shadow: -4px 0 0 0 var(--editor-background);
-}
-
 /* Left-sidebar tabs — keep pill style, no notch */
 .worksheet-tabs--left .worksheet-tab {
     writing-mode: vertical-rl;
@@ -191,11 +167,6 @@
 .worksheet-tabs--left .worksheet-tab--active {
     background: color-mix(in srgb, var(--radio-accent) 18%, var(--editor-background));
     border-color: var(--radio-accent);
-}
-
-.worksheet-tabs--left .worksheet-tab--active::before,
-.worksheet-tabs--left .worksheet-tab--active::after {
-    display: none;
 }
 
 .worksheet-tab-lock {
@@ -286,6 +257,7 @@
     width: 16px;
     height: 16px;
     border: none;
+    appearance: none;
     background: transparent;
     color: var(--descriptionForeground);
     border-radius: 50%;

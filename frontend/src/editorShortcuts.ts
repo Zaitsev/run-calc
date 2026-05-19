@@ -24,6 +24,11 @@ type ShortcutWheelLike = PrimaryShortcutModifierLike & {
     deltaY: number;
 };
 
+type EscapeShortcutLike = ShortcutKeyLike & {
+    defaultPrevented: boolean;
+    shiftKey: boolean;
+};
+
 function isPrimaryModifierPressed(event: PrimaryShortcutModifierLike): boolean {
     return event.ctrlKey || event.metaKey;
 }
@@ -95,4 +100,23 @@ export function getFontResizeDirectionFromWheel(event: ShortcutWheelLike): 1 | -
     }
 
     return null;
+}
+
+export function shouldHideWindowOnDoubleEscape(
+    event: EscapeShortcutLike,
+    lastEscapeKeyAt: number,
+    now: number,
+    thresholdMs: number,
+): { shouldHideWindow: boolean; nextLastEscapeKeyAt: number } {
+    if (event.defaultPrevented || event.key !== 'Escape' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+        return {
+            shouldHideWindow: false,
+            nextLastEscapeKeyAt: lastEscapeKeyAt,
+        };
+    }
+
+    return {
+        shouldHideWindow: now - lastEscapeKeyAt <= thresholdMs,
+        nextLastEscapeKeyAt: now,
+    };
 }
