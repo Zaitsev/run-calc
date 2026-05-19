@@ -23,7 +23,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { StaleBanner } from './components/StaleBanner';
 import { StatusBar } from './components/StatusBar';
 import { WorksheetTabs } from './components/WorksheetTabs';
-import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction } from './editorShortcuts';
+import { getFontResizeDirectionFromWheel, getPrimaryShortcutAction, shouldHideWindowOnDoubleEscape } from './editorShortcuts';
 import { getExpressionSource, splitLineComment } from './lineExpression';
 import {
     DEFAULT_FONT_SCALE,
@@ -394,6 +394,31 @@ function App() {
         }
         lockProtectedWorksheets();
     }, [autoLockOnSystemSleep, lockProtectedWorksheets]);
+
+    useEffect(() => {
+        const onDocumentEscape = (event: globalThis.KeyboardEvent) => {
+            const decision = shouldHideWindowOnDoubleEscape(
+                event,
+                lastEscapeKeyAtRef.current,
+                Date.now(),
+                DOUBLE_ESCAPE_HIDE_WINDOW_MS,
+            );
+
+            lastEscapeKeyAtRef.current = decision.nextLastEscapeKeyAt;
+            if (!decision.shouldHideWindow) {
+                return;
+            }
+
+            event.preventDefault();
+            lockProtectedWorksheetsIfEnabled();
+            WindowHide();
+        };
+
+        document.addEventListener('keydown', onDocumentEscape);
+        return () => {
+            document.removeEventListener('keydown', onDocumentEscape);
+        };
+    }, [lastEscapeKeyAtRef, lockProtectedWorksheetsIfEnabled]);
 
     // --- Menu / keyboard event subscriptions ---
 
@@ -791,18 +816,6 @@ function App() {
     });
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
-            const now = Date.now();
-            const elapsed = now - lastEscapeKeyAtRef.current;
-            lastEscapeKeyAtRef.current = now;
-            if (elapsed <= DOUBLE_ESCAPE_HIDE_WINDOW_MS) {
-                event.preventDefault();
-                lockProtectedWorksheetsIfEnabled();
-                WindowHide();
-            }
-            return;
-        }
-
         const shortcutAction = getPrimaryShortcutAction(event);
         if (shortcutAction === 'new-worksheet') {
             event.preventDefault();
