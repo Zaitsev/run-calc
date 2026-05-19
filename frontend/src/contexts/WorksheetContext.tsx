@@ -73,12 +73,12 @@ function remapLineIndex(
     return null;
 }
 
-function sameMarkedLines(markedLines: number[], currentMarkedLines: ReadonlySet<number>): boolean {
-    if (markedLines.length !== currentMarkedLines.size) {
+function sameMarkedLines(markedLinesArray: number[], markedLinesSet: ReadonlySet<number>): boolean {
+    if (markedLinesArray.length !== markedLinesSet.size) {
         return false;
     }
 
-    return markedLines.every((line) => currentMarkedLines.has(line));
+    return markedLinesArray.every((line) => markedLinesSet.has(line));
 }
 
 function sameVariableValues(nextValues: Record<string, unknown>, currentValues: Record<string, unknown>): boolean {

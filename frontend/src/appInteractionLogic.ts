@@ -3,7 +3,7 @@ import { parseDeclaredVariable } from './utils/worksheetEditing';
 
 type DecimalDelimiter = '.' | ',';
 type PrecisionMode = 'auto' | 'full' | number;
-const NUMERIC_TEXT_RE = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
+const NUMERIC_TEXT_REGEX = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
 
 type FormatNumberFn = (
     value: number,
@@ -37,7 +37,7 @@ export function getPreservedCaretOffset(caretOffsetInLine: number, replacementLe
 
 export function parseNumericText(text: string): string | null {
     const trimmed = text.trim();
-    return NUMERIC_TEXT_RE.test(trimmed) ? trimmed : null;
+    return NUMERIC_TEXT_REGEX.test(trimmed) ? trimmed : null;
 }
 
 export function isAITriggerSourceLine(lineText: string): boolean {
