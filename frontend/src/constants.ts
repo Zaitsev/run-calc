@@ -3,7 +3,7 @@ export const OPERATOR_KEY_RE = /^[+\-*/]$/;
 
 // App / Help
 export const IS_DEV = import.meta.env.DEV;
-export const APP_VERSION = '6.0.0';
+export const APP_VERSION = '6.1.0';
 export const HELP_SITE_URL = import.meta.env.VITE_HELP_SITE_URL || (IS_DEV ? 'http://localhost:3001' : 'https://run-calc.taalgem.nl/');
 
 // Window state
@@ -48,6 +48,7 @@ export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystem
 export const COPY_MODE_STORAGE_KEY = 'calc.editor.copyMode';
 export const VARIABLE_FIRST_INLINING_STORAGE_KEY = 'calc.editor.variableFirstInlining';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
+export const HELP_LAST_SEEN_VERSION_STORAGE_KEY = 'calc.help.lastSeenVersion';
 export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
 export const WORKSHEETS_ACTIVE_ID_STORAGE_KEY = 'calc.worksheets.activeId';
 export const WORKSHEETS_TAB_POSITION_STORAGE_KEY = 'calc.worksheets.tabPosition';

@@ -440,8 +440,14 @@ code {
     margin: 0;
 }
 
+.help-subsection + .help-subsection {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
 .help-subsection-header {
-    margin: 16px 0 4px;
+    margin: 0 0 4px;
     font-size: 1rem;
     font-weight: 600;
     color: var(--text);

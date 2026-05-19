@@ -97,6 +97,9 @@ function App() {
         setShowSettings,
         showHelp,
         setShowHelp,
+        helpActivePage,
+        setHelpActivePage,
+        openHelpPanel,
         showThemeStore,
         setShowThemeStore,
         helpPanelPosition,
@@ -409,9 +412,7 @@ function App() {
         const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
         const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
         const unsubOpenHelp = EventsOn('menu:help:open', () => {
-            setShowThemeStore(false);
-            setShowSettings(false);
-            setShowHelp(true);
+            openHelpPanel();
         });
         const unsubAIProgress = EventsOn('ai:progress', handleAIProgressEvent);
         return () => {
@@ -426,7 +427,7 @@ function App() {
             unsubOpenHelp();
             unsubAIProgress();
         };
-    }, [changeFontScale, createWorksheet, handleAIProgressEvent, lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume, resetFontSize, resetWindowLayout]);
+    }, [changeFontScale, createWorksheet, handleAIProgressEvent, lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume, openHelpPanel, resetFontSize, resetWindowLayout]);
 
     useEffect(() => {
         const now = Date.now();
@@ -1644,6 +1645,8 @@ function App() {
                 <HelpPanelContainer
                     helpPanelPosition={helpPanelPosition}
                     setHelpPanelPosition={setHelpPanelPosition}
+                    helpActivePage={helpActivePage}
+                    setHelpActivePage={setHelpActivePage}
                     helpPanelSideSize={helpPanelSideSize}
                     setHelpPanelSideSize={setHelpPanelSideSize}
                     helpPanelBottomSize={helpPanelBottomSize}
