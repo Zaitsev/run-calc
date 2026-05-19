@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestBeforeClose_DoesNotMinimiseOutsideWindows(t *testing.T) {
+func TestBeforeClose_DoesNotMinimizeOutsideWindows(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("non-Windows behavior test")
 	}
