@@ -149,6 +149,10 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 
+	if runtime.GOOS != "windows" {
+		return false
+	}
+
 	if !a.minimiseToTrayOnClose.Load() {
 		return false
 	}
