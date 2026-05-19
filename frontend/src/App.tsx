@@ -10,7 +10,9 @@ import './App.css';
 import {
     buildEvaluationExpression,
     buildStaleLineDetails,
+    getCopyableNumericResultText,
     isAITriggerSourceLine,
+    parseNumericText,
     reformatComputedLineResult
 } from './appInteractionLogic';
 import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
@@ -51,14 +53,6 @@ import { formatNumber, getPrecisionScale, resolveDecimalDelimiter } from './util
 import { MATH_CONSTANT_NAMES, MATH_FUNCTION_NAMES, usePrefersDark } from './utils/identifierUtils';
 import { hashWorksheetPassword, verifyWorksheetPassword } from './utils/worksheetLock';
 import { getLineBounds, lineIndexAtPosition, parseDeclaredVariable, remapLineRecordForEdit, remapMarkedLinesForEdit } from './utils/worksheetEditing';
-
-const CLIPBOARD_NUMBER_RE = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
-
-function parseClipboardNumericText(text: string): string | null {
-    const trimmed = text.trim();
-    return CLIPBOARD_NUMBER_RE.test(trimmed) ? trimmed : null;
-}
-
 
 function App() {
     const { worksheets, activeId, createWorksheet, lockWorksheet, lockProtectedWorksheets, unlockWorksheet } = useWorksheetManager();
@@ -177,7 +171,7 @@ function App() {
     const refreshClipboardNumericText = useCallback(async () => {
         try {
             const text = await navigator.clipboard?.readText?.() ?? '';
-            setClipboardNumericText(parseClipboardNumericText(text));
+            setClipboardNumericText(parseNumericText(text));
         } catch {
             setClipboardNumericText(null);
         }
@@ -1104,7 +1098,7 @@ function App() {
         content: string;
     }) => {
         return (
-            <div className="result-actions-layer" aria-hidden="true">
+            <div className="result-actions-layer">
                 <button
                     type="button"
                     className={params.className}
@@ -1114,7 +1108,7 @@ function App() {
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={params.onClick}
                 >
-                    {params.content}
+                    <span aria-hidden="true">{params.content}</span>
                 </button>
             </div>
         );
@@ -1127,10 +1121,8 @@ function App() {
         if (!line) return null;
         const {body: lineBody} = splitLineComment(line);
         const isVariableLine = declarationLines.has(i);
-        const eqIdx = isVariableLine ? lineBody.lastIndexOf(' = ') : lineBody.indexOf(' = ');
-        if (eqIdx === -1) return null;
-        const resultText = lineBody.slice(eqIdx + 3).trim();
-        if (resultText.length === 0 || resultText === 'error') return null;
+        const resultText = getCopyableNumericResultText(line, isVariableLine);
+        if (!resultText) return null;
         const top = EDITOR_TOP_PADDING_PX + getLineTop(i) - editorScrollTop;
         const height = lineRowHeights[i] ?? lineHeightPx;
         const textWidth = measureLineWidth(lineBody.trimEnd());
@@ -1540,8 +1532,22 @@ function App() {
                                 .split('\n')
                                 .map((line) => getExpressionSource(line))
                                 .join('\n');
-                            e.preventDefault();
-                            void navigator.clipboard.writeText(transformed);
+                            if (e.clipboardData) {
+                                e.preventDefault();
+                                e.clipboardData.setData('text/plain', transformed);
+                                return;
+                            }
+                            if (fallbackCopyText(transformed)) {
+                                e.preventDefault();
+                                return;
+                            }
+                            if (navigator.clipboard?.writeText) {
+                                e.preventDefault();
+                                void navigator.clipboard.writeText(transformed).catch(() => {
+                                    setStatusText('Unable to copy selection');
+                                    setIsStatusError(true);
+                                });
+                            }
                         }}
                         onScroll={() => {
                             const el = editorRef.current;

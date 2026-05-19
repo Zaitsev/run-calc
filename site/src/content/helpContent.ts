@@ -56,6 +56,7 @@ export const helpContent: HelpContentMap = {
         'Worksheets are now a core part of Run-Calc: use independent tabs for separate calculations and variable scopes.',
         'This release adds worksheet locking with password protection, hidden content while locked, and unlock controls in the lock screen.',
         'Auto-lock options are included for inactivity timeout, minimize/hide, and system sleep/resume to protect worksheet data.',
+        'Evaluated numeric results can now be copied directly from the editor with the hover copy button.',
         'Version 0.5.1 - First Test-Drive Release',
         'This is the initial test-drive version of Run-Calc. All core features are included and ready for feedback.',
         'Features: inline expression evaluation, AI mode with structured output, pipeline analytics, comprehensive math functions, themed editor, help system, and worksheet persistence.',

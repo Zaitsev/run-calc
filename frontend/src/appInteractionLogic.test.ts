@@ -2,8 +2,10 @@ import {describe, expect, it} from 'vitest';
 import {
     buildEvaluationExpression,
     buildStaleLineDetails,
+    getCopyableNumericResultText,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
+    parseNumericText,
     reformatComputedLineResult,
     shouldSkipEvaluationAtCaret,
     stripMarkdownCodeFences,
@@ -28,6 +30,13 @@ describe('app interaction helpers', () => {
         expect(getPreservedCaretOffset(4, 12)).toBe(4);
         expect(getPreservedCaretOffset(20, 8)).toBe(8);
         expect(getPreservedCaretOffset(-5, 8)).toBe(0);
+    });
+
+    it('accepts only numeric text for clipboard-compatible copy and paste flows', () => {
+        expect(parseNumericText('  12.5 ')).toBe('12.5');
+        expect(parseNumericText('-1,25e3')).toBe('-1,25e3');
+        expect(parseNumericText('true')).toBeNull();
+        expect(parseNumericText('[1, 2]')).toBeNull();
     });
 
     it('builds operator carry-over expression only when last result exists', () => {
@@ -111,5 +120,13 @@ describe('app interaction helpers', () => {
 
         expect(reformatComputedLineResult('v = 2/3 = 0.6666666667', '.', 2, false, format)).toBe('v = 2/3 = 0.67');
         expect(reformatComputedLineResult('v = 2/3 " keep', '.', 2, false, format)).toBe('v = 2/3 " keep');
+    });
+
+    it('only exposes evaluated numeric results for result-copy actions', () => {
+        expect(getCopyableNumericResultText('2 + 3 = 5', false)).toBe('5');
+        expect(getCopyableNumericResultText('total = 2 + 3 = 5', true)).toBe('5');
+        expect(getCopyableNumericResultText('total = 5', true)).toBeNull();
+        expect(getCopyableNumericResultText('label = "ok" = ok', true)).toBeNull();
+        expect(getCopyableNumericResultText('status = true', false)).toBeNull();
     });
 });
