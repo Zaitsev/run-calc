@@ -43,6 +43,7 @@ type EvalDeps = {
     decimalDelimiter: DecimalDelimiter;
     precision: PrecisionMode;
     scientificNotation: boolean;
+    variableFirstInlining: boolean;
     // setters
     setContent: (v: string) => void;
     setCaretPos: (v: number) => void;
@@ -76,9 +77,12 @@ function applyContentAndCaret(
     setContent(nextContent);
     setCaretPos(nextCaret);
     requestAnimationFrame(() => {
-        if (!editorRef.current) return;
-        editorRef.current.selectionStart = nextCaret;
-        editorRef.current.selectionEnd = nextCaret;
+        requestAnimationFrame(() => {
+            if (!editorRef.current) return;
+            const clampedCaret = Math.min(nextCaret, editorRef.current.value.length);
+            editorRef.current.selectionStart = clampedCaret;
+            editorRef.current.selectionEnd = clampedCaret;
+        });
     });
 }
 
@@ -86,7 +90,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
     const {
         content, lastResult, variableValues, variableVersions, lineDependencies: _ld, lineDependencyVersions: _ldv,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
-        decimalDelimiter, precision, scientificNotation,
+        decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
         setVariableValues, setVariableVersions, setLineDependencies, setLineDependencyVersions,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
@@ -279,9 +283,22 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
 
         const trimmed = editableLine.trim();
+        
+        // Extract previous line content for variable-first inlining feature
+        let previousLineSource = '';
+        if (lineStart > 0) {
+            const prevLineEnd = lineStart - 1;  // Account for the newline
+            const prevBounds = getLineBounds(content, Math.max(0, lineStart - 2));
+            const prevLineStart = prevBounds.lineStart;
+            const prevLineText = content.slice(prevLineStart, prevLineEnd);
+            previousLineSource = getExpressionSource(prevLineText);
+        }
+        
         const expression = buildEvaluationExpression(
             editableLine, trimmed, lastResult, decimalDelimiter,
             (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
+            previousLineSource,
+            variableFirstInlining,
         );
 
         try {
@@ -316,10 +333,34 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             const dependencySnapshot: Record<string, number> = {};
             dependencies.forEach((name) => { dependencySnapshot[name] = nextVariableVersions[name] ?? 0; });
 
+            // For lines not yet tracked in this session, synthesize stale entries for
+            // any that reference a changed variable. This covers worksheets loaded from storage
+            // where lineDependencyVersions starts empty.
+            const synthesizedStaleEntries: Record<number, Record<string, number>> = {};
+            if (changedVariableKeys.size > 0) {
+                const allLines = content.split('\n');
+                allLines.forEach((lineText, idx) => {
+                    if (idx === lineIndex) return;
+                    if (_ldv[idx] !== undefined) return;
+                    const deps = extractExpressionDependencies(lineText);
+                    const staleSnap: Record<string, number> = {};
+                    let hasChangedDep = false;
+                    deps.forEach((dep) => {
+                        if (changedVariableKeys.has(dep)) {
+                            staleSnap[dep] = variableVersions[dep] ?? 0;
+                            hasChangedDep = true;
+                        }
+                    });
+                    if (hasChangedDep) {
+                        synthesizedStaleEntries[idx] = staleSnap;
+                    }
+                });
+            }
+
             setVariableValues(nextVariables);
             setVariableVersions((prev) => ({ ...prev, ...nextVariableVersions }));
             setLineDependencies((prev) => ({ ...prev, [lineIndex]: dependencies }));
-            setLineDependencyVersions((prev) => ({ ...prev, [lineIndex]: dependencySnapshot }));
+            setLineDependencyVersions((prev) => ({ ...prev, ...synthesizedStaleEntries, [lineIndex]: dependencySnapshot }));
             setStatusText('Calculated');
             setIsStatusError(false);
             setDevError('');

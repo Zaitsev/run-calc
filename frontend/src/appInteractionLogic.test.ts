@@ -2,8 +2,10 @@ import {describe, expect, it} from 'vitest';
 import {
     buildEvaluationExpression,
     buildStaleLineDetails,
+    getCopyableNumericResultText,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
+    parseNumericText,
     reformatComputedLineResult,
     shouldSkipEvaluationAtCaret,
     stripMarkdownCodeFences,
@@ -30,6 +32,13 @@ describe('app interaction helpers', () => {
         expect(getPreservedCaretOffset(-5, 8)).toBe(0);
     });
 
+    it('accepts only numeric text for clipboard-compatible copy and paste flows', () => {
+        expect(parseNumericText('  12.5 ')).toBe('12.5');
+        expect(parseNumericText('-1,25e3')).toBe('-1,25e3');
+        expect(parseNumericText('true')).toBeNull();
+        expect(parseNumericText('[1, 2]')).toBeNull();
+    });
+
     it('builds operator carry-over expression only when last result exists', () => {
         const format = (value: number, delimiter: '.' | ',') =>
             delimiter === ',' ? String(value).replace('.', ',') : String(value);
@@ -38,6 +47,26 @@ describe('app interaction helpers', () => {
         expect(buildEvaluationExpression('-3', '-3', 1.5, ',', format)).toBe('1,5-3');
         expect(buildEvaluationExpression('2+3', '2+3', 5, '.', format)).toBe('2+3');
         expect(buildEvaluationExpression('+2', '+2', null, '.', format)).toBe('+2');
+    });
+
+    it('uses variable name instead of result when variable-first inlining is enabled', () => {
+        const format = (value: number, delimiter: '.' | ',') =>
+            delimiter === ',' ? String(value).replace('.', ',') : String(value);
+
+        // Variable assignment: should use variable name
+        expect(buildEvaluationExpression('+', '+', 5, '.', format, 'a=5', true)).toBe('a+');
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', true)).toBe('a+2');
+        expect(buildEvaluationExpression('*3', '*3', 10, '.', format, 'price=100', true)).toBe('price*3');
+        expect(buildEvaluationExpression('-1', '-1', 42, '.', format, '@arr=[1,2,3]', true)).toBe('@arr-1');
+        
+        // Regular expression: should still use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '2+3 = 5', true)).toBe('5+2');
+        
+        // When disabled: should use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', false)).toBe('5+2');
+        
+        // Without previous line: should use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '', true)).toBe('5+2');
     });
 
     it('maps syntax and math failures to user-friendly messages', () => {
@@ -91,5 +120,13 @@ describe('app interaction helpers', () => {
 
         expect(reformatComputedLineResult('v = 2/3 = 0.6666666667', '.', 2, false, format)).toBe('v = 2/3 = 0.67');
         expect(reformatComputedLineResult('v = 2/3 " keep', '.', 2, false, format)).toBe('v = 2/3 " keep');
+    });
+
+    it('only exposes evaluated numeric results for result-copy actions', () => {
+        expect(getCopyableNumericResultText('2 + 3 = 5', false)).toBe('5');
+        expect(getCopyableNumericResultText('total = 2 + 3 = 5', true)).toBe('5');
+        expect(getCopyableNumericResultText('total = 5', true)).toBeNull();
+        expect(getCopyableNumericResultText('label = "ok" = ok', true)).toBeNull();
+        expect(getCopyableNumericResultText('status = true', false)).toBeNull();
     });
 });

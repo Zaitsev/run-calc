@@ -17,7 +17,7 @@ import { BurgerMenu } from './BurgerMenu';
 export function StatusBar() {
     const { statusText, isStatusError, devError, setStatusText, setIsStatusError, setDevError } = useStatus();
     const { isAIQueryPending, aiDebugLog } = useAI();
-    const { wordWrap, setWordWrap, precision, setPrecision, scientificNotation, setScientificNotation } = useDisplaySettings();
+    const { wordWrap, setWordWrap, precision, setPrecision, scientificNotation, setScientificNotation, copyMode, setCopyMode } = useDisplaySettings();
     const { setFontScale, precisionMenuRef, burgerMenuRef } = useEditorUI();
     const {
         showSettings,
@@ -217,6 +217,16 @@ export function StatusBar() {
                 onClick={() => setWordWrap((prev) => !prev)}
             >
                 wrap: {wordWrap ? 'on' : 'off'}
+            </button>
+            <button
+                type="button"
+                className={`status-chip status-chip-btn${copyMode === 'expressions-only' ? ' status-chip-btn--active' : ''}`}
+                title={copyMode === 'expressions-only' ? 'Copy mode: expressions only (results stripped)' : 'Copy mode: as-is'}
+                aria-label="Toggle copy mode"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setCopyMode(copyMode === 'expressions-only' ? 'as-is' : 'expressions-only')}
+            >
+                copy: {copyMode === 'expressions-only' ? 'expr' : 'raw'}
             </button>
             <div className="status-chip-wrap" ref={precisionMenuRef}>
                 <button

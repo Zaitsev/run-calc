@@ -16,7 +16,11 @@ export const helpContent: HelpContentMap = {
         'If a line is invalid, it is marked in red with a gutter ! so it is easy to spot and fix.',
         'If you edit a line that already has = result, Run-Calc removes the old result so you can recalculate cleanly.',
         'When a variable changes, dependent lines are marked stale until you run them again.',
-        'Status messages are written in plain language with practical examples for faster troubleshooting.'
+        'Status messages are written in plain language with practical examples for faster troubleshooting.',
+        '## Copying results',
+        'Hover over any evaluated line to reveal a copy icon (⧉) next to the result.',
+        'Click the icon to copy the result value to the clipboard. The status bar confirms the copy.',
+        'Only numeric results are copyable — error lines do not show the icon.',
     ],
     shortcuts: [
         'Enter: Evaluate current line, or move to the next line when the current line is empty/comment-only or caret is in trailing comment text. On the last line, Enter creates a new line and moves the caret to it when no evaluation error occurs.',
@@ -52,6 +56,7 @@ export const helpContent: HelpContentMap = {
         'Worksheets are now a core part of Run-Calc: use independent tabs for separate calculations and variable scopes.',
         'This release adds worksheet locking with password protection, hidden content while locked, and unlock controls in the lock screen.',
         'Auto-lock options are included for inactivity timeout, minimize/hide, and system sleep/resume to protect worksheet data.',
+        'Evaluated numeric results can now be copied directly from the editor with the hover copy button.',
         'Version 0.5.1 - First Test-Drive Release',
         'This is the initial test-drive version of Run-Calc. All core features are included and ready for feedback.',
         'Features: inline expression evaluation, AI mode with structured output, pipeline analytics, comprehensive math functions, themed editor, help system, and worksheet persistence.',

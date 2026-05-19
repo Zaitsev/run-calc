@@ -77,7 +77,9 @@ export function HelpPanel({ helpSiteUrl }: HelpPanelProps) {
                 {activeHelpPage === 'operations' && (
                     <ul>
                         {helpContent.operations.map((item) => (
-                            <li key={item}>{item}</li>
+                            item.startsWith('## ')
+                                ? <li key={item} className="help-subsection-header"><strong>{item.slice(3)}</strong></li>
+                                : <li key={item}>{item}</li>
                         ))}
                     </ul>
                 )}

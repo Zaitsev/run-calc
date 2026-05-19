@@ -1,7 +1,9 @@
-import { splitLineComment } from './lineExpression';
+import { splitLineComment, getExpressionSource } from './lineExpression';
+import { parseDeclaredVariable } from './utils/worksheetEditing';
 
 type DecimalDelimiter = '.' | ',';
 type PrecisionMode = 'auto' | 'full' | number;
+const NUMERIC_TEXT_REGEX = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
 
 type FormatNumberFn = (
     value: number,
@@ -33,9 +35,29 @@ export function getPreservedCaretOffset(caretOffsetInLine: number, replacementLe
     return Math.max(0, Math.min(caretOffsetInLine, replacementLength));
 }
 
+export function parseNumericText(text: string): string | null {
+    const trimmed = text.trim();
+    return NUMERIC_TEXT_REGEX.test(trimmed) ? trimmed : null;
+}
+
 export function isAITriggerSourceLine(lineText: string): boolean {
     const {body} = splitLineComment(lineText);
     return body.trimStart().startsWith('?');
+}
+
+export function getCopyableNumericResultText(lineText: string, isVariableLine: boolean): string | null {
+    const {body} = splitLineComment(lineText);
+    const firstEqualsIndex = body.indexOf(' = ');
+    if (firstEqualsIndex === -1) {
+        return null;
+    }
+
+    const resultEqualsIndex = isVariableLine ? body.indexOf(' = ', firstEqualsIndex + 3) : firstEqualsIndex;
+    if (resultEqualsIndex === -1) {
+        return null;
+    }
+
+    return parseNumericText(body.slice(resultEqualsIndex + 3));
 }
 
 export function buildEvaluationExpression(
@@ -44,11 +66,25 @@ export function buildEvaluationExpression(
     lastResult: number | null,
     decimalDelimiter: DecimalDelimiter,
     formatNumber: (value: number, decimalDelimiter: DecimalDelimiter) => string,
+    previousLineSource?: string,
+    variableFirstInlining?: boolean,
 ): string {
     if (!trimmedLine.match(/^[+\-*/]/) || lastResult === null) {
         return editableLine;
     }
 
+    // If variable-first inlining is enabled and previous line is a variable assignment,
+    // use the variable name instead of the result
+    if (variableFirstInlining && previousLineSource) {
+        const prevLineExpr = getExpressionSource(previousLineSource);
+        const declaredVar = parseDeclaredVariable(prevLineExpr);
+        if (declaredVar) {
+            // Use the variable label (with optional @ prefix)
+            return `${declaredVar.label}${trimmedLine}`;
+        }
+    }
+
+    // Otherwise, use the original behavior: inject the last result
     return `${formatNumber(lastResult, decimalDelimiter)}${trimmedLine}`;
 }
 

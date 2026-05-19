@@ -73,6 +73,56 @@ function remapLineIndex(
     return null;
 }
 
+function sameMarkedLines(markedLinesArray: number[], markedLinesSet: ReadonlySet<number>): boolean {
+    if (markedLinesArray.length !== markedLinesSet.size) {
+        return false;
+    }
+
+    return markedLinesArray.every((line) => markedLinesSet.has(line));
+}
+
+function sameVariableValues(nextValues: Record<string, unknown>, currentValues: Record<string, unknown>): boolean {
+    const nextEntries = Object.entries(nextValues);
+    if (nextEntries.length !== Object.keys(currentValues).length) {
+        return false;
+    }
+
+    return nextEntries.every(([key, value]) => Object.is(currentValues[key], value));
+}
+
+export function shouldResetSessionEvaluationMetadata(params: {
+    activeWorksheet: WorksheetSnapshot;
+    syncedWorksheetId: string;
+    hasPendingContentSync: boolean;
+    content: string;
+    lastResult: number | null;
+    markedLines: ReadonlySet<number>;
+    variableValues: Record<string, unknown>;
+}): boolean {
+    const {
+        activeWorksheet,
+        syncedWorksheetId,
+        hasPendingContentSync,
+        content,
+        lastResult,
+        markedLines,
+        variableValues,
+    } = params;
+
+    if (syncedWorksheetId !== activeWorksheet.id) {
+        return true;
+    }
+
+    if (hasPendingContentSync) {
+        return false;
+    }
+
+    return activeWorksheet.content !== content
+        || activeWorksheet.lastResult !== lastResult
+        || !sameMarkedLines(activeWorksheet.markedLines, markedLines)
+        || !sameVariableValues(activeWorksheet.variableValues, variableValues);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function WorksheetProvider({ children }: { children: ReactNode }) {
@@ -102,11 +152,31 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
     const hasPendingContentSyncRef = useRef(false);
     const syncedWorksheetIdRef = useRef(fallbackWorksheet.id);
+    const contentRef = useRef(content);
+    const lastResultRef = useRef(lastResult);
+    const markedLinesRef = useRef(markedLines);
+    const variableValuesRef = useRef(variableValues);
+
+    useEffect(() => {
+        contentRef.current = content;
+        lastResultRef.current = lastResult;
+        markedLinesRef.current = markedLines;
+        variableValuesRef.current = variableValues;
+    }, [content, lastResult, markedLines, variableValues]);
 
     // Sync local state from active worksheet when it changes
     useEffect(() => {
         if (!activeWorksheet) return;
         const isWorksheetSwitch = syncedWorksheetIdRef.current !== activeWorksheet.id;
+        const shouldResetMetadata = shouldResetSessionEvaluationMetadata({
+            activeWorksheet,
+            syncedWorksheetId: syncedWorksheetIdRef.current,
+            hasPendingContentSync: hasPendingContentSyncRef.current,
+            content: contentRef.current,
+            lastResult: lastResultRef.current,
+            markedLines: markedLinesRef.current,
+            variableValues: variableValuesRef.current,
+        });
         syncedWorksheetIdRef.current = activeWorksheet.id;
         if (isWorksheetSwitch || !hasPendingContentSyncRef.current) {
             setContentState(activeWorksheet.content);
@@ -115,10 +185,12 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setMarkedLines(new Set(activeWorksheet.markedLines));
         setVariableValues(activeWorksheet.variableValues);
         hasPendingContentSyncRef.current = false;
-        // Clear session state when switching worksheets
-        setVariableVersions({});
-        setLineDependencies({});
-        setLineDependencyVersions({});
+
+        if (shouldResetMetadata) {
+            setVariableVersions({});
+            setLineDependencies({});
+            setLineDependencyVersions({});
+        }
     }, [activeWorksheet]);
 
     // Persist state changes back to manager - debounced to avoid excessive updates
