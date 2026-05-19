@@ -642,22 +642,24 @@ export function SettingsPanel({
                         </div>
                     </div>
 
-                    <div className="settings-card">
-                        <div className="settings-row">
-                            <div className="settings-row-info">
-                                <div className="settings-row-title">Close button behavior</div>
-                                <div className="settings-row-desc">Hide to tray on close (default) instead of quitting</div>
+                    {windowContext.runtimePlatform === 'windows' && (
+                        <div className="settings-card">
+                            <div className="settings-row">
+                                <div className="settings-row-info">
+                                    <div className="settings-row-title">Close button behavior</div>
+                                    <div className="settings-row-desc">Hide to tray on close (default) instead of quitting</div>
+                                </div>
+                                <label className="settings-toggle" aria-label="Toggle close button behavior">
+                                    <input
+                                        type="checkbox"
+                                        checked={windowContext.minimiseToTrayOnClose}
+                                        onChange={(e) => windowContext.setMinimiseToTrayOnClose(e.target.checked)}
+                                    />
+                                    <span className="settings-toggle-track" />
+                                </label>
                             </div>
-                            <label className="settings-toggle" aria-label="Toggle close button behavior">
-                                <input
-                                    type="checkbox"
-                                    checked={windowContext.minimiseToTrayOnClose}
-                                    onChange={(e) => windowContext.setMinimiseToTrayOnClose(e.target.checked)}
-                                />
-                                <span className="settings-toggle-track" />
-                            </label>
                         </div>
-                    </div>
+                    )}
 
                     <div className="settings-card">
                         <div className="settings-row">
