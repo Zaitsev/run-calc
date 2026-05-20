@@ -41,7 +41,6 @@ export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'calc.settings.drawerWidth';
 export const HELP_PANEL_SIDE_SIZE_STORAGE_KEY = 'calc.help.sideSize';
 export const HELP_PANEL_BOTTOM_SIZE_STORAGE_KEY = 'calc.help.bottomSize';
 export const MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY = 'calc.window.minimiseToTrayOnClose';
-export const RESTORE_SHORTCUT_ENABLED_STORAGE_KEY = 'calc.window.restoreShortcutEnabled';
 export const AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY = 'calc.lock.autoLockTimeoutMinutes';
 export const AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY = 'calc.lock.autoLockOnWindowHide';
 export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystemSleep';

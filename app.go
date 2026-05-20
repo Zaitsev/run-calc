@@ -18,7 +18,6 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/options"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
-	"golang.design/x/hotkey"
 )
 
 // App struct
@@ -26,12 +25,7 @@ type App struct {
 	ctx context.Context
 
 	minimiseToTrayOnClose atomic.Bool
-	restoreShortcutOn     atomic.Bool
 	allowCloseOnce        atomic.Bool
-	windowHidden          atomic.Bool
-
-	hotkeyMu      sync.Mutex
-	restoreHotkey []*hotkey.Hotkey
 
 	themeSearchMu       sync.Mutex
 	themeSearchCancel   context.CancelFunc
@@ -50,18 +44,13 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.minimiseToTrayOnClose.Store(true)
-	// Global hotkeys are blocked by the AppContainer sandbox when running as MSIX.
-	a.restoreShortcutOn.Store(!isRunningAsMSIX())
-	a.windowHidden.Store(false)
 	a.startTray()
-	a.refreshRestoreHotkeyRegistrationForWindowState()
 	a.startSleepResumeMonitor()
 	a.ShowWindow()
 }
 
 func (a *App) shutdown(ctx context.Context) {
 	a.stopTray()
-	a.unregisterRestoreHotkey()
 	if a.sleepMonitorCancel != nil {
 		a.sleepMonitorCancel()
 		a.sleepMonitorCancel = nil
@@ -159,8 +148,6 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 
-	a.windowHidden.Store(true)
-	a.refreshRestoreHotkeyRegistrationForWindowState()
 	wruntime.EventsEmit(ctx, "window:hidden")
 	wruntime.WindowHide(ctx)
 	setProcessPriorityBackground()
@@ -172,8 +159,6 @@ func (a *App) ShowWindow() {
 		return
 	}
 
-	a.windowHidden.Store(false)
-	a.refreshRestoreHotkeyRegistrationForWindowState()
 	setProcessPriorityNormal()
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
@@ -197,76 +182,6 @@ func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
 	a.minimiseToTrayOnClose.Store(enabled)
 }
 
-func (a *App) SetRestoreShortcutEnabled(enabled bool) {
-	if isRunningAsMSIX() {
-		return // hotkeys unavailable in AppContainer sandbox
-	}
-	a.restoreShortcutOn.Store(enabled)
-	a.refreshRestoreHotkeyRegistrationForWindowState()
-}
-
-// IsRunningAsMSIX reports whether the app is running inside an MSIX package.
-// When true, global hotkeys are unavailable due to AppContainer sandbox restrictions.
-func (a *App) IsRunningAsMSIX() bool {
-	return isRunningAsMSIX()
-}
-
-func (a *App) refreshRestoreHotkeyRegistrationForWindowState() {
-	a.hotkeyMu.Lock()
-	defer a.hotkeyMu.Unlock()
-
-	if !a.restoreShortcutOn.Load() {
-		a.unregisterRestoreHotkeyLocked()
-		return
-	}
-
-	if !a.windowHidden.Load() {
-		a.unregisterRestoreHotkeyLocked()
-		return
-	}
-
-	if len(a.restoreHotkey) > 0 {
-		return
-	}
-
-	registered := make([]*hotkey.Hotkey, 0, 2)
-	for _, spec := range restoreHotkeySpecs() {
-		hk := hotkey.New(spec.mods, spec.key)
-		if err := hk.Register(); err != nil {
-			continue
-		}
-
-		registered = append(registered, hk)
-		go func(h *hotkey.Hotkey) {
-			for range h.Keydown() {
-				a.ShowWindow()
-			}
-		}(hk)
-	}
-
-	if len(registered) == 0 {
-		return
-	}
-
-	a.restoreHotkey = registered
-}
-
-func (a *App) unregisterRestoreHotkey() {
-	a.hotkeyMu.Lock()
-	defer a.hotkeyMu.Unlock()
-	a.unregisterRestoreHotkeyLocked()
-}
-
-func (a *App) unregisterRestoreHotkeyLocked() {
-	if len(a.restoreHotkey) == 0 {
-		return
-	}
-
-	for _, hk := range a.restoreHotkey {
-		_ = hk.Unregister()
-	}
-	a.restoreHotkey = nil
-}
 
 // ===================== Worksheet File I/O (Secure Persistence) =====================
 
@@ -658,3 +573,4 @@ func (a *App) LoadWorksheetFromFile(filePath string) LoadWorksheetResponse {
 		Payload: &payload,
 	}
 }
+

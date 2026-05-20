@@ -1,7 +1,7 @@
-
 Use these instructions for all work in this repository.
 
-1. Do not hide confusion or guess through ambiguity. Surface architecture tradeoffs, name unclear requirements explicitly, and ask when a decision cannot be made from the code or request.
+1. For all tasks, when ambiguity exists, surface relevant architecture tradeoffs and name unclear requirements explicitly. If a decision cannot be made from the code or request, ask for clarification before implementing.
 2. Implement the minimum code that solves the stated problem. Avoid speculative abstractions, fallback paths, and "just-in-case" logic unless the task explicitly requires them.
-3. Touch only the files required for the task. Keep edits narrow, clean up any code you introduce, and preserve existing repository patterns unless a change in pattern is the task.
-4. Define concrete validation criteria before concluding the task. Prefer the smallest relevant executable check, rerun it after each fix, and do not stop until the targeted behavior is verified or a real blocker is stated.
+3. Touch only the files required for the task. Keep edits narrow, clean up any code you introduce, and preserve existing repository patterns unless the task is to change those patterns. If existing patterns conflict with task requirements, document the conflict and request clarification before deviating.
+4. Before concluding the task, define specific and measurable validation criteria (for example: exact test command, build command, expected behavior, or benchmark target). Prefer the smallest relevant executable check, rerun it after each fix, and do not stop until the targeted behavior is verified or a real blocker is stated. If criteria cannot be defined because requirements are incomplete, document that blocker and request clarification.
+5. Use LF line endings only. Do not introduce or preserve CRLF in edited or created text files.

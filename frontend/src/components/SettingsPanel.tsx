@@ -663,7 +663,7 @@ export function SettingsPanel({
                             <div className="settings-row">
                                 <div className="settings-row-info">
                                     <div className="settings-row-title">Close button behavior</div>
-                                    <div className="settings-row-desc">Hide to tray on close (default) instead of quitting</div>
+                                    <div className="settings-row-desc">Hide to tray on close (default) instead of quitting. Restore from the tray icon menu.</div>
                                 </div>
                                 <label className="settings-toggle" aria-label="Toggle close button behavior">
                                     <input
@@ -677,29 +677,6 @@ export function SettingsPanel({
                         </div>
                     )}
 
-                    <div className="settings-card">
-                        <div className="settings-row">
-                            <div className="settings-row-info">
-                                <div className="settings-row-title">Restore shortcut</div>
-                                <div className="settings-row-desc">
-                                    {windowContext.isMSIX
-                                        ? 'Not available in the Store version (Windows sandbox restriction)'
-                                        : windowContext.runtimePlatform === 'darwin'
-                                          ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state. This global shortcut listener may use a small amount of CPU while the app is in tray mode.'
-                                          : 'Use Ctrl + NumLock to restore from hidden/minimized state. This global shortcut listener may use a small amount of CPU while the app is in tray mode.'}
-                                </div>
-                            </div>
-                            <label className="settings-toggle" aria-label="Toggle restore shortcut">
-                                <input
-                                    type="checkbox"
-                                    checked={windowContext.restoreShortcutEnabled}
-                                    disabled={windowContext.isMSIX}
-                                    onChange={(e) => windowContext.setRestoreShortcutEnabled(e.target.checked)}
-                                />
-                                <span className="settings-toggle-track" />
-                            </label>
-                        </div>
-                    </div>
                 </div>
             )}
         </div>

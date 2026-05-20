@@ -9,7 +9,7 @@ import {
     WindowSetPosition,
     WindowSetSize,
 } from '../../wailsjs/runtime/runtime';
-import { IsRunningAsMSIX, SetMinimiseToTrayOnClose, SetRestoreShortcutEnabled } from '../../wailsjs/go/main/App';
+import { SetMinimiseToTrayOnClose } from '../../wailsjs/go/main/App';
 import {
     WINDOW_STATE_KEY,
     WINDOW_STATE_SAVE_DEBOUNCE_MS,
@@ -17,7 +17,6 @@ import {
     DEFAULT_WINDOW_WIDTH,
     DEFAULT_WINDOW_HEIGHT,
     MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY,
-    RESTORE_SHORTCUT_ENABLED_STORAGE_KEY,
 } from '../constants';
 import { WindowCenter, WindowSetDarkTheme, WindowSetLightTheme, WindowSetSystemDefaultTheme } from '../../wailsjs/runtime/runtime';
 import type { ThemeState } from '../useTheme';
@@ -25,11 +24,8 @@ import { inferCustomThemeMode } from '../utils/colorUtils';
 
 type WindowContextValue = {
     runtimePlatform: string;
-    isMSIX: boolean;
     minimiseToTrayOnClose: boolean;
     setMinimiseToTrayOnClose: (v: boolean) => void;
-    restoreShortcutEnabled: boolean;
-    setRestoreShortcutEnabled: (v: boolean) => void;
     resetWindowLayout: (onReset?: () => void) => void;
     expandWindowForThemeStore: () => Promise<void>;
     restoreWindowAfterThemeStore: () => Promise<void>;
@@ -44,12 +40,8 @@ const WindowContext = createContext<WindowContextValue | null>(null);
 
 export function WindowProvider({ children }: { children: ReactNode }) {
     const [runtimePlatform, setRuntimePlatform] = useState('');
-    const [isMSIX, setIsMSIX] = useState(false);
     const [minimiseToTrayOnClose, setMinimiseToTrayOnCloseState] = useState(() =>
         localStorage.getItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY) !== 'false'
-    );
-    const [restoreShortcutEnabled, setRestoreShortcutEnabledState] = useState(() =>
-        localStorage.getItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY) !== 'false'
     );
 
     const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
@@ -79,18 +71,9 @@ export function WindowProvider({ children }: { children: ReactNode }) {
     }, []);
 
     useEffect(() => {
-        IsRunningAsMSIX().then((v) => setIsMSIX(v)).catch(() => {});
-    }, []);
-
-    useEffect(() => {
         localStorage.setItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY, String(minimiseToTrayOnClose));
         SetMinimiseToTrayOnClose(minimiseToTrayOnClose).catch(() => {});
     }, [minimiseToTrayOnClose]);
-
-    useEffect(() => {
-        localStorage.setItem(RESTORE_SHORTCUT_ENABLED_STORAGE_KEY, String(restoreShortcutEnabled));
-        if (!isMSIX) SetRestoreShortcutEnabled(restoreShortcutEnabled).catch(() => {});
-    }, [restoreShortcutEnabled, isMSIX]);
 
     // ── Window state persistence ──────────────────────────────────────────────
     useEffect(() => {
@@ -222,13 +205,10 @@ export function WindowProvider({ children }: { children: ReactNode }) {
     };
 
     const setMinimiseToTrayOnClose = (v: boolean) => setMinimiseToTrayOnCloseState(v);
-    const setRestoreShortcutEnabled = (v: boolean) => setRestoreShortcutEnabledState(v);
-
     return (
         <WindowContext.Provider value={{
-            runtimePlatform, isMSIX,
+            runtimePlatform,
             minimiseToTrayOnClose, setMinimiseToTrayOnClose,
-            restoreShortcutEnabled, setRestoreShortcutEnabled,
             resetWindowLayout,
             expandWindowForThemeStore, restoreWindowAfterThemeStore,
             expandWindowForSettingsDrawer, restoreWindowAfterSettingsDrawer,
