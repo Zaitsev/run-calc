@@ -840,7 +840,7 @@ function App() {
     }, [isAIQueryPending]);
 
     useEffect(() => {
-        if (isActiveWorksheetLocked) {
+        if (!autoEval || isActiveWorksheetLocked) {
             if (shadowVerifyTimerRef.current !== null) {
                 window.clearTimeout(shadowVerifyTimerRef.current);
                 shadowVerifyTimerRef.current = null;
@@ -871,6 +871,7 @@ function App() {
             }
         };
     }, [
+        autoEval,
         activeId,
         content,
         decimalDelimiter,
