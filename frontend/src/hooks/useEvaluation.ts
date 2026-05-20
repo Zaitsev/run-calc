@@ -8,6 +8,7 @@ import {
     getExpressionSource,
     isAITriggerLine,
     getAITriggerPrompt,
+    splitLineComment,
 } from '../lineExpression';
 import {
     shouldSkipEvaluation,
@@ -63,6 +64,7 @@ type EvalDeps = {
 };
 
 type ContentAndCaret = { nextContent: string; nextCaret: number };
+const NON_DETERMINISTIC_FUNCTION_CALL_RE = /\b(?:uniform|normal)\s*\(/i;
 
 function applyContentAndCaret(
     editorRef: RefObject<HTMLTextAreaElement | null>,
@@ -111,8 +113,26 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         if (isReevaluatingAll || isAIQueryPending) return 0;
 
         const sourceLines = content.split('\n');
+        const containsNonDeterministicExpressions = sourceLines.some((sourceLine) => {
+            const editableLine = getExpressionSource(sourceLine);
+            if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                return false;
+            }
+            const { body } = splitLineComment(editableLine);
+            return NON_DETERMINISTIC_FUNCTION_CALL_RE.test(body);
+        });
+        if (containsNonDeterministicExpressions) {
+            setLineDependencyVersions(() => ({}));
+            return 0;
+        }
+
         const revisionAtStart = worksheetRevisionRef?.current ?? 0;
-        const capturedRandomState = await CaptureRandomState();
+        let capturedRandomState: Awaited<ReturnType<typeof CaptureRandomState>> | null = null;
+        try {
+            capturedRandomState = await CaptureRandomState();
+        } catch {
+            return 0;
+        }
         let shadowVariables: Record<string, unknown> = {};
         const mismatchedLineIndexes: number[] = [];
 
@@ -125,6 +145,9 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
                 const editableLine = getExpressionSource(sourceLines[i]);
                 if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                    continue;
+                }
+                if (sourceLines[i] === editableLine) {
                     continue;
                 }
 
@@ -162,11 +185,12 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             setLineDependencyVersions(() => shadowSnapshots);
             return mismatchedLineIndexes.length;
         } finally {
-            // Only restore if the worksheet hasn't changed — a concurrent reevaluateAllExpressions
-            // bumps the revision before it starts, so we skip the rollback to avoid corrupting
-            // random state mid-reevaluation.
-            if (!revisionChanged()) {
-                await RestoreRandomState(capturedRandomState);
+            if (capturedRandomState !== null) {
+                try {
+                    await RestoreRandomState(capturedRandomState);
+                } catch {
+                    // Ignore random-state rollback failures during shadow verification.
+                }
             }
         }
     };

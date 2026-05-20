@@ -174,6 +174,10 @@ function App() {
     const previousPrecisionRef = useRef<PrecisionMode>(precision);
     const worksheetRevisionRef = useRef(0);
     const shadowVerifyTimerRef = useRef<number | null>(null);
+    const verifyWorksheetShadowRef = useRef<() => Promise<number>>(async () => 0);
+    const reevaluateAllExpressionsRef = useRef<() => Promise<void>>(async () => {});
+    const isReevaluatingAllRef = useRef(isReevaluatingAll);
+    const isAIQueryPendingRef = useRef(isAIQueryPending);
     const inactivityByWorksheetRef = useRef<Record<string, number>>({});
     const previousActiveWorksheetIdRef = useRef<string | null>(null);
     const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
@@ -823,6 +827,19 @@ function App() {
     });
 
     useEffect(() => {
+        verifyWorksheetShadowRef.current = verifyWorksheetShadow;
+        reevaluateAllExpressionsRef.current = reevaluateAllExpressions;
+    }, [reevaluateAllExpressions, verifyWorksheetShadow]);
+
+    useEffect(() => {
+        isReevaluatingAllRef.current = isReevaluatingAll;
+    }, [isReevaluatingAll]);
+
+    useEffect(() => {
+        isAIQueryPendingRef.current = isAIQueryPending;
+    }, [isAIQueryPending]);
+
+    useEffect(() => {
         if (isActiveWorksheetLocked) {
             if (shadowVerifyTimerRef.current !== null) {
                 window.clearTimeout(shadowVerifyTimerRef.current);
@@ -841,7 +858,10 @@ function App() {
             if (worksheetRevisionRef.current !== revisionAtSchedule) {
                 return;
             }
-            void verifyWorksheetShadow();
+            if (isReevaluatingAllRef.current || isAIQueryPendingRef.current) {
+                return;
+            }
+            void verifyWorksheetShadowRef.current();
         }, 180);
 
         return () => {
@@ -874,12 +894,12 @@ function App() {
 
         let cancelled = false;
         const runAutoEval = async () => {
-            const mismatchedCount = await verifyWorksheetShadow();
+            const mismatchedCount = await verifyWorksheetShadowRef.current();
             if (cancelled) {
                 return;
             }
             if ((mismatchedCount ?? 0) > 0) {
-                await reevaluateAllExpressions();
+                await reevaluateAllExpressionsRef.current();
             }
         };
 
@@ -894,8 +914,6 @@ function App() {
         isAIQueryPending,
         isActiveWorksheetLocked,
         isReevaluatingAll,
-        reevaluateAllExpressions,
-        verifyWorksheetShadow,
     ]);
 
     const handleEnterEvaluation = async () => {
@@ -1773,4 +1791,3 @@ function App() {
 }
 
 export default App;
-

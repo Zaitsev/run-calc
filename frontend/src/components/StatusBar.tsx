@@ -232,6 +232,7 @@ export function StatusBar() {
                 className={`status-chip status-chip-btn${autoEval ? ' status-chip-btn--active' : ''}`}
                 title={autoEval ? 'Auto-eval stale lines: on' : 'Auto-eval stale lines: off'}
                 aria-label="Toggle auto eval"
+                aria-pressed={autoEval}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setAutoEval(!autoEval)}
             >

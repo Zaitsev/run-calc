@@ -14,16 +14,14 @@ export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, au
                 {`Stale results detected on ${staleCount} line${staleCount === 1 ? '' : 's'}.`}
             </span>
             <div className="stale-banner-actions">
-                {!autoEvalEnabled && (
-                    <button
-                        type="button"
-                        className="stale-banner-btn"
-                        onClick={onReevaluateAll}
-                        disabled={isReevaluatingAll}
-                    >
-                        {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className="stale-banner-btn"
+                    onClick={onReevaluateAll}
+                    disabled={isReevaluatingAll}
+                >
+                    {isReevaluatingAll ? 'Re-evaluating...' : 'Re-evaluate All'}
+                </button>
                 <button
                     type="button"
                     className={`stale-banner-btn stale-banner-btn--ghost${autoEvalEnabled ? ' stale-banner-btn--active' : ''}`}
