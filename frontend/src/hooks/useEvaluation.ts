@@ -135,7 +135,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
         let shadowVariables: Record<string, unknown> = {};
         const mismatchedLineIndexes: number[] = [];
-        let nextShadowSnapshots: Record<number, Record<string, number>> | null = null;
+        let nextShadowSnapshots: Record<number, Record<string, number>> = {};
         let restoreRandomStateFailed = false;
 
         const revisionChanged = () => (worksheetRevisionRef?.current ?? 0) !== revisionAtStart;
@@ -192,7 +192,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             }
         }
 
-        if (restoreRandomStateFailed || nextShadowSnapshots === null) {
+        if (restoreRandomStateFailed) {
             setLineDependencyVersions(() => ({}));
             return 0;
         }
