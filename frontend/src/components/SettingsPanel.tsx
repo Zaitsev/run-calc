@@ -685,8 +685,8 @@ export function SettingsPanel({
                                     {windowContext.isMSIX
                                         ? 'Not available in the Store version (Windows sandbox restriction)'
                                         : windowContext.runtimePlatform === 'darwin'
-                                          ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state'
-                                          : 'Use Ctrl + NumLock to restore from hidden/minimized state'}
+                                          ? 'Use Cmd + Clear (NumLock-equivalent) to restore from hidden/minimized state. This global shortcut listener may use a small amount of CPU while the app is in tray mode.'
+                                          : 'Use Ctrl + NumLock to restore from hidden/minimized state. This global shortcut listener may use a small amount of CPU while the app is in tray mode.'}
                                 </div>
                             </div>
                             <label className="settings-toggle" aria-label="Toggle restore shortcut">

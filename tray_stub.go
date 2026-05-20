@@ -7,3 +7,9 @@ func (a *App) startTray() {
 
 func (a *App) stopTray() {
 }
+
+func setProcessPriorityBackground() {
+}
+
+func setProcessPriorityNormal() {
+}

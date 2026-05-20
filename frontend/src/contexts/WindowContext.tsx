@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     Environment,
+    EventsOn,
     ScreenGetAll,
     WindowGetPosition,
     WindowGetSize,
@@ -53,6 +54,21 @@ export function WindowProvider({ children }: { children: ReactNode }) {
 
     const themeStoreOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
     const settingsDrawerOriginalSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const isWindowHiddenRef = useRef(false);
+
+    useEffect(() => {
+        const unsubWindowHidden = EventsOn('window:hidden', () => {
+            isWindowHiddenRef.current = true;
+        });
+        const unsubWindowShown = EventsOn('window:shown', () => {
+            isWindowHiddenRef.current = false;
+        });
+
+        return () => {
+            unsubWindowHidden();
+            unsubWindowShown();
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -118,7 +134,10 @@ export function WindowProvider({ children }: { children: ReactNode }) {
 
         void restoreWindowState();
 
-        const persistWindowState = async () => {
+        const persistWindowState = async (force: boolean = false) => {
+            if (!force && isWindowHiddenRef.current) {
+                return;
+            }
             try {
                 const size = await WindowGetSize();
                 const position = await WindowGetPosition();
@@ -135,7 +154,7 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         };
 
         const handleBeforeUnload = () => {
-            void persistWindowState();
+            void persistWindowState(true);
         };
 
         window.addEventListener('resize', schedulePersist);
@@ -147,7 +166,7 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             if (saveTimer !== null) window.clearTimeout(saveTimer);
             if (periodicSaveTimer !== null) window.clearInterval(periodicSaveTimer);
-            void persistWindowState();
+            void persistWindowState(true);
         };
     }, []);
 

@@ -28,6 +28,7 @@ type App struct {
 	minimiseToTrayOnClose atomic.Bool
 	restoreShortcutOn     atomic.Bool
 	allowCloseOnce        atomic.Bool
+	windowHidden          atomic.Bool
 
 	hotkeyMu      sync.Mutex
 	restoreHotkey []*hotkey.Hotkey
@@ -51,8 +52,9 @@ func (a *App) startup(ctx context.Context) {
 	a.minimiseToTrayOnClose.Store(true)
 	// Global hotkeys are blocked by the AppContainer sandbox when running as MSIX.
 	a.restoreShortcutOn.Store(!isRunningAsMSIX())
+	a.windowHidden.Store(false)
 	a.startTray()
-	a.ensureRestoreHotkeyRegistration()
+	a.refreshRestoreHotkeyRegistrationForWindowState()
 	a.startSleepResumeMonitor()
 	a.ShowWindow()
 }
@@ -157,8 +159,11 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 
+	a.windowHidden.Store(true)
+	a.refreshRestoreHotkeyRegistrationForWindowState()
 	wruntime.EventsEmit(ctx, "window:hidden")
 	wruntime.WindowHide(ctx)
+	setProcessPriorityBackground()
 	return true
 }
 
@@ -167,8 +172,12 @@ func (a *App) ShowWindow() {
 		return
 	}
 
+	a.windowHidden.Store(false)
+	a.refreshRestoreHotkeyRegistrationForWindowState()
+	setProcessPriorityNormal()
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
+	wruntime.EventsEmit(a.ctx, "window:shown")
 
 	// Toggle always-on-top briefly to reliably bring restored tray windows to front on Windows.
 	if runtime.GOOS == "windows" {
@@ -193,7 +202,7 @@ func (a *App) SetRestoreShortcutEnabled(enabled bool) {
 		return // hotkeys unavailable in AppContainer sandbox
 	}
 	a.restoreShortcutOn.Store(enabled)
-	a.ensureRestoreHotkeyRegistration()
+	a.refreshRestoreHotkeyRegistrationForWindowState()
 }
 
 // IsRunningAsMSIX reports whether the app is running inside an MSIX package.
@@ -202,11 +211,16 @@ func (a *App) IsRunningAsMSIX() bool {
 	return isRunningAsMSIX()
 }
 
-func (a *App) ensureRestoreHotkeyRegistration() {
+func (a *App) refreshRestoreHotkeyRegistrationForWindowState() {
 	a.hotkeyMu.Lock()
 	defer a.hotkeyMu.Unlock()
 
 	if !a.restoreShortcutOn.Load() {
+		a.unregisterRestoreHotkeyLocked()
+		return
+	}
+
+	if !a.windowHidden.Load() {
 		a.unregisterRestoreHotkeyLocked()
 		return
 	}
