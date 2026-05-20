@@ -444,7 +444,8 @@ export function buildEvaluationHooks(deps: EvalDeps) {
     const reevaluateAllExpressions = async (contentOverride?: string) => {
         if (isReevaluatingAll) return;
         // Bump revision before the first await so any in-flight verifyWorksheetShadow
-        // will see revisionChanged() === true in its finally block and skip RestoreRandomState.
+        // can detect that its work is stale. This does not skip RestoreRandomState
+        // in verifyWorksheetShadow's finally block.
         if (worksheetRevisionRef) worksheetRevisionRef.current += 1;
         setIsReevaluatingAll(true);
         const sourceContent = contentOverride ?? content;
