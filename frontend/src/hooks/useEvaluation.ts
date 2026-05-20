@@ -3,12 +3,12 @@ import type { AIContextMode, AISettingsState } from '../AISettings';
 import type { AIDebugEntry } from '../AIDebugDrawer';
 import type { AIRunResponse } from '../types/app';
 import type { DecimalDelimiter, PrecisionMode } from '../types/app';
-import { EvaluateExprProgram, RunAIQuery } from '../../wailsjs/go/main/App';
+import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../wailsjs/go/main/App';
 import {
     getExpressionSource,
     isAITriggerLine,
     getAITriggerPrompt,
-    extractExpressionDependencies,
+    splitLineComment,
 } from '../lineExpression';
 import {
     shouldSkipEvaluation,
@@ -18,12 +18,12 @@ import {
     getFriendlyEvalErrorMessage,
     isAITriggerSourceLine,
     stripMarkdownCodeFences,
+    SHADOW_STALE_MARKER,
 } from '../appInteractionLogic';
 import {
     getLineBounds,
     lineIndexAtPosition,
     formatEvaluatedLine,
-    areValuesEquivalent,
     formatExprValue,
 } from '../utils/evalHelpers';
 import { formatNumber } from '../utils/formatting';
@@ -33,8 +33,6 @@ type EvalDeps = {
     content: string;
     lastResult: number | null;
     variableValues: Record<string, unknown>;
-    variableVersions: Record<string, number>;
-    lineDependencies: Record<number, string[]>;
     lineDependencyVersions: Record<number, Record<string, number>>;
     isReevaluatingAll: boolean;
     isAIQueryPending: boolean;
@@ -49,8 +47,6 @@ type EvalDeps = {
     setCaretPos: (v: number) => void;
     setLastResult: (v: number | null) => void;
     setVariableValues: (v: Record<string, unknown>) => void;
-    setVariableVersions: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-    setLineDependencies: React.Dispatch<React.SetStateAction<Record<number, string[]>>>;
     setLineDependencyVersions: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
     setIsReevaluatingAll: (v: boolean) => void;
     setIsAIQueryPending: (v: boolean) => void;
@@ -64,9 +60,11 @@ type EvalDeps = {
     // refs
     editorRef: RefObject<HTMLTextAreaElement | null>;
     aiDebugIdRef: RefObject<number>;
+    worksheetRevisionRef?: React.MutableRefObject<number>;
 };
 
 type ContentAndCaret = { nextContent: string; nextCaret: number };
+const NON_DETERMINISTIC_FUNCTION_CALL_RE = /\b(?:uniform|normal)\s*\(/i;
 
 function applyContentAndCaret(
     editorRef: RefObject<HTMLTextAreaElement | null>,
@@ -88,18 +86,120 @@ function applyContentAndCaret(
 
 export function buildEvaluationHooks(deps: EvalDeps) {
     const {
-        content, lastResult, variableValues, variableVersions, lineDependencies: _ld, lineDependencyVersions: _ldv,
+        content, lastResult, variableValues,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
         decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
-        setVariableValues, setVariableVersions, setLineDependencies, setLineDependencyVersions,
+        setVariableValues, setLineDependencyVersions,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
+        worksheetRevisionRef,
     } = deps;
 
     const setContentAndCaret = (nextContent: string, nextCaret: number) => {
         applyContentAndCaret(editorRef, setContent, setCaretPos, { nextContent, nextCaret });
+    };
+
+    const buildShadowLineSnapshots = (lineIndexes: number[]) => {
+        const snapshots: Record<number, Record<string, number>> = {};
+        lineIndexes.forEach((lineIndex) => {
+            snapshots[lineIndex] = { [SHADOW_STALE_MARKER]: -1 };
+        });
+        return snapshots;
+    };
+
+    const verifyWorksheetShadow = async () => {
+        if (isReevaluatingAll || isAIQueryPending) return 0;
+
+        const sourceLines = content.split('\n');
+        const containsNonDeterministicExpressions = sourceLines.some((sourceLine) => {
+            const editableLine = getExpressionSource(sourceLine);
+            if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                return false;
+            }
+            const { body } = splitLineComment(editableLine);
+            return NON_DETERMINISTIC_FUNCTION_CALL_RE.test(body);
+        });
+        if (containsNonDeterministicExpressions) {
+            setLineDependencyVersions(() => ({}));
+            return 0;
+        }
+
+        const revisionAtStart = worksheetRevisionRef?.current ?? 0;
+        let capturedRandomState: Awaited<ReturnType<typeof CaptureRandomState>> | null = null;
+        try {
+            capturedRandomState = await CaptureRandomState();
+        } catch {
+            return 0;
+        }
+        let shadowVariables: Record<string, unknown> = {};
+        const mismatchedLineIndexes: number[] = [];
+        let nextShadowSnapshots: Record<number, Record<string, number>> = {};
+        let restoreRandomStateFailed = false;
+
+        const revisionChanged = () => (worksheetRevisionRef?.current ?? 0) !== revisionAtStart;
+
+        try {
+            // Evaluate each line top-to-bottom and compare results
+            for (let i = 0; i < sourceLines.length; i++) {
+                if (revisionChanged()) return 0;
+
+                const editableLine = getExpressionSource(sourceLines[i]);
+                if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
+                    continue;
+                }
+                if (sourceLines[i] === editableLine) {
+                    continue;
+                }
+
+                try {
+                    const evalResult = await EvaluateExprProgram(editableLine, shadowVariables as Record<string, any>);
+                    if (!evalResult.ok) throw new Error(evalResult.error || 'Evaluation failed');
+                    if (revisionChanged()) return 0;
+
+                    const numberValue = evalResult.numberValue ?? 0;
+                    const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
+                    const shadowLineResult = formatEvaluatedLine(editableLine, formatted);
+
+                    // Compare shadow result with actual source line
+                    if (shadowLineResult !== sourceLines[i]) {
+                        mismatchedLineIndexes.push(i);
+                    }
+
+                    // Update shadow variables for next line evaluation
+                    const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
+                    shadowVariables = nextVariables;
+                } catch {
+                    // Compare: if source doesn't show error, it's a mismatch
+                    if (sourceLines[i] !== formatEvaluatedLine(editableLine, 'error')) {
+                        mismatchedLineIndexes.push(i);
+                    }
+                }
+            }
+
+            if (revisionChanged()) return 0;
+
+            // Mark mismatched lines with shadow verification marker.
+            nextShadowSnapshots = buildShadowLineSnapshots(mismatchedLineIndexes);
+        } finally {
+            if (capturedRandomState !== null) {
+                try {
+                    await RestoreRandomState(capturedRandomState);
+                } catch {
+                    restoreRandomStateFailed = true;
+                }
+            }
+        }
+
+        if (restoreRandomStateFailed) {
+            setLineDependencyVersions(() => ({}));
+            return 0;
+        }
+
+        // Shadow verification is the single source of stale markers in shadow-only mode.
+        setLineDependencyVersions(() => nextShadowSnapshots);
+        return mismatchedLineIndexes.length;
     };
 
     const evaluateCurrentLine = async () => {
@@ -319,48 +419,9 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             setLastResult(evalResult.isNumber ? numberValue : null);
 
             const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
-            const changedVariableKeys = new Set<string>();
-            const allVariableKeys = new Set<string>([...Object.keys(variableValues), ...Object.keys(nextVariables)]);
-            allVariableKeys.forEach((key) => {
-                const nk = key.toLowerCase();
-                if (!areValuesEquivalent(variableValues[nk], nextVariables[nk])) changedVariableKeys.add(nk);
-            });
-
-            const nextVariableVersions = { ...variableVersions };
-            changedVariableKeys.forEach((key) => { nextVariableVersions[key] = (nextVariableVersions[key] ?? 0) + 1; });
-
-            const dependencies = extractExpressionDependencies(editableLine);
-            const dependencySnapshot: Record<string, number> = {};
-            dependencies.forEach((name) => { dependencySnapshot[name] = nextVariableVersions[name] ?? 0; });
-
-            // For lines not yet tracked in this session, synthesize stale entries for
-            // any that reference a changed variable. This covers worksheets loaded from storage
-            // where lineDependencyVersions starts empty.
-            const synthesizedStaleEntries: Record<number, Record<string, number>> = {};
-            if (changedVariableKeys.size > 0) {
-                const allLines = content.split('\n');
-                allLines.forEach((lineText, idx) => {
-                    if (idx === lineIndex) return;
-                    if (_ldv[idx] !== undefined) return;
-                    const deps = extractExpressionDependencies(lineText);
-                    const staleSnap: Record<string, number> = {};
-                    let hasChangedDep = false;
-                    deps.forEach((dep) => {
-                        if (changedVariableKeys.has(dep)) {
-                            staleSnap[dep] = variableVersions[dep] ?? 0;
-                            hasChangedDep = true;
-                        }
-                    });
-                    if (hasChangedDep) {
-                        synthesizedStaleEntries[idx] = staleSnap;
-                    }
-                });
-            }
 
             setVariableValues(nextVariables);
-            setVariableVersions((prev) => ({ ...prev, ...nextVariableVersions }));
-            setLineDependencies((prev) => ({ ...prev, [lineIndex]: dependencies }));
-            setLineDependencyVersions((prev) => ({ ...prev, ...synthesizedStaleEntries, [lineIndex]: dependencySnapshot }));
+            clearLineEvaluationMetadata(lineIndex);
             setStatusText('Calculated');
             setIsStatusError(false);
             setDevError('');
@@ -382,47 +443,48 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
     const reevaluateAllExpressions = async (contentOverride?: string) => {
         if (isReevaluatingAll) return;
+        // Bump revision before the first await so any in-flight verifyWorksheetShadow
+        // can detect that its work is stale. This does not skip RestoreRandomState
+        // in verifyWorksheetShadow's finally block.
+        if (worksheetRevisionRef) worksheetRevisionRef.current += 1;
         setIsReevaluatingAll(true);
+        const sourceContent = contentOverride ?? content;
+        const caretSnapshot = editorRef.current?.selectionStart ?? 0;
+        const caretBounds = getLineBounds(sourceContent, caretSnapshot);
+        const caretLineIndex = lineIndexAtPosition(sourceContent, caretSnapshot);
+        const caretLineText = sourceContent.slice(caretBounds.lineStart, caretBounds.lineEnd);
+        const caretOffsetInLine = Math.min(Math.max(caretSnapshot - caretBounds.lineStart, 0), caretLineText.length);
+        const caretExpressionOffset = Math.min(caretOffsetInLine, getExpressionSource(caretLineText).length);
+        const revisionAtStart = worksheetRevisionRef?.current ?? 0;
         try {
-            const sourceLines = (contentOverride ?? content).split('\n');
+            const sourceLines = sourceContent.split('\n');
             const nextLines = [...sourceLines];
             let workingVariables: Record<string, unknown> = {};
-            let workingVariableVersions: Record<string, number> = {};
-            const nextLineDependencies: Record<number, string[]> = {};
-            const nextLineDependencyVersions: Record<number, Record<string, number>> = {};
             let nextLastResult: number | null = null;
             let calculatedCount = 0;
             let failedCount = 0;
 
+            // Simple line-by-line evaluation: no complex refresh logic
             for (let i = 0; i < sourceLines.length; i++) {
-                const originalLine = sourceLines[i];
-                const editableLine = getExpressionSource(originalLine);
+                const editableLine = getExpressionSource(sourceLines[i]);
                 if (shouldSkipEvaluation(editableLine)) continue;
                 if (isAITriggerSourceLine(editableLine)) continue;
+                if ((worksheetRevisionRef?.current ?? 0) !== revisionAtStart) {
+                    return;
+                }
 
                 try {
                     const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
                     if (!evalResult.ok) throw new Error(evalResult.error || 'Evaluation failed');
+                    if ((worksheetRevisionRef?.current ?? 0) !== revisionAtStart) {
+                        return;
+                    }
 
                     const numberValue = evalResult.numberValue ?? 0;
                     const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
                     nextLines[i] = formatEvaluatedLine(editableLine, formatted);
 
                     const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
-                    const changedVariableKeys = new Set<string>();
-                    const allVariableKeys = new Set<string>([...Object.keys(workingVariables), ...Object.keys(nextVariables)]);
-                    allVariableKeys.forEach((key) => {
-                        const nk = key.toLowerCase();
-                        if (!areValuesEquivalent(workingVariables[nk], nextVariables[nk])) changedVariableKeys.add(nk);
-                    });
-                    changedVariableKeys.forEach((key) => { workingVariableVersions[key] = (workingVariableVersions[key] ?? 0) + 1; });
-
-                    const dependencies = extractExpressionDependencies(editableLine);
-                    const dependencySnapshot: Record<string, number> = {};
-                    dependencies.forEach((name) => { dependencySnapshot[name] = workingVariableVersions[name] ?? 0; });
-
-                    nextLineDependencies[i] = dependencies;
-                    nextLineDependencyVersions[i] = dependencySnapshot;
                     workingVariables = nextVariables;
                     nextLastResult = evalResult.isNumber ? numberValue : null;
                     calculatedCount++;
@@ -433,94 +495,31 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                 }
             }
 
-            // A strict top-to-bottom pass can still leave lines stale when a referenced
-            // variable is reassigned later. Refresh stale lines against the latest state
-            // and propagate variable updates until snapshots converge.
-            let refreshedStaleCount = 0;
-            const maxRefreshPasses = Math.max(1, sourceLines.length);
-            for (let pass = 0; pass < maxRefreshPasses; pass++) {
-                const staleLineIndexes = Object.entries(nextLineDependencyVersions)
-                    .filter(([, dependencySnapshot]) => Object.entries(dependencySnapshot).some(([name, version]) => {
-                        const currentVersion = workingVariableVersions[name] ?? 0;
-                        return currentVersion !== version;
-                    }))
-                    .map(([lineKey]) => Number(lineKey))
-                    .filter((lineIndex) => Number.isFinite(lineIndex))
-                    .sort((left, right) => left - right);
-
-                if (staleLineIndexes.length === 0) {
-                    break;
-                }
-
-                for (const lineIndex of staleLineIndexes) {
-                    const editableLine = getExpressionSource(nextLines[lineIndex] ?? '');
-                    if (shouldSkipEvaluation(editableLine) || isAITriggerSourceLine(editableLine)) {
-                        delete nextLineDependencies[lineIndex];
-                        delete nextLineDependencyVersions[lineIndex];
-                        continue;
-                    }
-
-                    try {
-                        const evalResult = await EvaluateExprProgram(editableLine, workingVariables as Record<string, any>);
-                        if (!evalResult.ok) {
-                            throw new Error(evalResult.error || 'Evaluation failed');
-                        }
-
-                        const numberValue = evalResult.numberValue ?? 0;
-                        const formatted = formatExprValue(evalResult.value, evalResult.isNumber, numberValue, decimalDelimiter, precision, scientificNotation);
-                        nextLines[lineIndex] = formatEvaluatedLine(editableLine, formatted);
-
-                        const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
-                        const changedVariableKeys = new Set<string>();
-                        const allVariableKeys = new Set<string>([...Object.keys(workingVariables), ...Object.keys(nextVariables)]);
-                        allVariableKeys.forEach((key) => {
-                            const nk = key.toLowerCase();
-                            if (!areValuesEquivalent(workingVariables[nk], nextVariables[nk])) {
-                                changedVariableKeys.add(nk);
-                            }
-                        });
-                        changedVariableKeys.forEach((key) => {
-                            workingVariableVersions[key] = (workingVariableVersions[key] ?? 0) + 1;
-                        });
-
-                        const dependencies = extractExpressionDependencies(editableLine);
-                        const dependencySnapshotAtLatestState: Record<string, number> = {};
-                        dependencies.forEach((name) => {
-                            dependencySnapshotAtLatestState[name] = workingVariableVersions[name] ?? 0;
-                        });
-                        nextLineDependencies[lineIndex] = dependencies;
-                        nextLineDependencyVersions[lineIndex] = dependencySnapshotAtLatestState;
-                        workingVariables = nextVariables;
-                        nextLastResult = evalResult.isNumber ? numberValue : null;
-                        refreshedStaleCount++;
-                    } catch {
-                        nextLines[lineIndex] = formatEvaluatedLine(editableLine, 'error');
-                        delete nextLineDependencies[lineIndex];
-                        delete nextLineDependencyVersions[lineIndex];
-                        failedCount++;
-                        nextLastResult = null;
-                    }
-                }
-            }
-
             const nextContent = nextLines.join('\n');
+            const targetLineIndex = Math.min(caretLineIndex, Math.max(0, nextLines.length - 1));
+            let targetLineStart = 0;
+            for (let i = 0; i < targetLineIndex; i++) {
+                targetLineStart += nextLines[i].length + 1;
+            }
+            const targetEditableLine = getExpressionSource(nextLines[targetLineIndex] ?? '');
+            const targetCaret = targetLineStart + Math.min(caretExpressionOffset, targetEditableLine.length);
+
             setContent(nextContent);
             setVariableValues(workingVariables);
-            setVariableVersions(() => workingVariableVersions);
-            setLineDependencies(() => nextLineDependencies);
-            setLineDependencyVersions(() => nextLineDependencyVersions);
+            // Clear all stale markers after re-evaluation (shadow verifier will detect mismatches)
+            setLineDependencyVersions(() => ({}));
             setLastResult(nextLastResult);
             setIsStatusError(failedCount > 0);
             setDevError('');
             setStatusText(
                 failedCount > 0
-                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}${refreshedStaleCount > 0 ? `, refreshed ${refreshedStaleCount} stale` : ''}, ${failedCount} failed`
-                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}${refreshedStaleCount > 0 ? `, refreshed ${refreshedStaleCount} stale` : ''}`
+                    ? `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}, ${failedCount} failed`
+                    : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}`
             );
 
             requestAnimationFrame(() => {
                 if (!editorRef.current) return;
-                const nextCaret = Math.min(editorRef.current.selectionStart, nextContent.length);
+                const nextCaret = Math.min(targetCaret, nextContent.length);
                 editorRef.current.selectionStart = nextCaret;
                 editorRef.current.selectionEnd = nextCaret;
                 setCaretPos(nextCaret);
@@ -530,13 +529,5 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
     };
 
-    const clearStaleStates = () => {
-        setLineDependencies(() => ({}));
-        setLineDependencyVersions(() => ({}));
-        setStatusText('Cleared stale markers');
-        setIsStatusError(false);
-        setDevError('');
-    };
-
-    return { evaluateCurrentLine, reevaluateAllExpressions, clearStaleStates };
+    return { evaluateCurrentLine, reevaluateAllExpressions, verifyWorksheetShadow };
 }

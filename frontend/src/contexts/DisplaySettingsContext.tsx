@@ -13,10 +13,12 @@ import {
     AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY,
     AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY,
     COPY_MODE_STORAGE_KEY,
+    AUTO_EVAL_STORAGE_KEY,
     VARIABLE_FIRST_INLINING_STORAGE_KEY,
     DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE,
     DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP,
     DEFAULT_AUTO_LOCK_TIMEOUT_MINUTES,
+    DEFAULT_AUTO_EVAL,
     DECIMAL_DELIMITER_STORAGE_KEY,
     PRECISION_STORAGE_KEY,
     SCIENTIFIC_NOTATION_STORAGE_KEY,
@@ -62,6 +64,8 @@ type DisplaySettingsContextValue = {
     setAutoLockOnSystemSleep: (value: boolean) => void;
     copyMode: 'as-is' | 'expressions-only';
     setCopyMode: (mode: 'as-is' | 'expressions-only') => void;
+    autoEval: boolean;
+    setAutoEval: (value: boolean) => void;
     variableFirstInlining: boolean;
     setVariableFirstInlining: (v: boolean) => void;
     formatNumber: (value: number, delimiter?: '.' | ',', prec?: PrecisionMode, sci?: boolean) => string;
@@ -141,6 +145,14 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         return 'as-is';
     });
 
+    const [autoEval, setAutoEvalState] = useState(() => {
+        const raw = localStorage.getItem(AUTO_EVAL_STORAGE_KEY);
+        if (raw === null) {
+            return DEFAULT_AUTO_EVAL;
+        }
+        return raw === 'true';
+    });
+
     const [variableFirstInlining, setVariableFirstInliningState] = useState(() => {
         const raw = localStorage.getItem(VARIABLE_FIRST_INLINING_STORAGE_KEY);
         if (raw === null) {
@@ -197,10 +209,15 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
     }, [copyMode]);
 
     useEffect(() => {
+        localStorage.setItem(AUTO_EVAL_STORAGE_KEY, String(autoEval));
+    }, [autoEval]);
+
+    useEffect(() => {
         localStorage.setItem(VARIABLE_FIRST_INLINING_STORAGE_KEY, String(variableFirstInlining));
     }, [variableFirstInlining]);
 
     const setCopyMode = (mode: 'as-is' | 'expressions-only') => setCopyModeState(mode);
+    const setAutoEval = (value: boolean) => setAutoEvalState(value);
     const setVariableFirstInlining = (v: boolean) => setVariableFirstInliningState(v);
 
     const setDecimalDelimiterMode = (mode: DecimalDelimiterMode) => setDecimalDelimiterModeState(mode);
@@ -294,6 +311,8 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
             setAutoLockOnSystemSleep,
             copyMode,
             setCopyMode,
+            autoEval,
+            setAutoEval,
             variableFirstInlining,
             setVariableFirstInlining,
             formatNumber: fmtNumber,

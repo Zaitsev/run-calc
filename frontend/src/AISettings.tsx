@@ -168,7 +168,7 @@ export function AISettingsPanel({
             <div className={`settings-card`}>
                 <div className="settings-card-header">
                     <div className="settings-card-title">Provider</div>
-                    <div className="settings-card-desc">Choose a preset to auto-fill endpoint and model, or set them manually.</div>
+                    <div className="settings-card-desc">Choose a preset to auto-fill URL and model, or set them manually.</div>
                 </div>
                 <div className="settings-provider-list" role="radiogroup" aria-label="AI provider preset">
                     {providerPresetOptions.map((preset) => (
@@ -198,12 +198,12 @@ export function AISettingsPanel({
                 </div>
                 <div className="settings-row settings-row--stack settings-row--divider-top">
                     <div className="settings-row-info">
-                        <div className="settings-row-title">Endpoint</div>
-                        <div className="settings-row-desc">OpenAI-compatible chat endpoint or base URL.</div>
+                        <div className="settings-row-title">API URL</div>
+                        <div className="settings-row-desc">OpenAI-compatible chat API URL.</div>
                         {customEndpointReuseRisk && (
                             <div className="settings-row-desc settings-row-desc--error" role="alert">
-                                Warning: your saved custom API key was last used with {customEndpointSource}. Testing this endpoint will reuse that key.
-                                Enable "Allow key reuse across custom endpoints" below to opt in, or clear/save a key for this endpoint.
+                                Warning: your saved custom API key was last used with {customEndpointSource}. Testing this URL will reuse that key.
+                                Enable "Allow key reuse across custom URLs" below to opt in, or clear/save a key for this URL.
                             </div>
                         )}
                     </div>
@@ -218,8 +218,8 @@ export function AISettingsPanel({
                 </div>
                 <div className="settings-row settings-row--stack">
                     <div className="settings-row-info">
-                        <div className="settings-row-title">Model ID</div>
-                        <div className="settings-row-desc">Raw model id string sent to provider.</div>
+                        <div className="settings-row-title">Model</div>
+                        <div className="settings-row-desc">Specific model name (like gpt-4o-mini).</div>
                     </div>
                     <input
                         type="text"
@@ -233,8 +233,8 @@ export function AISettingsPanel({
                 {settings.providerPreset === 'custom' && (
                     <div className="settings-row">
                         <div className="settings-row-info">
-                            <div className="settings-row-title">Allow key reuse across custom endpoints</div>
-                            <div className="settings-row-desc">Required when changing custom endpoint while a custom API key already exists.</div>
+                            <div className="settings-row-title">Allow key reuse across custom URLs</div>
+                            <div className="settings-row-desc">Required when changing custom URL while a custom API key already exists.</div>
                         </div>
                         <label className="settings-toggle" aria-label="Toggle custom endpoint key reuse">
                             <input
@@ -251,8 +251,8 @@ export function AISettingsPanel({
 
             <div className={`settings-card settings-card--apply${hasUnsavedChanges ? ' settings-card--action-required' : ''}`}>
                 <div className="settings-card-header">
-                    <div className="settings-card-title">Apply settings</div>
-                    <div className="settings-card-desc">Changes stay local until a test passes and settings are saved.</div>
+                    <div className="settings-card-title">Save AI settings</div>
+                    <div className="settings-card-desc">We'll test the connection before saving.</div>
                 </div>
                 <div className="settings-row settings-row--stack">
                     <div className="settings-row-info">
@@ -292,8 +292,8 @@ export function AISettingsPanel({
 
             <div className="settings-card">
                 <div className="settings-card-header">
-                    <div className="settings-card-title">API key (BYOK)</div>
-                    <div className="settings-card-desc">Stored in OS secure storage. Linux can explicitly use insecure key-file fallback.</div>
+                    <div className="settings-card-title">Personal API key</div>
+                    <div className="settings-card-desc">Stored securely on your device.</div>
                 </div>
                 <div className="settings-row settings-row--stack">
                     <div className="settings-row-info">
@@ -332,7 +332,7 @@ export function AISettingsPanel({
                 </div>
                 <div className="settings-row settings-row--stack">
                     <div className="settings-row-info">
-                        <div className="settings-row-title">Request timeout (seconds)</div>
+                        <div className="settings-row-title">Max wait time (seconds)</div>
                         <div className="settings-row-desc">Allowed range: 5 to 180 seconds.</div>
                     </div>
                     <input
@@ -347,8 +347,8 @@ export function AISettingsPanel({
                 </div>
                 <div className="settings-row">
                     <div className="settings-row-info">
-                        <div className="settings-row-title">Linux fallback mode</div>
-                        <div className="settings-row-desc">Allow explicit insecure key-file fallback if secure store fails.</div>
+                        <div className="settings-row-title">Alternative key storage (Linux)</div>
+                        <div className="settings-row-desc">Save the API key to a standard file if secure storage fails.</div>
                     </div>
                     <label className="settings-toggle" aria-label="Toggle Linux fallback mode">
                         <input

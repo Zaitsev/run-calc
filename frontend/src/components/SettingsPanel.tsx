@@ -159,7 +159,7 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">Interface font size</div>
+                                <div className="settings-row-title">Menus & Help panel text size</div>
                                 <div className="settings-row-desc">Adjust text size for menus and help panel</div>
                             </div>
                             <div className="settings-stepper-group">
@@ -207,8 +207,8 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">Font size</div>
-                                <div className="settings-row-desc">Adjust the editor text size</div>
+                                <div className="settings-row-title">Worksheet text size</div>
+                                <div className="settings-row-desc">Adjust the main text size</div>
                             </div>
                             <div className="settings-stepper-group">
                                 <button
@@ -269,8 +269,8 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">Copy mode</div>
-                                <div className="settings-row-desc">When copying selected text, strip results and keep only expressions</div>
+                                <div className="settings-row-title">Copy expressions only</div>
+                                <div className="settings-row-desc">Exclude calculated results when copying</div>
                             </div>
                             <label className="settings-toggle" aria-label="Toggle copy mode">
                                 <input
@@ -285,8 +285,8 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">Variable-first inlining</div>
-                                <div className="settings-row-desc">When typing an operator on a new line, inject the variable name instead of its result</div>
+                                <div className="settings-row-title">Use variables for new lines</div>
+                                <div className="settings-row-desc">When starting a new line with an operator, use the previous variable name instead of its value</div>
                             </div>
                             <label className="settings-toggle" aria-label="Toggle variable-first inlining">
                                 <input
@@ -381,9 +381,25 @@ export function SettingsPanel({
            {/* ── Calculation ── */}
                     <p className="settings-section-label">Calculation</p>
                     <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
+                                <div className="settings-row-title">Auto-calculate</div>
+                                <div className="settings-row-desc">Automatically recalculate the worksheet if a result changes elsewhere</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle auto eval">
+                                <input
+                                    type="checkbox"
+                                    checked={display.autoEval}
+                                    onChange={(e) => display.setAutoEval(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
                         <div className="settings-card-header">
                             <div className="settings-card-title">Decimal delimiter</div>
-                            <div className="settings-card-desc">Choose how decimal values are written and parsed</div>
+                            <div className="settings-card-desc">Choose how decimal values are typed and displayed</div>
                         </div>
                         <div className="settings-options">
                             {(['dot', 'comma', 'system'] as const).map((mode) => (
@@ -410,7 +426,7 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
-                                <div className="settings-row-title">Decimal precision</div>
+                                <div className="settings-row-title">Decimal places</div>
                                 <div className="settings-row-desc">Auto = 10 decimals · Full = no rounding · or pick 0–15</div>
                             </div>
                             <div className="settings-stepper-group">

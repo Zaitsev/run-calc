@@ -820,3 +820,24 @@ func TestEvaluateExprProgram_NormalRandom(t *testing.T) {
 		t.Fatalf("expected normal(0) to fail because normal() accepts no arguments")
 	}
 }
+
+func TestRandomStateSnapshotRestore(t *testing.T) {
+	app := NewApp()
+
+	initial := app.CaptureRandomState()
+	first := uniformExpr()
+
+	app.RestoreRandomState(initial)
+	replayed := uniformExpr()
+	if first != replayed {
+		t.Fatalf("expected restored random state to replay uniform value, got %v and %v", first, replayed)
+	}
+
+	mid := app.CaptureRandomState()
+	next := uniformExpr()
+	app.RestoreRandomState(mid)
+	replayedNext := uniformExpr()
+	if next != replayedNext {
+		t.Fatalf("expected restored mid random state to replay uniform value, got %v and %v", next, replayedNext)
+	}
+}

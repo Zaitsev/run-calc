@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -26,7 +25,8 @@ type ExprEvalResponse struct {
 
 var (
 	identifierRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	randomSeedOnce = sync.Once{}
+	randomMu       sync.Mutex
+	randomState    = randomGeneratorState{}
 	internalExprFunctions = map[string]interface{}{
 		// Most aggregation functions (sum, mean, median, min, max, etc.) are now provided
 		// natively by expr-lang and used directly via pipeline stages.
@@ -186,6 +186,20 @@ var (
 	}
 )
 
+type randomGeneratorState struct {
+	state    uint64
+	hasSpare bool
+	spare    float64
+	seeded   bool
+}
+
+type RandomStateSnapshot struct {
+	State    string  `json:"state"`
+	HasSpare bool    `json:"hasSpare"`
+	Spare    float64 `json:"spare"`
+	Seeded   bool    `json:"seeded"`
+}
+
 func (a *App) EvaluateExprProgram(input string, variables map[string]interface{}) ExprEvalResponse {
 	scope := cloneScope(variables)
 
@@ -209,6 +223,35 @@ func (a *App) EvaluateExprProgram(input string, variables map[string]interface{}
 	}
 
 	return response
+}
+
+func (a *App) CaptureRandomState() RandomStateSnapshot {
+	randomMu.Lock()
+	defer randomMu.Unlock()
+	ensureRandomSeededLocked()
+	return RandomStateSnapshot{
+		State:    strconv.FormatUint(randomState.state, 10),
+		HasSpare: randomState.hasSpare,
+		Spare:    randomState.spare,
+		Seeded:   randomState.seeded,
+	}
+}
+
+func (a *App) RestoreRandomState(snapshot RandomStateSnapshot) {
+	randomMu.Lock()
+	defer randomMu.Unlock()
+
+	state, err := strconv.ParseUint(snapshot.State, 10, 64)
+	if err != nil || state == 0 {
+		state = uint64(time.Now().UnixNano()) | 1
+	}
+
+	randomState = randomGeneratorState{
+		state:    state,
+		hasSpare: snapshot.HasSpare,
+		spare:    snapshot.Spare,
+		seeded:   snapshot.Seeded,
+	}
 }
 
 func evaluateExprProgram(input string, scope map[string]interface{}) (interface{}, error) {
@@ -1248,20 +1291,58 @@ func signExpr(value interface{}) (float64, error) {
 	return -1, nil
 }
 
-func ensureRandomSeeded() {
-	randomSeedOnce.Do(func() {
-		rand.Seed(time.Now().UnixNano())
-	})
+func ensureRandomSeededLocked() {
+	if randomState.seeded {
+		return
+	}
+
+	seed := uint64(time.Now().UnixNano())
+	if seed == 0 {
+		seed = 1
+	}
+
+	randomState.state = seed
+	randomState.hasSpare = false
+	randomState.spare = 0
+	randomState.seeded = true
 }
 
 func uniformExpr() float64 {
-	ensureRandomSeeded()
-	return rand.Float64()
+	randomMu.Lock()
+	defer randomMu.Unlock()
+	return nextUniformLocked()
 }
 
 func normalExpr() float64 {
-	ensureRandomSeeded()
-	return rand.NormFloat64()
+	randomMu.Lock()
+	defer randomMu.Unlock()
+
+	if randomState.hasSpare {
+		randomState.hasSpare = false
+		return randomState.spare
+	}
+
+	u1 := nextUniformLocked()
+	for u1 <= 0 {
+		u1 = nextUniformLocked()
+	}
+	u2 := nextUniformLocked()
+
+	r := math.Sqrt(-2.0 * math.Log(u1))
+	theta := 2 * math.Pi * u2
+	z0 := r * math.Cos(theta)
+	z1 := r * math.Sin(theta)
+
+	randomState.spare = z1
+	randomState.hasSpare = true
+
+	return z0
+}
+
+func nextUniformLocked() float64 {
+	ensureRandomSeededLocked()
+	randomState.state = randomState.state*6364136223846793005 + 1442695040888963407
+	return float64(randomState.state>>11) * (1.0 / (1 << 53))
 }
 
 func takeExpr(input interface{}, count interface{}) ([]interface{}, error) {

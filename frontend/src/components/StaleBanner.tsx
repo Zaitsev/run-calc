@@ -2,10 +2,11 @@ type Props = {
     staleCount: number;
     isReevaluatingAll: boolean;
     onReevaluateAll: () => void;
-    onClearStale: () => void;
+    autoEvalEnabled: boolean;
+    onToggleAutoEval: () => void;
 };
 
-export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, onClearStale }: Props) {
+export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, autoEvalEnabled, onToggleAutoEval }: Props) {
     if (staleCount === 0) return null;
     return (
         <div className="stale-banner" role="status" aria-live="polite">
@@ -23,11 +24,12 @@ export function StaleBanner({ staleCount, isReevaluatingAll, onReevaluateAll, on
                 </button>
                 <button
                     type="button"
-                    className="stale-banner-btn stale-banner-btn--ghost"
-                    onClick={onClearStale}
+                    className={`stale-banner-btn stale-banner-btn--ghost${autoEvalEnabled ? ' stale-banner-btn--active' : ''}`}
+                    onClick={onToggleAutoEval}
                     disabled={isReevaluatingAll}
+                    aria-pressed={autoEvalEnabled}
                 >
-                    Clear Stale
+                    Auto-eval: {autoEvalEnabled ? 'on' : 'off'}
                 </button>
             </div>
         </div>

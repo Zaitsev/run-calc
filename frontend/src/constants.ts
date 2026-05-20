@@ -47,6 +47,7 @@ export const AUTO_LOCK_ON_WINDOW_HIDE_STORAGE_KEY = 'calc.lock.autoLockOnWindowH
 export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystemSleep';
 export const COPY_MODE_STORAGE_KEY = 'calc.editor.copyMode';
 export const VARIABLE_FIRST_INLINING_STORAGE_KEY = 'calc.editor.variableFirstInlining';
+export const AUTO_EVAL_STORAGE_KEY = 'calc.editor.autoEval';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
 export const HELP_LAST_SEEN_VERSION_STORAGE_KEY = 'calc.help.lastSeenVersion';
 export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
@@ -58,6 +59,7 @@ export const MIN_AUTO_LOCK_TIMEOUT_MINUTES = 0;
 export const MAX_AUTO_LOCK_TIMEOUT_MINUTES = 30;
 export const DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE = true;
 export const DEFAULT_AUTO_LOCK_ON_SYSTEM_SLEEP = true;
+export const DEFAULT_AUTO_EVAL = false;
 export const AUTO_LOCK_SLEEP_GAP_MS = 120000;
 export const AUTO_LOCK_SLEEP_CHECK_INTERVAL_MS = 30000;
 
