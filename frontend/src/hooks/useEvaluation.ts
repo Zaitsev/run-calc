@@ -135,6 +135,8 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
         let shadowVariables: Record<string, unknown> = {};
         const mismatchedLineIndexes: number[] = [];
+        let nextShadowSnapshots: Record<number, Record<string, number>> | null = null;
+        let restoreRandomStateFailed = false;
 
         const revisionChanged = () => (worksheetRevisionRef?.current ?? 0) !== revisionAtStart;
 
@@ -178,21 +180,26 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
             if (revisionChanged()) return 0;
 
-            // Mark mismatched lines with shadow verification marker
-            const shadowSnapshots = buildShadowLineSnapshots(mismatchedLineIndexes);
-
-            // Shadow verification is the single source of stale markers in shadow-only mode.
-            setLineDependencyVersions(() => shadowSnapshots);
-            return mismatchedLineIndexes.length;
+            // Mark mismatched lines with shadow verification marker.
+            nextShadowSnapshots = buildShadowLineSnapshots(mismatchedLineIndexes);
         } finally {
             if (capturedRandomState !== null) {
                 try {
                     await RestoreRandomState(capturedRandomState);
                 } catch {
-                    // Ignore random-state rollback failures during shadow verification.
+                    restoreRandomStateFailed = true;
                 }
             }
         }
+
+        if (restoreRandomStateFailed || nextShadowSnapshots === null) {
+            setLineDependencyVersions(() => ({}));
+            return 0;
+        }
+
+        // Shadow verification is the single source of stale markers in shadow-only mode.
+        setLineDependencyVersions(() => nextShadowSnapshots);
+        return mismatchedLineIndexes.length;
     };
 
     const evaluateCurrentLine = async () => {

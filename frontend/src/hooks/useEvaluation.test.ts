@@ -132,6 +132,122 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         expect(restoreRandomStateMock).toHaveBeenCalledWith({ state: '123', hasSpare: false, spare: 0, seeded: true });
     });
 
+    it('returns no-op when random-state capture fails during shadow verification', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const captureRandomStateMock = vi.mocked(CaptureRandomState);
+        const restoreRandomStateMock = vi.mocked(RestoreRandomState);
+
+        captureRandomStateMock.mockRejectedValue(new Error('random backend unavailable'));
+
+        const hooks = buildEvaluationHooks({
+            content: 'a = 1 = 1',
+            lastResult: null,
+            variableValues: {},
+            lineDependencyVersions: {},
+            isReevaluatingAll: false,
+            isAIQueryPending: false,
+            aiContextMode: 'above',
+            aiSettings: {
+                providerPreset: 'openai',
+                endpoint: '',
+                modelId: '',
+                defaultContextMode: 'above',
+                allowInsecureKeyFallback: false,
+                allowCustomEndpointKeyReuse: false,
+                requestTimeoutSeconds: 30,
+            },
+            decimalDelimiter: '.',
+            precision: 'auto',
+            scientificNotation: false,
+            variableFirstInlining: true,
+            setContent: () => {},
+            setCaretPos: () => {},
+            setLastResult: () => {},
+            setVariableValues: () => {},
+            setLineDependencyVersions: () => ({}),
+            setIsReevaluatingAll: () => {},
+            setIsAIQueryPending: () => {},
+            setAIPendingLineIndex: () => {},
+            setAIProgressMessage: () => {},
+            setAIDebugLog: () => [],
+            setStatusText: () => {},
+            setIsStatusError: () => {},
+            setDevError: () => {},
+            clearLineEvaluationMetadata: () => {},
+            editorRef: { current: null },
+            aiDebugIdRef: { current: 0 },
+            worksheetRevisionRef: { current: 1 },
+        });
+
+        await expect(hooks.verifyWorksheetShadow()).resolves.toBe(0);
+
+        expect(evaluateExprMock).not.toHaveBeenCalled();
+        expect(restoreRandomStateMock).not.toHaveBeenCalled();
+    });
+
+    it('returns no-op when random-state restore fails during shadow verification', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const captureRandomStateMock = vi.mocked(CaptureRandomState);
+        const restoreRandomStateMock = vi.mocked(RestoreRandomState);
+        let lineDependencyVersions: Record<number, Record<string, number>> = { 0: { stale: 1 } };
+        captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
+        restoreRandomStateMock.mockRejectedValue(new Error('restore failed'));
+        evaluateExprMock.mockResolvedValue({
+            ok: true,
+            value: 2,
+            isNumber: true,
+            numberValue: 2,
+            variables: { a: 2 },
+        } as EvalResult);
+
+        const hooks = buildEvaluationHooks({
+            content: 'a = 1 = 1',
+            lastResult: null,
+            variableValues: {},
+            lineDependencyVersions,
+            isReevaluatingAll: false,
+            isAIQueryPending: false,
+            aiContextMode: 'above',
+            aiSettings: {
+                providerPreset: 'openai',
+                endpoint: '',
+                modelId: '',
+                defaultContextMode: 'above',
+                allowInsecureKeyFallback: false,
+                allowCustomEndpointKeyReuse: false,
+                requestTimeoutSeconds: 30,
+            },
+            decimalDelimiter: '.',
+            precision: 'auto',
+            scientificNotation: false,
+            variableFirstInlining: true,
+            setContent: () => {},
+            setCaretPos: () => {},
+            setLastResult: () => {},
+            setVariableValues: () => {},
+            setLineDependencyVersions: (next) => {
+                lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
+            },
+            setIsReevaluatingAll: () => {},
+            setIsAIQueryPending: () => {},
+            setAIPendingLineIndex: () => {},
+            setAIProgressMessage: () => {},
+            setAIDebugLog: () => [],
+            setStatusText: () => {},
+            setIsStatusError: () => {},
+            setDevError: () => {},
+            clearLineEvaluationMetadata: () => {},
+            editorRef: { current: null },
+            aiDebugIdRef: { current: 0 },
+            worksheetRevisionRef: { current: 1 },
+        });
+
+        await expect(hooks.verifyWorksheetShadow()).resolves.toBe(0);
+
+        expect(evaluateExprMock).toHaveBeenCalledTimes(1);
+        expect(lineDependencyVersions).toEqual({});
+    });
+
     it('always restores random state even when worksheet revision changes mid-flight', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
         const captureRandomStateMock = vi.mocked(CaptureRandomState);
