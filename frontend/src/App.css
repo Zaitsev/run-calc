@@ -547,6 +547,8 @@
     white-space: pre;
     overflow-wrap: normal;
     word-break: normal;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .editor,
@@ -717,7 +719,7 @@
     white-space: pre;
     overflow-wrap: normal;
     word-break: normal;
-    min-height: 1lh;
+    min-height: calc(1em * 1.8);
 }
 
 .marked-result {
