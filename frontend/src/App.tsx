@@ -95,6 +95,7 @@ function App() {
         editorScrollLeft,
         setEditorScrollLeft,
         editorScrollbarWidth,
+        editorScrollbarHeight,
         syncEditorScrollbarWidth,
         lineHeightPx,
         lineRowHeights,
@@ -1703,7 +1704,7 @@ function App() {
                         style={{
                             fontSize: `${fontScale}em`,
                             paddingTop: `${EDITOR_TOP_PADDING_PX}px`,
-                            paddingBottom: `${EDITOR_BOTTOM_PADDING_PX}px`,
+                            paddingBottom: `${EDITOR_BOTTOM_PADDING_PX + editorScrollbarHeight}px`,
                             paddingRight: `${EDITOR_SIDE_PADDING_PX + editorScrollbarWidth}px`,
                         }}
                     >

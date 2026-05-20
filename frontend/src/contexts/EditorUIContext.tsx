@@ -24,6 +24,7 @@ type EditorUIContextValue = {
     editorScrollLeft: number;
     setEditorScrollLeft: (v: number) => void;
     editorScrollbarWidth: number;
+    editorScrollbarHeight: number;
     syncEditorScrollbarWidth: () => void;
     // Line heights
     lineHeightPx: number;
@@ -53,6 +54,7 @@ export function EditorUIProvider({ children }: { children: ReactNode }) {
     const [editorScrollTop, setEditorScrollTop] = useState(0);
     const [editorScrollLeft, setEditorScrollLeft] = useState(0);
     const [editorScrollbarWidth, setEditorScrollbarWidth] = useState(0);
+    const [editorScrollbarHeight, setEditorScrollbarHeight] = useState(0);
     const [lineHeightPx, setLineHeightPx] = useState(22);
     const [lineRowHeights, setLineRowHeights] = useState<number[]>([]);
 
@@ -79,6 +81,8 @@ export function EditorUIProvider({ children }: { children: ReactNode }) {
         if (!editor) return;
         const nextWidth = Math.max(0, editor.offsetWidth - editor.clientWidth);
         setEditorScrollbarWidth((prev) => (Math.abs(prev - nextWidth) < 0.5 ? prev : nextWidth));
+        const nextHeight = Math.max(0, editor.offsetHeight - editor.clientHeight);
+        setEditorScrollbarHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
     };
 
     useLayoutEffect(() => {
@@ -139,7 +143,7 @@ export function EditorUIProvider({ children }: { children: ReactNode }) {
             caretPos, setCaretPos,
             editorScrollTop, setEditorScrollTop,
             editorScrollLeft, setEditorScrollLeft,
-            editorScrollbarWidth, syncEditorScrollbarWidth,
+            editorScrollbarWidth, editorScrollbarHeight, syncEditorScrollbarWidth,
             lineHeightPx, lineRowHeights, measureLineRowHeights,
             editorRef, overlayRef, gutterRef, burgerMenuRef, precisionMenuRef,
         }}>
