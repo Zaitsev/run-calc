@@ -1503,7 +1503,7 @@ function App() {
                                         : (truncatedLines.has(i)
                                             ? `Result truncated — actual: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, 'auto', false)}, displayed: ${formatNumber(truncatedLines.get(i)!, decimalDelimiter, precision, scientificNotation)} (precision: ${precision})`
                                             : (staleLineDetails.has(i)
-                                                ? `Stale result: depends on changed variable${staleLineDetails.get(i)!.length === 1 ? '' : 's'} ${staleLineDetails.get(i)!.join(', ')}`
+                                                ? `Out-of-date result: needs refresh due to ${staleLineDetails.get(i)!.join(', ')}`
                                             : (aiTriggerLines.has(i)
                                                 ? 'AI prompt line'
                                             : (declarationLines.has(i)

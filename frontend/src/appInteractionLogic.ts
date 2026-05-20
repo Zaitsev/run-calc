@@ -213,7 +213,7 @@ export function buildStaleLineDetails(
         const staleVariables: string[] = [];
         Object.entries(snapshot).forEach(([variableName]) => {
             if (variableName === SHADOW_STALE_MARKER) {
-                staleVariables.push('shadow verification');
+                staleVariables.push('background check');
             }
         });
 

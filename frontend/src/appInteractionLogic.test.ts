@@ -77,14 +77,14 @@ describe('app interaction helpers', () => {
         expect(getFriendlyEvalErrorMessage('some unexpected backend issue')).toContain('Cannot evaluate');
     });
 
-    it('labels shadow verification stale markers', () => {
+    it('labels background-check stale markers', () => {
         const stale = buildStaleLineDetails(
             {
                 2: {[SHADOW_STALE_MARKER]: -1},
             },
         );
 
-        expect(stale.get(2)).toEqual(['shadow verification']);
+        expect(stale.get(2)).toEqual(['background check']);
     });
 
     it('strips markdown code fences from AI code blocks before insertion', () => {
