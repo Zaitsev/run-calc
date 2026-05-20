@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "windows": "pwsh -NoProfile -NonInteractive -File scripts/hook-go-vet.ps1",
+        "linux":   "pwsh -NoProfile -NonInteractive -File scripts/hook-go-vet.ps1",
+        "osx":     "pwsh -NoProfile -NonInteractive -File scripts/hook-go-vet.ps1",
+        "cwd": "d:/vlz/calc",
+        "timeout": 30
+      }
+    ]
+  }
+}

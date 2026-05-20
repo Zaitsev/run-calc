@@ -286,7 +286,7 @@ export function SettingsPanel({
                         <div className="settings-row">
                             <div className="settings-row-info">
                                 <div className="settings-row-title">Auto-eval stale lines</div>
-                                <div className="settings-row-desc">Automatically run Re-evaluate All when shadow verification marks stale results</div>
+                                <div className="settings-row-desc">After you press Enter to evaluate, automatically run Re-evaluate All if shadow verification marks results as stale</div>
                             </div>
                             <label className="settings-toggle" aria-label="Toggle auto eval">
                                 <input

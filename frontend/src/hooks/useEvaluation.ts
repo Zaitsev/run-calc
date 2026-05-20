@@ -390,6 +390,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             const nextVariables = (evalResult.variables || {}) as Record<string, unknown>;
 
             setVariableValues(nextVariables);
+            clearLineEvaluationMetadata(lineIndex);
             setStatusText('Calculated');
             setIsStatusError(false);
             setDevError('');

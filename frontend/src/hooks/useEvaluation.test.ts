@@ -421,6 +421,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
         let caretPos = 0;
         selectionStart = 0;
         selectionEnd = 0;
+        const clearLineEvaluationMetadata = vi.fn();
 
         const originalRAF = globalThis.requestAnimationFrame;
         globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
@@ -468,7 +469,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 setStatusText: () => {},
                 setIsStatusError: () => {},
                 setDevError: () => {},
-                clearLineEvaluationMetadata: () => {},
+                clearLineEvaluationMetadata,
                 editorRef,
                 aiDebugIdRef: { current: 0 },
             });
@@ -486,6 +487,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
             expect(caretPos).toBe(expectedCaret);
             expect(editorRef.current!.selectionStart).toBe(expectedCaret);
             expect(editorRef.current!.selectionEnd).toBe(expectedCaret);
+            expect(clearLineEvaluationMetadata).toHaveBeenCalledWith(0);
         } finally {
             globalThis.requestAnimationFrame = originalRAF;
         }

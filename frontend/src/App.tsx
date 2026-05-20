@@ -1320,6 +1320,7 @@ function App() {
     };
 
     const activeLineIndex = content.slice(0, caretPos).split('\n').length - 1;
+    const effectiveStaleCount = staleLineDetails.size - (staleLineDetails.has(activeLineIndex) ? 1 : 0);
     const activeLineError = lineErrors.get(activeLineIndex) ?? '';
     const activeLineText = contentLines[activeLineIndex] ?? '';
     const canPasteClipboardNumericText = clipboardNumericText !== null && activeLineText.trim() === '';
@@ -1539,7 +1540,7 @@ function App() {
                 </div>
                 <div className="editor-area" onMouseMove={handleEditorAreaMouseMove} onMouseLeave={handleEditorAreaMouseLeave}>
                     <StaleBanner
-                        staleCount={staleLineDetails.size}
+                        staleCount={effectiveStaleCount}
                         isReevaluatingAll={isReevaluatingAll}
                         onReevaluateAll={() => void reevaluateAllExpressions()}
                         autoEvalEnabled={autoEval}
@@ -1772,3 +1773,4 @@ function App() {
 }
 
 export default App;
+
