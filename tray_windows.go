@@ -34,6 +34,47 @@ const (
 	trayCallbackMessage = win.WM_APP + 42
 	trayMenuCmdShow     = 1001
 	trayMenuCmdQuit     = 1002
+
+	// Windows process power throttling constants for Efficiency Mode
+	PROCESS_POWER_THROTTLING_EXECUTION_SPEED         = 0x1
+	PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4
+	ProcessPowerThrottlingInformationClass           = 4
+
+	// Process enumeration constants
+	TH32CS_SNAPPROCESS            = 0x00000002
+	PROCESS_SET_INFORMATION       = 0x0200
+	PROCESS_QUERY_LIMITED_INFO    = 0x1000
+	PROCESS_MODE_BACKGROUND_BEGIN = 0x00100000
+	PROCESS_MODE_BACKGROUND_END   = 0x00200000
+)
+
+type PROCESS_POWER_THROTTLING_STATE struct {
+	Version     uint32
+	ControlMask uint32
+	StateMask   uint32
+}
+
+type PROCESSENTRY32 struct {
+	DwSize              uint32
+	CntUsage            uint32
+	Th32ProcessID       uint32
+	Th32DefaultHeapID   uintptr
+	Th32ModuleID        uint32
+	CntThreads          uint32
+	Th32ParentProcessID uint32
+	PcPriClassBase      int32
+	DwFlags             uint32
+	SzExeFile           [260]uint16
+}
+
+var (
+	kernel32                  = syscall.NewLazyDLL("kernel32.dll")
+	procSetProcessInformation = kernel32.NewProc("SetProcessInformation")
+	procSetPriorityClass      = kernel32.NewProc("SetPriorityClass")
+	procCreateToolhelp32Snapshot = kernel32.NewProc("CreateToolhelp32Snapshot")
+	procProcess32First        = kernel32.NewProc("Process32FirstW")
+	procProcess32Next         = kernel32.NewProc("Process32NextW")
+	procOpenProcess           = kernel32.NewProc("OpenProcess")
 )
 
 func (a *App) startTray() {
@@ -267,4 +308,104 @@ func writeTrayIconTempFile(data []byte) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func setProcessPriorityBackground() {
+	// Enable Windows 11 Efficiency Mode (EcoQoS).
+	state := PROCESS_POWER_THROTTLING_STATE{
+		Version:     1,
+		ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED | PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+		StateMask:   PROCESS_POWER_THROTTLING_EXECUTION_SPEED | PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+	}
+	applyEfficiencyModeToProcessTree(state, PROCESS_MODE_BACKGROUND_BEGIN)
+}
+
+func setProcessPriorityNormal() {
+	// Disable power throttling to restore normal performance.
+	state := PROCESS_POWER_THROTTLING_STATE{
+		Version:     1,
+		ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED | PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+		StateMask:   0,
+	}
+	applyEfficiencyModeToProcessTree(state, PROCESS_MODE_BACKGROUND_END)
+}
+
+func applyEfficiencyModeToProcessTree(state PROCESS_POWER_THROTTLING_STATE, priorityClass uintptr) {
+	currentPID := uint32(os.Getpid())
+	processes, err := snapshotProcesses()
+	if err != nil {
+		return
+	}
+
+	pidQueue := []uint32{currentPID}
+	seen := map[uint32]struct{}{currentPID: {}}
+	for len(pidQueue) > 0 {
+		pid := pidQueue[0]
+		pidQueue = pidQueue[1:]
+		applyEfficiencyToSingleProcess(pid, state, priorityClass)
+
+		for _, entry := range processes {
+			if entry.Th32ParentProcessID != pid {
+				continue
+			}
+			if _, exists := seen[entry.Th32ProcessID]; exists {
+				continue
+			}
+			seen[entry.Th32ProcessID] = struct{}{}
+			pidQueue = append(pidQueue, entry.Th32ProcessID)
+		}
+	}
+}
+
+func snapshotProcesses() ([]PROCESSENTRY32, error) {
+	currentPID := uint32(os.Getpid())
+	_ = currentPID
+
+	snapshot, _, _ := procCreateToolhelp32Snapshot.Call(
+		uintptr(TH32CS_SNAPPROCESS),
+		0,
+	)
+	if snapshot == 0 || snapshot == uintptr(syscall.InvalidHandle) {
+		return nil, syscall.EINVAL
+	}
+	defer syscall.CloseHandle(syscall.Handle(snapshot))
+
+	var pe PROCESSENTRY32
+	pe.DwSize = uint32(unsafe.Sizeof(pe))
+
+	ret, _, _ := procProcess32First.Call(snapshot, uintptr(unsafe.Pointer(&pe)))
+	if ret == 0 {
+		return nil, syscall.EINVAL
+	}
+
+	processes := make([]PROCESSENTRY32, 0, 64)
+	for {
+		processes = append(processes, pe)
+		ret, _, _ = procProcess32Next.Call(snapshot, uintptr(unsafe.Pointer(&pe)))
+		if ret == 0 {
+			break
+		}
+	}
+
+	return processes, nil
+}
+
+func applyEfficiencyToSingleProcess(pid uint32, state PROCESS_POWER_THROTTLING_STATE, priorityClass uintptr) {
+	hProcess, _, _ := procOpenProcess.Call(
+		PROCESS_SET_INFORMATION|PROCESS_QUERY_LIMITED_INFO,
+		0,
+		uintptr(pid),
+	)
+	if hProcess == 0 {
+		return
+	}
+	defer syscall.CloseHandle(syscall.Handle(hProcess))
+
+	procSetProcessInformation.Call(
+		hProcess,
+		uintptr(ProcessPowerThrottlingInformationClass),
+		uintptr(unsafe.Pointer(&state)),
+		unsafe.Sizeof(state),
+	)
+	procSetPriorityClass.Call(hProcess, priorityClass)
 }

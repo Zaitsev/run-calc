@@ -20,8 +20,6 @@ export function Greet(arg1:string):Promise<string>;
 
 export function InstallTheme(arg1:string,arg2:string):Promise<main.CustomTheme>;
 
-export function IsRunningAsMSIX():Promise<boolean>;
-
 export function LoadWorksheetFromFile(arg1:string):Promise<main.LoadWorksheetResponse>;
 
 export function OpenThemeStore():Promise<void>;
@@ -45,7 +43,5 @@ export function SelectWorksheetPlaintextExportPath(arg1:string):Promise<string>;
 export function SetAIAPIKey(arg1:string,arg2:main.AISettings):Promise<main.AIKeyStatus>;
 
 export function SetMinimiseToTrayOnClose(arg1:boolean):Promise<void>;
-
-export function SetRestoreShortcutEnabled(arg1:boolean):Promise<void>;
 
 export function ShowWindow():Promise<void>;

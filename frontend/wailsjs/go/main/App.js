@@ -38,10 +38,6 @@ export function InstallTheme(arg1, arg2) {
   return window['go']['main']['App']['InstallTheme'](arg1, arg2);
 }
 
-export function IsRunningAsMSIX() {
-  return window['go']['main']['App']['IsRunningAsMSIX']();
-}
-
 export function LoadWorksheetFromFile(arg1) {
   return window['go']['main']['App']['LoadWorksheetFromFile'](arg1);
 }
@@ -88,10 +84,6 @@ export function SetAIAPIKey(arg1, arg2) {
 
 export function SetMinimiseToTrayOnClose(arg1) {
   return window['go']['main']['App']['SetMinimiseToTrayOnClose'](arg1);
-}
-
-export function SetRestoreShortcutEnabled(arg1) {
-  return window['go']['main']['App']['SetRestoreShortcutEnabled'](arg1);
 }
 
 export function ShowWindow() {

@@ -179,6 +179,7 @@ function App() {
     const reevaluateAllExpressionsRef = useRef<() => Promise<void>>(async () => {});
     const isReevaluatingAllRef = useRef(isReevaluatingAll);
     const isAIQueryPendingRef = useRef(isAIQueryPending);
+    const isWindowHiddenRef = useRef(false);
     const inactivityByWorksheetRef = useRef<Record<string, number>>({});
     const previousActiveWorksheetIdRef = useRef<string | null>(null);
     const previousAutoLockTimeoutMinutesRef = useRef(autoLockTimeoutMinutes);
@@ -218,8 +219,15 @@ function App() {
         void reevaluateAllExpressions();
     }, [precision]);
 
+    // Keep this guard: reevaluateAllExpressions aborts when worksheet revision changes
+    // mid-loop (see useEvaluation.ts revisionAtStart checks). During reevaluation we call
+    // setContent with computed lines; if this effect bumps revision unconditionally on every
+    // content change, the active reevaluation can cancel itself, which breaks auto-eval flows
+    // like pasted expressions and inserted AI results.
     useEffect(() => {
-        worksheetRevisionRef.current += 1;
+        if (!isReevaluatingAllRef.current) {
+            worksheetRevisionRef.current += 1;
+        }
     }, [activeId, content]);
 
 
@@ -419,6 +427,36 @@ function App() {
         lockProtectedWorksheets();
     }, [autoLockOnSystemSleep, lockProtectedWorksheets]);
 
+    const runInactiveWorksheetAutoLockCheck = useCallback((now: number = Date.now()) => {
+        if (autoLockTimeoutMinutes <= 0) {
+            return;
+        }
+
+        const timeoutMs = autoLockTimeoutMinutes * 60 * 1000;
+        const timedOutInactiveWorksheets = worksheets.filter((worksheet) => {
+            if (worksheet.id === activeId || worksheet.isLocked || !worksheet.lockPasswordHash) {
+                return false;
+            }
+
+            const lastActivity = inactivityByWorksheetRef.current[worksheet.id] ?? now;
+            return now - lastActivity >= timeoutMs;
+        });
+
+        if (timedOutInactiveWorksheets.length === 0) {
+            return;
+        }
+
+        for (const worksheet of timedOutInactiveWorksheets) {
+            lockWorksheet(worksheet.id, worksheet.lockPasswordHash as string);
+            inactivityByWorksheetRef.current[worksheet.id] = now;
+        }
+
+        const suffix = timedOutInactiveWorksheets.length === 1 ? '' : 's';
+        setStatusText(`Inactive protected worksheet${suffix} auto-locked due to inactivity`);
+        setIsStatusError(false);
+        setDevError('');
+    }, [autoLockTimeoutMinutes, worksheets, activeId, lockWorksheet, setStatusText, setIsStatusError, setDevError]);
+
     useEffect(() => {
         const onDocumentEscape = (event: globalThis.KeyboardEvent) => {
             const decision = shouldHideWindowOnDoubleEscape(
@@ -453,7 +491,14 @@ function App() {
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubWindowHidden = EventsOn('window:hidden', lockProtectedWorksheetsIfEnabled);
+        const unsubWindowHidden = EventsOn('window:hidden', () => {
+            isWindowHiddenRef.current = true;
+            lockProtectedWorksheetsIfEnabled();
+        });
+        const unsubWindowShown = EventsOn('window:shown', () => {
+            isWindowHiddenRef.current = false;
+            runInactiveWorksheetAutoLockCheck();
+        });
         const unsubSystemResume = EventsOn('system:resume', lockProtectedWorksheetsOnSystemResume);
         const unsubNew = EventsOn('menu:file:new', () => createWorksheet());
         const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
@@ -467,6 +512,7 @@ function App() {
         return () => {
             unsubThemeStore();
             unsubWindowHidden();
+            unsubWindowShown();
             unsubSystemResume();
             unsubNew();
             unsubResetWindow();
@@ -476,7 +522,17 @@ function App() {
             unsubOpenHelp();
             unsubAIProgress();
         };
-    }, [changeFontScale, createWorksheet, handleAIProgressEvent, lockProtectedWorksheetsIfEnabled, lockProtectedWorksheetsOnSystemResume, openHelpPanel, resetFontSize, resetWindowLayout]);
+    }, [
+        changeFontScale,
+        createWorksheet,
+        handleAIProgressEvent,
+        lockProtectedWorksheetsIfEnabled,
+        lockProtectedWorksheetsOnSystemResume,
+        openHelpPanel,
+        resetFontSize,
+        resetWindowLayout,
+        runInactiveWorksheetAutoLockCheck,
+    ]);
 
     useEffect(() => {
         const now = Date.now();
@@ -541,37 +597,17 @@ function App() {
             return;
         }
 
-        const timeoutMs = autoLockTimeoutMinutes * 60 * 1000;
         const intervalId = window.setInterval(() => {
-            const now = Date.now();
-            const timedOutInactiveWorksheets = worksheets.filter((worksheet) => {
-                if (worksheet.id === activeId || worksheet.isLocked || !worksheet.lockPasswordHash) {
-                    return false;
-                }
-
-                const lastActivity = inactivityByWorksheetRef.current[worksheet.id] ?? now;
-                return now - lastActivity >= timeoutMs;
-            });
-
-            if (timedOutInactiveWorksheets.length === 0) {
+            if (isWindowHiddenRef.current) {
                 return;
             }
-
-            for (const worksheet of timedOutInactiveWorksheets) {
-                lockWorksheet(worksheet.id, worksheet.lockPasswordHash as string);
-                inactivityByWorksheetRef.current[worksheet.id] = now;
-            }
-
-            const suffix = timedOutInactiveWorksheets.length === 1 ? '' : 's';
-            setStatusText(`Inactive protected worksheet${suffix} auto-locked due to inactivity`);
-            setIsStatusError(false);
-            setDevError('');
+            runInactiveWorksheetAutoLockCheck();
         }, 1000);
 
         return () => {
             window.clearInterval(intervalId);
         };
-    }, [autoLockTimeoutMinutes, worksheets, activeId, lockWorksheet, setStatusText, setIsStatusError, setDevError]);
+    }, [autoLockTimeoutMinutes, runInactiveWorksheetAutoLockCheck]);
 
     // --- Editor helpers ---
 

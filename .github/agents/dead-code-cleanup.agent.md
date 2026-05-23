@@ -14,6 +14,7 @@ Treat the following as dead code and remove it:
 4. **Unused types / constants** — type declarations or `const` blocks referenced nowhere in non-test code.
 5. **Unreachable branches** — code after unconditional `return`/`panic`, or `if false { ... }` style guards.
 6. **Dead frontend symbols** — TypeScript/TSX functions, variables, types, or imports that are exported but never imported elsewhere in the frontend source tree, or local symbols never referenced in the same file.
+7. **Empty files** — files that become empty, pure empty stubs or contain only comments after removals should be deleted.
 
 ## Constraints
 
