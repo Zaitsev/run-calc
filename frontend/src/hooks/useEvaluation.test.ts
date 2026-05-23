@@ -391,7 +391,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: ['a = 1', 'b = 2 = 2'].join('\n'),
             lastResult: null,
             variableValues: {},
-            staleLineMarkers,
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -434,6 +433,66 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         expect(evaluateExprMock).toHaveBeenCalledTimes(1);
         expect(evaluateExprMock).toHaveBeenCalledWith('b = 2', {});
         expect(staleLineMarkers).toEqual({ 0: { __unevaluated__: -1 } });
+    });
+
+    it('marks downstream deterministic lines when dependency sources are unevaluated', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const captureRandomStateMock = vi.mocked(CaptureRandomState);
+        const restoreRandomStateMock = vi.mocked(RestoreRandomState);
+        let staleLineMarkers: Record<number, Record<string, number>> = {};
+        captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
+        restoreRandomStateMock.mockResolvedValue();
+        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+
+        const hooks = buildEvaluationHooks({
+            content: ['a = 1', 'b = a + 1 = 2'].join('\n'),
+            lastResult: null,
+            variableValues: {},
+            isReevaluatingAll: false,
+            isAIQueryPending: false,
+            aiContextMode: 'above',
+            aiSettings: {
+                providerPreset: 'openai',
+                endpoint: '',
+                modelId: '',
+                defaultContextMode: 'above',
+                allowInsecureKeyFallback: false,
+                allowCustomEndpointKeyReuse: false,
+                requestTimeoutSeconds: 30,
+            },
+            decimalDelimiter: '.',
+            precision: 'auto',
+            scientificNotation: false,
+            variableFirstInlining: true,
+            setContent: () => {},
+            setCaretPos: () => {},
+            setLastResult: () => {},
+            setVariableValues: () => {},
+            setStaleLineMarkers: (next) => {
+                staleLineMarkers = typeof next === 'function' ? next(staleLineMarkers) : next;
+            },
+            setIsReevaluatingAll: () => {},
+            setIsAIQueryPending: () => {},
+            setAIPendingLineIndex: () => {},
+            setAIProgressMessage: () => {},
+            setAIDebugLog: () => [],
+            setStatusText: () => {},
+            setIsStatusError: () => {},
+            setDevError: () => {},
+            clearLineEvaluationMetadata: () => {},
+            editorRef: { current: null },
+            aiDebugIdRef: { current: 0 },
+            worksheetRevisionRef: { current: 1 },
+        });
+
+        await expect(hooks.verifyWorksheetShadow()).resolves.toBe(2);
+
+        expect(evaluateExprMock).toHaveBeenCalledTimes(1);
+        expect(evaluateExprMock).toHaveBeenCalledWith('b = a + 1', {});
+        expect(staleLineMarkers).toEqual({
+            0: { __unevaluated__: -1 },
+            1: { __shadow_verification__: -1 },
+        });
     });
 
     it('abandons reevaluation when the worksheet revision changes mid-flight', async () => {

@@ -102,7 +102,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         applyContentAndCaret(editorRef, setContent, setCaretPos, { nextContent, nextCaret });
     };
 
-    const buildShadowLineSnapshots = (lineIndexes: number[], markerName: string = SHADOW_STALE_MARKER) => {
+    const buildStaleMarkerSnapshots = (lineIndexes: number[], markerName: string = SHADOW_STALE_MARKER) => {
         const snapshots: Record<number, Record<string, number>> = {};
         lineIndexes.forEach((lineIndex) => {
             snapshots[lineIndex] = { [markerName]: -1 };
@@ -185,8 +185,8 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
             // Mark mismatched lines and lines missing computed results.
             nextShadowSnapshots = {
-                ...buildShadowLineSnapshots(mismatchedLineIndexes),
-                ...buildShadowLineSnapshots(unevaluatedLineIndexes, UNEVALUATED_STALE_MARKER),
+                ...buildStaleMarkerSnapshots(mismatchedLineIndexes),
+                ...buildStaleMarkerSnapshots(unevaluatedLineIndexes, UNEVALUATED_STALE_MARKER),
             };
         } finally {
             if (capturedRandomState !== null) {
