@@ -52,6 +52,12 @@ export const helpContent: HelpContentMap = {
         'Variables and results are isolated: a variable defined in one worksheet is not visible in another.',
     ],
     new: [
+        '## Version 6.2.0',
+        'Copy-paste expressions autoevaluation is now optional: toggle "Auto-eval copied expressions" in Settings or the Status Bar to control whether pasted expressions calculate immediately or wait for you to review and press Enter.',
+        'Better stale result tracking: when you change a variable, all dependent lines are now marked with a yellow warning icon in the gutter until you recalculate them.',
+        'Improved background power consumption: the app now reduces CPU usage when idle, while keeping the interface responsive and ready for your next calculation.',
+        'Removed Ctrl-NumLock shortcut to restore app from tray. ',
+        'Use Escape twice quickly to hide the app window instead.',
         '## Version 6.1.0 - Modern Copy-Paste',
         `You can now copy evaluated results directly from the editor with the new hover copy button.`,
         'You can now toggle "Copy expressions only" in Settings and the Status Bar to copy selected text without its calculated results.',

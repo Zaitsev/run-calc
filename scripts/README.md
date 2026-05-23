@@ -83,7 +83,7 @@ Builds and packages the app as an MSIX. Optionally signs it with a PFX for local
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `-Version` | `6.1.0.0` | Four-part version written into `AppxManifest.xml` |
+| `-Version` | `6.2.0.0` | Four-part version written into `AppxManifest.xml` |
 | `-SkipBuild` | off | Skip `wails build -clean`; use existing executable |
 | `-SelfSign` | off | Sign the MSIX after packing |
 | `-PfxPath` | — | Path to PFX file (create with `New-MsixDevCert.ps1`) |
@@ -101,7 +101,7 @@ Output: `build\bin\Run-Calc-<Version>-windows.msix`
 .\scripts\pack-msix.ps1 -SelfSign -PfxPath .\build\certs\Run-Calc-Dev.pfx -PfxPassword "MyPass"
 
 # 3. Install
-Add-AppxPackage .\build\bin\Run-Calc-6.1.0.0-windows.msix
+Add-AppxPackage .\build\bin\Run-Calc-6.2.0.0-windows.msix
 ```
 
 ---
