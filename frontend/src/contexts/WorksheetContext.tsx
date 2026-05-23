@@ -12,8 +12,8 @@ type WorksheetContextValue = {
     setMarkedLines: React.Dispatch<React.SetStateAction<ReadonlySet<number>>>;
     variableValues: Record<string, unknown>;
     setVariableValues: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
-    lineDependencyVersions: Record<number, Record<string, number>>;
-    setLineDependencyVersions: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
+    staleLineMarkers: Record<number, Record<string, number>>;
+    setStaleLineMarkers: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
     clearWorksheet: (editorFocusCb?: () => void) => void;
     remapMarkedLinesForEdit: (prevMarked: ReadonlySet<number>, beforeText: string, afterText: string) => ReadonlySet<number>;
     remapLineRecordForEdit: <T>(prev: Record<number, T>, beforeText: string, afterText: string) => Record<number, T>;
@@ -143,7 +143,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     const [variableValues, setVariableValues] = useState<Record<string, unknown>>(fallbackWorksheet.variableValues);
 
     // Session-only state (not persisted)
-    const [lineDependencyVersions, setLineDependencyVersions] = useState<Record<number, Record<string, number>>>({});
+    const [staleLineMarkers, setStaleLineMarkers] = useState<Record<number, Record<string, number>>>({});
     const hasPendingContentSyncRef = useRef(false);
     const syncedWorksheetIdRef = useRef(fallbackWorksheet.id);
     const contentRef = useRef(content);
@@ -181,7 +181,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         hasPendingContentSyncRef.current = false;
 
         if (shouldResetMetadata) {
-            setLineDependencyVersions({});
+            setStaleLineMarkers({});
         }
     }, [activeWorksheet]);
 
@@ -220,7 +220,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
         setLastResultState(null);
         setMarkedLines(new Set());
         setVariableValues({});
-        setLineDependencyVersions({});
+        setStaleLineMarkers({});
         editorFocusCb?.();
     };
 
@@ -257,7 +257,7 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
     };
 
     const clearLineEvaluationMetadata = (lineIndex: number) => {
-        setLineDependencyVersions((prev) => {
+        setStaleLineMarkers((prev) => {
             if (!(lineIndex in prev)) return prev;
             const next = { ...prev };
             delete next[lineIndex];
@@ -275,8 +275,8 @@ export function WorksheetProvider({ children }: { children: ReactNode }) {
             setMarkedLines,
             variableValues,
             setVariableValues,
-            lineDependencyVersions,
-            setLineDependencyVersions,
+            staleLineMarkers,
+            setStaleLineMarkers,
             clearWorksheet,
             remapMarkedLinesForEdit,
             remapLineRecordForEdit,
