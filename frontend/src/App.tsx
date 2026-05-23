@@ -206,11 +206,10 @@ function App() {
     }, [clipboardPreviewEnabled]);
 
     useEffect(() => {
+        void refreshClipboardNumericText();
         if (!clipboardPreviewEnabled) {
-            setClipboardNumericText(null);
             return;
         }
-        void refreshClipboardNumericText();
         window.addEventListener('focus', refreshClipboardNumericText);
         return () => window.removeEventListener('focus', refreshClipboardNumericText);
     }, [clipboardPreviewEnabled, refreshClipboardNumericText]);
