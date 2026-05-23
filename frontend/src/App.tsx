@@ -219,8 +219,15 @@ function App() {
         void reevaluateAllExpressions();
     }, [precision]);
 
+    // Keep this guard: reevaluateAllExpressions aborts when worksheet revision changes
+    // mid-loop (see useEvaluation.ts revisionAtStart checks). During reevaluation we call
+    // setContent with computed lines; if this effect bumps revision unconditionally on every
+    // content change, the active reevaluation can cancel itself, which breaks auto-eval flows
+    // like pasted expressions and inserted AI results.
     useEffect(() => {
-        worksheetRevisionRef.current += 1;
+        if (!isReevaluatingAllRef.current) {
+            worksheetRevisionRef.current += 1;
+        }
     }, [activeId, content]);
 
 
