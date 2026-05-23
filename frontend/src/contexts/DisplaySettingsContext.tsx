@@ -13,6 +13,7 @@ import {
     AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY,
     AUTO_LOCK_TIMEOUT_MINUTES_STORAGE_KEY,
     COPY_MODE_STORAGE_KEY,
+    CLIPBOARD_PREVIEW_ENABLED_STORAGE_KEY,
     AUTO_EVAL_STORAGE_KEY,
     VARIABLE_FIRST_INLINING_STORAGE_KEY,
     DEFAULT_AUTO_LOCK_ON_WINDOW_HIDE,
@@ -66,6 +67,8 @@ type DisplaySettingsContextValue = {
     setCopyMode: (mode: 'as-is' | 'expressions-only') => void;
     autoEval: boolean;
     setAutoEval: (value: boolean) => void;
+    clipboardPreviewEnabled: boolean;
+    setClipboardPreviewEnabled: (value: boolean) => void;
     variableFirstInlining: boolean;
     setVariableFirstInlining: (v: boolean) => void;
     formatNumber: (value: number, delimiter?: '.' | ',', prec?: PrecisionMode, sci?: boolean) => string;
@@ -77,6 +80,10 @@ type DisplaySettingsContextValue = {
 };
 
 const DisplaySettingsContext = createContext<DisplaySettingsContextValue | null>(null);
+
+export function parseClipboardPreviewEnabled(raw: string | null): boolean {
+    return raw === 'true';
+}
 
 export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
     const systemDecimalDelimiter = getSystemDecimalDelimiter();
@@ -153,6 +160,10 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
         return raw === 'true';
     });
 
+    const [clipboardPreviewEnabled, setClipboardPreviewEnabledState] = useState(() => (
+        parseClipboardPreviewEnabled(localStorage.getItem(CLIPBOARD_PREVIEW_ENABLED_STORAGE_KEY))
+    ));
+
     const [variableFirstInlining, setVariableFirstInliningState] = useState(() => {
         const raw = localStorage.getItem(VARIABLE_FIRST_INLINING_STORAGE_KEY);
         if (raw === null) {
@@ -213,11 +224,16 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
     }, [autoEval]);
 
     useEffect(() => {
+        localStorage.setItem(CLIPBOARD_PREVIEW_ENABLED_STORAGE_KEY, String(clipboardPreviewEnabled));
+    }, [clipboardPreviewEnabled]);
+
+    useEffect(() => {
         localStorage.setItem(VARIABLE_FIRST_INLINING_STORAGE_KEY, String(variableFirstInlining));
     }, [variableFirstInlining]);
 
     const setCopyMode = (mode: 'as-is' | 'expressions-only') => setCopyModeState(mode);
     const setAutoEval = (value: boolean) => setAutoEvalState(value);
+    const setClipboardPreviewEnabled = (value: boolean) => setClipboardPreviewEnabledState(value);
     const setVariableFirstInlining = (v: boolean) => setVariableFirstInliningState(v);
 
     const setDecimalDelimiterMode = (mode: DecimalDelimiterMode) => setDecimalDelimiterModeState(mode);
@@ -313,6 +329,8 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
             setCopyMode,
             autoEval,
             setAutoEval,
+            clipboardPreviewEnabled,
+            setClipboardPreviewEnabled,
             variableFirstInlining,
             setVariableFirstInlining,
             formatNumber: fmtNumber,

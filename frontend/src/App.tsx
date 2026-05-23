@@ -82,6 +82,7 @@ function App() {
         copyMode,
         autoEval,
         setAutoEval,
+        clipboardPreviewEnabled,
         variableFirstInlining,
     } = useDisplaySettings();
     const {
@@ -193,19 +194,26 @@ function App() {
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
     const refreshClipboardNumericText = useCallback(async () => {
+        if (!clipboardPreviewEnabled) {
+            setClipboardNumericText(null);
+            return;
+        }
         try {
             const text = await navigator.clipboard?.readText?.() ?? '';
             setClipboardNumericText(parseNumericText(text));
         } catch {
             setClipboardNumericText(null);
         }
-    }, []);
+    }, [clipboardPreviewEnabled]);
 
     useEffect(() => {
         void refreshClipboardNumericText();
+        if (!clipboardPreviewEnabled) {
+            return;
+        }
         window.addEventListener('focus', refreshClipboardNumericText);
         return () => window.removeEventListener('focus', refreshClipboardNumericText);
-    }, [refreshClipboardNumericText]);
+    }, [clipboardPreviewEnabled, refreshClipboardNumericText]);
 
     useEffect(() => {
         const previousPrecision = previousPrecisionRef.current;
@@ -1380,7 +1388,7 @@ function App() {
     const effectiveStaleCount = staleLineDetails.size - (staleLineDetails.has(activeLineIndex) ? 1 : 0);
     const activeLineError = lineErrors.get(activeLineIndex) ?? '';
     const activeLineText = contentLines[activeLineIndex] ?? '';
-    const canPasteClipboardNumericText = clipboardNumericText !== null && activeLineText.trim() === '';
+    const canPasteClipboardNumericText = clipboardPreviewEnabled && clipboardNumericText !== null && activeLineText.trim() === '';
     const visibleContentLines = isActiveWorksheetLocked ? [''] : contentLines;
     const measureLineWidth = (text: string): number => {
         try {

@@ -47,6 +47,7 @@ export const AUTO_LOCK_ON_SYSTEM_SLEEP_STORAGE_KEY = 'calc.lock.autoLockOnSystem
 export const COPY_MODE_STORAGE_KEY = 'calc.editor.copyMode';
 export const VARIABLE_FIRST_INLINING_STORAGE_KEY = 'calc.editor.variableFirstInlining';
 export const AUTO_EVAL_STORAGE_KEY = 'calc.editor.autoEval';
+export const CLIPBOARD_PREVIEW_ENABLED_STORAGE_KEY = 'calc.editor.clipboardPreviewEnabled';
 export const HELP_PANEL_POSITION_STORAGE_KEY = 'calc.help.position';
 export const HELP_LAST_SEEN_VERSION_STORAGE_KEY = 'calc.help.lastSeenVersion';
 export const WORKSHEETS_LIST_STORAGE_KEY = 'calc.worksheets.list';
