@@ -285,6 +285,22 @@ export function SettingsPanel({
                     <div className="settings-card">
                         <div className="settings-row">
                             <div className="settings-row-info">
+                                <div className="settings-row-title">Clipboard preview</div>
+                                <div className="settings-row-desc">Show a paste button with numeric clipboard content on empty lines</div>
+                            </div>
+                            <label className="settings-toggle" aria-label="Toggle clipboard preview">
+                                <input
+                                    type="checkbox"
+                                    checked={display.clipboardPreviewEnabled}
+                                    onChange={(e) => display.setClipboardPreviewEnabled(e.target.checked)}
+                                />
+                                <span className="settings-toggle-track" />
+                            </label>
+                        </div>
+                    </div>
+                    <div className="settings-card">
+                        <div className="settings-row">
+                            <div className="settings-row-info">
                                 <div className="settings-row-title">Use variables for new lines</div>
                                 <div className="settings-row-desc">When starting a new line with an operator, use the previous variable name instead of its value</div>
                             </div>
