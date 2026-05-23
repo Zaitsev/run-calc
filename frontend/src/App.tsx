@@ -862,7 +862,7 @@ function App() {
     };
 
     const { evaluateCurrentLine, reevaluateAllExpressions, verifyWorksheetShadow } = buildEvaluationHooks({
-        content, lastResult, variableValues, staleLineMarkers,
+        content, lastResult, variableValues,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
         decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,

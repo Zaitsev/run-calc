@@ -34,7 +34,6 @@ type EvalDeps = {
     content: string;
     lastResult: number | null;
     variableValues: Record<string, unknown>;
-    staleLineMarkers: Record<number, Record<string, number>>;
     isReevaluatingAll: boolean;
     isAIQueryPending: boolean;
     aiContextMode: AIContextMode;
