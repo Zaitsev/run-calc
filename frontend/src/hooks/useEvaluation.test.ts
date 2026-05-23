@@ -8,7 +8,7 @@ vi.mock('../../wailsjs/go/main/App', () => ({
     RunAIQuery: vi.fn(),
 }));
 
-import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState } from '../../wailsjs/go/main/App';
+import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../wailsjs/go/main/App';
 import type { main } from '../../wailsjs/go/models';
 
 type EvalResult = main.ExprEvalResponse;
@@ -689,6 +689,243 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
 });
 
 describe('buildEvaluationHooks evaluateCurrentLine', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('reevaluates after AI insertion even without code lines', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const runAIQueryMock = vi.mocked(RunAIQuery);
+        evaluateExprMock.mockImplementation(async (expression, variables) => {
+            return mockedEvaluateExprProgram(expression, variables as Record<string, unknown>);
+        });
+        runAIQueryMock.mockResolvedValue({
+            ok: true,
+            output: {
+                answerNumber: 7,
+                comment: '',
+                answer: '',
+                code: '',
+            },
+            preview: {
+                modelId: 'test-model',
+                endpoint: 'https://example.invalid',
+                systemPrompt: 'system',
+                userPrompt: 'user',
+                contextMode: 'above',
+                contextLineCount: 0,
+            },
+        } as any);
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef = {
+            current: {
+                get selectionStart() {
+                    return selectionStart;
+                },
+                set selectionStart(value: number) {
+                    selectionStart = value;
+                },
+                get selectionEnd() {
+                    return selectionEnd;
+                },
+                set selectionEnd(value: number) {
+                    selectionEnd = value;
+                },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        let content = '? solve this';
+        editorRef.current!.value = content;
+        selectionStart = content.length;
+        selectionEnd = content.length;
+
+        const setStatusText = vi.fn();
+
+        const originalRAF = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            callback(0);
+            return 0;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content,
+                lastResult: null,
+                variableValues: {},
+                lineDependencyVersions: {},
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                variableFirstInlining: true,
+                setContent: (next) => {
+                    content = next;
+                    editorRef.current!.value = next;
+                },
+                setCaretPos: () => {},
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setLineDependencyVersions: () => ({}),
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText,
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            expect(runAIQueryMock).toHaveBeenCalled();
+            expect(evaluateExprMock).toHaveBeenCalledWith('ai0 = 7', expect.any(Object));
+            expect(content).toContain('ai0 = 7 = 7');
+            expect(setStatusText).toHaveBeenLastCalledWith('Re-evaluated 1 line');
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+
+    it('reevaluates multiline AI code insertions with comment lines', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const runAIQueryMock = vi.mocked(RunAIQuery);
+        evaluateExprMock.mockResolvedValue({
+            ok: true,
+            value: 1,
+            isNumber: true,
+            numberValue: 1,
+            variables: {},
+        } as EvalResult);
+        runAIQueryMock.mockResolvedValue({
+            ok: true,
+            output: {
+                answerNumber: undefined,
+                answer: '',
+                comment: '',
+                code: [
+                    '" Define the coefficients',
+                    'a_val = 1',
+                    'b_val = 1',
+                    'c_val = -3',
+                    '" Calculate the discriminant',
+                    'discriminant_val = b_val^2 - 4 * a_val * c_val',
+                ].join('\n'),
+            },
+            preview: {
+                modelId: 'test-model',
+                endpoint: 'https://example.invalid',
+                systemPrompt: 'system',
+                userPrompt: 'user',
+                contextMode: 'above',
+                contextLineCount: 0,
+            },
+        } as any);
+
+        let selectionStart = 0;
+        let selectionEnd = 0;
+        const editorRef = {
+            current: {
+                get selectionStart() {
+                    return selectionStart;
+                },
+                set selectionStart(value: number) {
+                    selectionStart = value;
+                },
+                get selectionEnd() {
+                    return selectionEnd;
+                },
+                set selectionEnd(value: number) {
+                    selectionEnd = value;
+                },
+                value: '',
+            },
+        } as unknown as React.RefObject<HTMLTextAreaElement | null>;
+
+        let content = '? solve x^2 + x - 3 = 0';
+        editorRef.current!.value = content;
+        selectionStart = content.length;
+        selectionEnd = content.length;
+
+        const originalRAF = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+            callback(0);
+            return 0;
+        }) as typeof requestAnimationFrame;
+
+        try {
+            const hooks = buildEvaluationHooks({
+                content,
+                lastResult: null,
+                variableValues: {},
+                lineDependencyVersions: {},
+                isReevaluatingAll: false,
+                isAIQueryPending: false,
+                aiContextMode: 'above',
+                aiSettings: {
+                    providerPreset: 'openai',
+                    endpoint: '',
+                    modelId: '',
+                    defaultContextMode: 'above',
+                    allowInsecureKeyFallback: false,
+                    allowCustomEndpointKeyReuse: false,
+                    requestTimeoutSeconds: 30,
+                },
+                decimalDelimiter: '.',
+                precision: 'auto',
+                scientificNotation: false,
+                variableFirstInlining: true,
+                setContent: (next) => {
+                    content = next;
+                    editorRef.current!.value = next;
+                },
+                setCaretPos: () => {},
+                setLastResult: () => {},
+                setVariableValues: () => {},
+                setLineDependencyVersions: () => ({}),
+                setIsReevaluatingAll: () => {},
+                setIsAIQueryPending: () => {},
+                setAIPendingLineIndex: () => {},
+                setAIProgressMessage: () => {},
+                setAIDebugLog: () => [],
+                setStatusText: () => {},
+                setIsStatusError: () => {},
+                setDevError: () => {},
+                clearLineEvaluationMetadata: () => {},
+                editorRef,
+                aiDebugIdRef: { current: 0 },
+            });
+
+            await hooks.evaluateCurrentLine();
+
+            expect(runAIQueryMock).toHaveBeenCalled();
+            expect(evaluateExprMock).toHaveBeenCalledWith('a_val = 1', expect.any(Object));
+            expect(evaluateExprMock).toHaveBeenCalledWith('discriminant_val = b_val^2 - 4 * a_val * c_val', expect.any(Object));
+            expect(content).toContain('a_val = 1 = 1');
+            expect(content).toContain('discriminant_val = b_val^2 - 4 * a_val * c_val = 1');
+            expect(content).toContain('" Define the coefficients');
+        } finally {
+            globalThis.requestAnimationFrame = originalRAF;
+        }
+    });
+
     it('moves caret to the next line after evaluating a non-final line', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
         evaluateExprMock.mockResolvedValue({

@@ -187,6 +187,7 @@ function App() {
     const [clipboardNumericText, setClipboardNumericText] = useState<string | null>(null);
     const [autoEvalEnterSequence, setAutoEvalEnterSequence] = useState(0);
     const processedAutoEvalEnterSequenceRef = useRef(0);
+    const isPasteRef = useRef(false);
 
     const decimalDelimiter = resolveDecimalDelimiter(decimalDelimiterMode);
 
@@ -824,7 +825,7 @@ function App() {
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
-        worksheetRevisionRef,
+        worksheetRevisionRef, isReevaluatingAllRef,
     });
 
     useEffect(() => {
@@ -1644,12 +1645,27 @@ function App() {
 
                             setMarkedLines((prev) => remapMarkedLinesForEdit(prev, content, nextContent));
                             setLineDependencyVersions((prev) => remapLineRecordForEdit(prev, content, nextContent));
+
+                            if (isPasteRef.current) {
+                                isPasteRef.current = false;
+                                void reevaluateAllExpressions(nextContent);
+                            }
                         }}
                         onSelect={updateCaretPosFromEditor}
                         onClick={updateCaretPosFromEditor}
                         onKeyUp={updateCaretPosFromEditor}
                         onKeyDown={onKeyDown}
                         onWheel={onEditorWheel}
+                        onPaste={(e) => {
+                            if (e.currentTarget.readOnly) {
+                                isPasteRef.current = false;
+                                return;
+                            }
+                            isPasteRef.current = true;
+                            window.setTimeout(() => {
+                                isPasteRef.current = false;
+                            }, 0);
+                        }}
                         onCopy={(e) => {
                             if (copyMode !== 'expressions-only') return;
                             const el = e.currentTarget;

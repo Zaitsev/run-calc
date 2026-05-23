@@ -61,6 +61,7 @@ type EvalDeps = {
     editorRef: RefObject<HTMLTextAreaElement | null>;
     aiDebugIdRef: RefObject<number>;
     worksheetRevisionRef?: React.MutableRefObject<number>;
+    isReevaluatingAllRef?: React.MutableRefObject<boolean>;
 };
 
 type ContentAndCaret = { nextContent: string; nextCaret: number };
@@ -94,7 +95,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
-        worksheetRevisionRef,
+        worksheetRevisionRef, isReevaluatingAllRef,
     } = deps;
 
     const setContentAndCaret = (nextContent: string, nextCaret: number) => {
@@ -351,10 +352,11 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                     return [...prev, entry];
                 });
 
-                if (codeLines.length > 0) {
-                    const contentForReeval = nextContent;
-                    requestAnimationFrame(() => { void reevaluateAllExpressions(contentForReeval); });
-                }
+                const contentForReeval = nextContent;
+                await new Promise<void>((resolve) => {
+                    requestAnimationFrame(() => resolve());
+                });
+                await reevaluateAllExpressions(contentForReeval);
             } catch (error) {
                 setLastResult(null);
                 clearLineEvaluationMetadata(lineIndex);
@@ -442,7 +444,10 @@ export function buildEvaluationHooks(deps: EvalDeps) {
     };
 
     const reevaluateAllExpressions = async (contentOverride?: string) => {
-        if (isReevaluatingAll) return;
+        if (isReevaluatingAllRef?.current || (!isReevaluatingAllRef && isReevaluatingAll)) return;
+        // Synchronously mark reevaluation as active so the content useEffect in App.tsx
+        // does not bump worksheetRevisionRef while we are mid-loop (avoids abort race).
+        if (isReevaluatingAllRef) isReevaluatingAllRef.current = true;
         // Bump revision before the first await so any in-flight verifyWorksheetShadow
         // can detect that its work is stale. This does not skip RestoreRandomState
         // in verifyWorksheetShadow's finally block.
@@ -517,15 +522,22 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                     : `Re-evaluated ${calculatedCount} line${calculatedCount === 1 ? '' : 's'}`
             );
 
-            requestAnimationFrame(() => {
+            const applyCaret = () => {
                 if (!editorRef.current) return;
                 const nextCaret = Math.min(targetCaret, nextContent.length);
                 editorRef.current.selectionStart = nextCaret;
                 editorRef.current.selectionEnd = nextCaret;
                 setCaretPos(nextCaret);
-            });
+            };
+
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(applyCaret);
+            } else {
+                applyCaret();
+            }
         } finally {
             setIsReevaluatingAll(false);
+            if (isReevaluatingAllRef) isReevaluatingAllRef.current = false;
         }
     };
 
