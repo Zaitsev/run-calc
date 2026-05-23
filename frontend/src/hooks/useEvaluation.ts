@@ -353,6 +353,9 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                 });
 
                 const contentForReeval = nextContent;
+                await new Promise<void>((resolve) => {
+                    requestAnimationFrame(() => resolve());
+                });
                 await reevaluateAllExpressions(contentForReeval);
             } catch (error) {
                 setLastResult(null);
@@ -441,7 +444,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
     };
 
     const reevaluateAllExpressions = async (contentOverride?: string) => {
-        if (isReevaluatingAll) return;
+        if (isReevaluatingAllRef?.current || (!isReevaluatingAllRef && isReevaluatingAll)) return;
         // Synchronously mark reevaluation as active so the content useEffect in App.tsx
         // does not bump worksheetRevisionRef while we are mid-loop (avoids abort race).
         if (isReevaluatingAllRef) isReevaluatingAllRef.current = true;

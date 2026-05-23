@@ -219,9 +219,7 @@ function App() {
     }, [precision]);
 
     useEffect(() => {
-        if (!isReevaluatingAllRef.current) {
-            worksheetRevisionRef.current += 1;
-        }
+        worksheetRevisionRef.current += 1;
     }, [activeId, content]);
 
 
@@ -1658,7 +1656,16 @@ function App() {
                         onKeyUp={updateCaretPosFromEditor}
                         onKeyDown={onKeyDown}
                         onWheel={onEditorWheel}
-                        onPaste={() => { isPasteRef.current = true; }}
+                        onPaste={(e) => {
+                            if (e.currentTarget.readOnly) {
+                                isPasteRef.current = false;
+                                return;
+                            }
+                            isPasteRef.current = true;
+                            window.setTimeout(() => {
+                                isPasteRef.current = false;
+                            }, 0);
+                        }}
                         onCopy={(e) => {
                             if (copyMode !== 'expressions-only') return;
                             const el = e.currentTarget;
