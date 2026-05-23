@@ -3,6 +3,7 @@ import {
     buildEvaluationExpression,
     buildStaleLineDetails,
     SHADOW_STALE_MARKER,
+    UNEVALUATED_STALE_MARKER,
     getCopyableNumericResultText,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
@@ -11,6 +12,8 @@ import {
     shouldSkipEvaluationAtCaret,
     stripMarkdownCodeFences,
     shouldSkipEvaluation,
+    shouldAutoReevaluateStaleLines,
+    shouldScheduleStaleVerification,
 } from './appInteractionLogic';
 
 describe('app interaction helpers', () => {
@@ -85,6 +88,50 @@ describe('app interaction helpers', () => {
         );
 
         expect(stale.get(2)).toEqual(['background check']);
+    });
+
+    it('labels unevaluated stale markers', () => {
+        const stale = buildStaleLineDetails(
+            {
+                4: {[UNEVALUATED_STALE_MARKER]: -1},
+            },
+        );
+
+        expect(stale.get(4)).toEqual(['not evaluated']);
+    });
+
+    it('keeps stale verification on when auto-eval is off', () => {
+        expect(shouldScheduleStaleVerification(false)).toBe(true);
+        expect(shouldScheduleStaleVerification(true)).toBe(false);
+    });
+
+    it('only auto re-evaluates on a fresh enter sequence when auto-eval is enabled', () => {
+        expect(shouldAutoReevaluateStaleLines({
+            autoEval: false,
+            isWorksheetLocked: false,
+            isAIQueryPending: false,
+            isReevaluatingAll: false,
+            autoEvalEnterSequence: 1,
+            processedAutoEvalEnterSequence: 0,
+        })).toBe(false);
+
+        expect(shouldAutoReevaluateStaleLines({
+            autoEval: true,
+            isWorksheetLocked: false,
+            isAIQueryPending: false,
+            isReevaluatingAll: false,
+            autoEvalEnterSequence: 1,
+            processedAutoEvalEnterSequence: 0,
+        })).toBe(true);
+
+        expect(shouldAutoReevaluateStaleLines({
+            autoEval: true,
+            isWorksheetLocked: false,
+            isAIQueryPending: false,
+            isReevaluatingAll: false,
+            autoEvalEnterSequence: 1,
+            processedAutoEvalEnterSequence: 1,
+        })).toBe(false);
     });
 
     it('strips markdown code fences from AI code blocks before insertion', () => {

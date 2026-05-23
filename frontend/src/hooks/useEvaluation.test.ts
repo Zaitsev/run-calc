@@ -89,7 +89,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: 'a = 1 = 1',
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions: {},
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -110,7 +109,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: () => ({}),
+            setStaleLineMarkers: () => ({}),
             setIsReevaluatingAll: () => {},
             setIsAIQueryPending: () => {},
             setAIPendingLineIndex: () => {},
@@ -143,7 +142,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: 'a = 1 = 1',
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions: {},
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -164,7 +162,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: () => ({}),
+            setStaleLineMarkers: () => ({}),
             setIsReevaluatingAll: () => {},
             setIsAIQueryPending: () => {},
             setAIPendingLineIndex: () => {},
@@ -204,7 +202,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: 'a = 1 = 1',
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions,
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -225,7 +222,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: (next) => {
+            setStaleLineMarkers: (next) => {
                 lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
             },
             setIsReevaluatingAll: () => {},
@@ -267,7 +264,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: 'a = 1 = 1',
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions: {},
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -288,7 +284,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: () => ({}),
+            setStaleLineMarkers: () => ({}),
             setIsReevaluatingAll: () => {},
             setIsAIQueryPending: () => {},
             setAIPendingLineIndex: () => {},
@@ -331,7 +327,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: 'a = uniform() = 0.1',
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions,
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -352,7 +347,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: (next) => {
+            setStaleLineMarkers: (next) => {
                 lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
             },
             setIsReevaluatingAll: () => {},
@@ -377,10 +372,11 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         expect(restoreRandomStateMock).not.toHaveBeenCalled();
     });
 
-    it('skips stale checks for lines without computed result suffixes', async () => {
+    it('marks lines without computed result suffixes as stale', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
         const captureRandomStateMock = vi.mocked(CaptureRandomState);
         const restoreRandomStateMock = vi.mocked(RestoreRandomState);
+        let staleLineMarkers: Record<number, Record<string, number>> = {};
         captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
         restoreRandomStateMock.mockResolvedValue();
         evaluateExprMock.mockResolvedValue({
@@ -395,7 +391,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: ['a = 1', 'b = 2 = 2'].join('\n'),
             lastResult: null,
             variableValues: {},
-            lineDependencyVersions: {},
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -416,7 +411,9 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: () => ({}),
+            setStaleLineMarkers: (next) => {
+                staleLineMarkers = typeof next === 'function' ? next(staleLineMarkers) : next;
+            },
             setIsReevaluatingAll: () => {},
             setIsAIQueryPending: () => {},
             setAIPendingLineIndex: () => {},
@@ -431,10 +428,71 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             worksheetRevisionRef: { current: 1 },
         });
 
-        await hooks.verifyWorksheetShadow();
+        await expect(hooks.verifyWorksheetShadow()).resolves.toBe(1);
 
         expect(evaluateExprMock).toHaveBeenCalledTimes(1);
         expect(evaluateExprMock).toHaveBeenCalledWith('b = 2', {});
+        expect(staleLineMarkers).toEqual({ 0: { __unevaluated__: -1 } });
+    });
+
+    it('marks downstream deterministic lines when dependency sources are unevaluated', async () => {
+        const evaluateExprMock = vi.mocked(EvaluateExprProgram);
+        const captureRandomStateMock = vi.mocked(CaptureRandomState);
+        const restoreRandomStateMock = vi.mocked(RestoreRandomState);
+        let staleLineMarkers: Record<number, Record<string, number>> = {};
+        captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
+        restoreRandomStateMock.mockResolvedValue();
+        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+
+        const hooks = buildEvaluationHooks({
+            content: ['a = 1', 'b = a + 1 = 2'].join('\n'),
+            lastResult: null,
+            variableValues: {},
+            isReevaluatingAll: false,
+            isAIQueryPending: false,
+            aiContextMode: 'above',
+            aiSettings: {
+                providerPreset: 'openai',
+                endpoint: '',
+                modelId: '',
+                defaultContextMode: 'above',
+                allowInsecureKeyFallback: false,
+                allowCustomEndpointKeyReuse: false,
+                requestTimeoutSeconds: 30,
+            },
+            decimalDelimiter: '.',
+            precision: 'auto',
+            scientificNotation: false,
+            variableFirstInlining: true,
+            setContent: () => {},
+            setCaretPos: () => {},
+            setLastResult: () => {},
+            setVariableValues: () => {},
+            setStaleLineMarkers: (next) => {
+                staleLineMarkers = typeof next === 'function' ? next(staleLineMarkers) : next;
+            },
+            setIsReevaluatingAll: () => {},
+            setIsAIQueryPending: () => {},
+            setAIPendingLineIndex: () => {},
+            setAIProgressMessage: () => {},
+            setAIDebugLog: () => [],
+            setStatusText: () => {},
+            setIsStatusError: () => {},
+            setDevError: () => {},
+            clearLineEvaluationMetadata: () => {},
+            editorRef: { current: null },
+            aiDebugIdRef: { current: 0 },
+            worksheetRevisionRef: { current: 1 },
+        });
+
+        await expect(hooks.verifyWorksheetShadow()).resolves.toBe(2);
+
+        expect(evaluateExprMock).toHaveBeenCalledTimes(1);
+        expect(evaluateExprMock).toHaveBeenCalledWith('b = a + 1', {});
+        expect(staleLineMarkers).toEqual({
+            0: { __unevaluated__: -1 },
+            1: { __shadow_verification__: -1 },
+        });
     });
 
     it('abandons reevaluation when the worksheet revision changes mid-flight', async () => {
@@ -456,7 +514,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content,
             lastResult: null,
             variableValues,
-            lineDependencyVersions,
             isReevaluatingAll,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -481,7 +538,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setVariableValues: (next) => {
                 variableValues = next;
             },
-            setLineDependencyVersions: (next) => {
+            setStaleLineMarkers: (next) => {
                 lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
             },
             setIsReevaluatingAll: (next) => {
@@ -565,7 +622,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
                 content,
                 lastResult,
                 variableValues,
-                lineDependencyVersions,
                 isReevaluatingAll,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -594,7 +650,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
                 setVariableValues: (next) => {
                     variableValues = next;
                 },
-                setLineDependencyVersions: (next) => {
+                setStaleLineMarkers: (next) => {
                     lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
                 },
                 setIsReevaluatingAll: (next) => {
@@ -643,7 +699,6 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             content: ['a = 5 = 5', 'b = a + 1 = 2'].join('\n'),
             lastResult: null,
             variableValues: { a: 5, b: 2 },
-            lineDependencyVersions,
             isReevaluatingAll: false,
             isAIQueryPending: false,
             aiContextMode: 'above',
@@ -664,7 +719,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
             setCaretPos: () => {},
             setLastResult: () => {},
             setVariableValues: () => {},
-            setLineDependencyVersions: (next) => {
+            setStaleLineMarkers: (next) => {
                 lineDependencyVersions = typeof next === 'function' ? next(lineDependencyVersions) : next;
             },
             setIsReevaluatingAll: () => {},
@@ -755,7 +810,6 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 content,
                 lastResult: null,
                 variableValues: {},
-                lineDependencyVersions: {},
                 isReevaluatingAll: false,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -779,7 +833,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 setCaretPos: () => {},
                 setLastResult: () => {},
                 setVariableValues: () => {},
-                setLineDependencyVersions: () => ({}),
+                setStaleLineMarkers: () => ({}),
                 setIsReevaluatingAll: () => {},
                 setIsAIQueryPending: () => {},
                 setAIPendingLineIndex: () => {},
@@ -875,7 +929,6 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 content,
                 lastResult: null,
                 variableValues: {},
-                lineDependencyVersions: {},
                 isReevaluatingAll: false,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -899,7 +952,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 setCaretPos: () => {},
                 setLastResult: () => {},
                 setVariableValues: () => {},
-                setLineDependencyVersions: () => ({}),
+                setStaleLineMarkers: () => ({}),
                 setIsReevaluatingAll: () => {},
                 setIsAIQueryPending: () => {},
                 setAIPendingLineIndex: () => {},
@@ -980,7 +1033,6 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 content,
                 lastResult: null,
                 variableValues: { a: 275 },
-                lineDependencyVersions: {},
                 isReevaluatingAll: false,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -1006,7 +1058,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 },
                 setLastResult: () => {},
                 setVariableValues: () => {},
-                setLineDependencyVersions: () => ({}),
+                setStaleLineMarkers: () => ({}),
                 setIsReevaluatingAll: () => {},
                 setIsAIQueryPending: () => {},
                 setAIPendingLineIndex: () => {},
@@ -1090,7 +1142,6 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 content,
                 lastResult: null,
                 variableValues: {},
-                lineDependencyVersions: {},
                 isReevaluatingAll: false,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -1115,7 +1166,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 },
                 setLastResult: () => {},
                 setVariableValues: () => {},
-                setLineDependencyVersions: () => ({}),
+                setStaleLineMarkers: () => ({}),
                 setIsReevaluatingAll: () => {},
                 setIsAIQueryPending: () => {},
                 setAIPendingLineIndex: () => {},
@@ -1199,7 +1250,6 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 content,
                 lastResult: null,
                 variableValues: {},
-                lineDependencyVersions: {},
                 isReevaluatingAll: false,
                 isAIQueryPending: false,
                 aiContextMode: 'above',
@@ -1225,7 +1275,7 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
                 },
                 setLastResult: () => {},
                 setVariableValues: () => {},
-                setLineDependencyVersions: () => ({}),
+                setStaleLineMarkers: () => ({}),
                 setIsReevaluatingAll: () => {},
                 setIsAIQueryPending: () => {},
                 setAIPendingLineIndex: () => {},

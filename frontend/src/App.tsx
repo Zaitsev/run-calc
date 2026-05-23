@@ -13,7 +13,9 @@ import {
     getCopyableNumericResultText,
     isAITriggerSourceLine,
     parseNumericText,
-    reformatComputedLineResult
+    reformatComputedLineResult,
+    shouldAutoReevaluateStaleLines,
+    shouldScheduleStaleVerification,
 } from './appInteractionLogic';
 import appLogoDark from './assets/images/icons/hare-calc-1024-black.png';
 import appLogo from './assets/images/icons/hare-calc-1024.png';
@@ -65,8 +67,8 @@ function App() {
         setMarkedLines,
         variableValues,
         setVariableValues,
-        lineDependencyVersions,
-        setLineDependencyVersions,
+        staleLineMarkers,
+        setStaleLineMarkers,
         clearWorksheet: clearWorksheetState,
     } = useWorksheet();
     const {
@@ -691,7 +693,7 @@ function App() {
     };
 
     const clearLineEvaluationMetadata = (lineIndex: number) => {
-        setLineDependencyVersions((prev) => {
+        setStaleLineMarkers((prev) => {
             if (!(lineIndex in prev)) {
                 return prev;
             }
@@ -860,12 +862,12 @@ function App() {
     };
 
     const { evaluateCurrentLine, reevaluateAllExpressions, verifyWorksheetShadow } = buildEvaluationHooks({
-        content, lastResult, variableValues, lineDependencyVersions,
+        content, lastResult, variableValues,
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
         decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
         setVariableValues,
-        setLineDependencyVersions,
+        setStaleLineMarkers,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
@@ -886,7 +888,7 @@ function App() {
     }, [isAIQueryPending]);
 
     useEffect(() => {
-        if (!autoEval || isActiveWorksheetLocked) {
+        if (!shouldScheduleStaleVerification(isActiveWorksheetLocked)) {
             if (shadowVerifyTimerRef.current !== null) {
                 window.clearTimeout(shadowVerifyTimerRef.current);
                 shadowVerifyTimerRef.current = null;
@@ -917,7 +919,6 @@ function App() {
             }
         };
     }, [
-        autoEval,
         activeId,
         content,
         decimalDelimiter,
@@ -927,13 +928,14 @@ function App() {
     ]);
 
     useEffect(() => {
-        if (autoEvalEnterSequence === 0) {
-            return;
-        }
-        if (autoEvalEnterSequence <= processedAutoEvalEnterSequenceRef.current) {
-            return;
-        }
-        if (!autoEval || isActiveWorksheetLocked || isAIQueryPending || isReevaluatingAll) {
+        if (!shouldAutoReevaluateStaleLines({
+            autoEval,
+            isWorksheetLocked: isActiveWorksheetLocked,
+            isAIQueryPending,
+            isReevaluatingAll,
+            autoEvalEnterSequence,
+            processedAutoEvalEnterSequence: processedAutoEvalEnterSequenceRef.current,
+        })) {
             return;
         }
 
@@ -1193,8 +1195,8 @@ function App() {
     }, [content]);
 
     const staleLineDetails = useMemo(() => {
-        return buildStaleLineDetails(lineDependencyVersions);
-    }, [lineDependencyVersions]);
+        return buildStaleLineDetails(staleLineMarkers);
+    }, [staleLineMarkers]);
 
     const renderOverlayLines = () => {
         return contentLines.map((line, i) => {
@@ -1688,7 +1690,7 @@ function App() {
                             });
 
                             setMarkedLines((prev) => remapMarkedLinesForEdit(prev, content, nextContent));
-                            setLineDependencyVersions((prev) => remapLineRecordForEdit(prev, content, nextContent));
+                            setStaleLineMarkers((prev) => remapLineRecordForEdit(prev, content, nextContent));
 
                             if (isPasteRef.current) {
                                 isPasteRef.current = false;

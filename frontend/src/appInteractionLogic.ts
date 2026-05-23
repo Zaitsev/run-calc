@@ -5,6 +5,7 @@ type DecimalDelimiter = '.' | ',';
 type PrecisionMode = 'auto' | 'full' | number;
 const NUMERIC_TEXT_REGEX = /^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:[eE][+-]?\d+)?$/;
 export const SHADOW_STALE_MARKER = '__shadow_verification__';
+export const UNEVALUATED_STALE_MARKER = '__unevaluated__';
 
 type FormatNumberFn = (
     value: number,
@@ -59,6 +60,38 @@ export function getCopyableNumericResultText(lineText: string, isVariableLine: b
     }
 
     return parseNumericText(body.slice(resultEqualsIndex + 3));
+}
+
+export function shouldScheduleStaleVerification(isWorksheetLocked: boolean): boolean {
+    return !isWorksheetLocked;
+}
+
+export function shouldAutoReevaluateStaleLines(params: {
+    autoEval: boolean;
+    isWorksheetLocked: boolean;
+    isAIQueryPending: boolean;
+    isReevaluatingAll: boolean;
+    autoEvalEnterSequence: number;
+    processedAutoEvalEnterSequence: number;
+}): boolean {
+    const {
+        autoEval,
+        isWorksheetLocked,
+        isAIQueryPending,
+        isReevaluatingAll,
+        autoEvalEnterSequence,
+        processedAutoEvalEnterSequence,
+    } = params;
+
+    if (autoEvalEnterSequence === 0) {
+        return false;
+    }
+
+    if (autoEvalEnterSequence <= processedAutoEvalEnterSequence) {
+        return false;
+    }
+
+    return autoEval && !isWorksheetLocked && !isAIQueryPending && !isReevaluatingAll;
 }
 
 export function buildEvaluationExpression(
@@ -201,10 +234,10 @@ export function getFriendlyEvalErrorMessage(message: string): string {
 }
 
 export function buildStaleLineDetails(
-    lineDependencyVersions: Record<number, Record<string, number>>,
+    staleLineMarkers: Record<number, Record<string, number>>,
 ): Map<number, string[]> {
     const details = new Map<number, string[]>();
-    Object.entries(lineDependencyVersions).forEach(([lineKey, snapshot]) => {
+    Object.entries(staleLineMarkers).forEach(([lineKey, snapshot]) => {
         const lineIndex = Number(lineKey);
         if (!Number.isFinite(lineIndex)) {
             return;
@@ -214,6 +247,11 @@ export function buildStaleLineDetails(
         Object.entries(snapshot).forEach(([variableName]) => {
             if (variableName === SHADOW_STALE_MARKER) {
                 staleVariables.push('background check');
+                return;
+            }
+
+            if (variableName === UNEVALUATED_STALE_MARKER) {
+                staleVariables.push('not evaluated');
             }
         });
 

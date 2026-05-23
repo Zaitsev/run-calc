@@ -19,6 +19,7 @@ import {
     isAITriggerSourceLine,
     stripMarkdownCodeFences,
     SHADOW_STALE_MARKER,
+    UNEVALUATED_STALE_MARKER,
 } from '../appInteractionLogic';
 import {
     getLineBounds,
@@ -33,7 +34,6 @@ type EvalDeps = {
     content: string;
     lastResult: number | null;
     variableValues: Record<string, unknown>;
-    lineDependencyVersions: Record<number, Record<string, number>>;
     isReevaluatingAll: boolean;
     isAIQueryPending: boolean;
     aiContextMode: AIContextMode;
@@ -47,7 +47,7 @@ type EvalDeps = {
     setCaretPos: (v: number) => void;
     setLastResult: (v: number | null) => void;
     setVariableValues: (v: Record<string, unknown>) => void;
-    setLineDependencyVersions: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
+    setStaleLineMarkers: React.Dispatch<React.SetStateAction<Record<number, Record<string, number>>>>;
     setIsReevaluatingAll: (v: boolean) => void;
     setIsAIQueryPending: (v: boolean) => void;
     setAIPendingLineIndex: (v: number | null) => void;
@@ -91,7 +91,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         isReevaluatingAll, isAIQueryPending, aiContextMode, aiSettings,
         decimalDelimiter, precision, scientificNotation, variableFirstInlining,
         setContent, setCaretPos, setLastResult,
-        setVariableValues, setLineDependencyVersions,
+        setVariableValues, setStaleLineMarkers,
         setIsReevaluatingAll, setIsAIQueryPending, setAIPendingLineIndex, setAIProgressMessage,
         setAIDebugLog, setStatusText, setIsStatusError, setDevError,
         clearLineEvaluationMetadata, editorRef, aiDebugIdRef,
@@ -102,10 +102,10 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         applyContentAndCaret(editorRef, setContent, setCaretPos, { nextContent, nextCaret });
     };
 
-    const buildShadowLineSnapshots = (lineIndexes: number[]) => {
+    const buildStaleMarkerSnapshots = (lineIndexes: number[], markerName: string = SHADOW_STALE_MARKER) => {
         const snapshots: Record<number, Record<string, number>> = {};
         lineIndexes.forEach((lineIndex) => {
-            snapshots[lineIndex] = { [SHADOW_STALE_MARKER]: -1 };
+            snapshots[lineIndex] = { [markerName]: -1 };
         });
         return snapshots;
     };
@@ -123,7 +123,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             return NON_DETERMINISTIC_FUNCTION_CALL_RE.test(body);
         });
         if (containsNonDeterministicExpressions) {
-            setLineDependencyVersions(() => ({}));
+            setStaleLineMarkers(() => ({}));
             return 0;
         }
 
@@ -136,6 +136,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
         let shadowVariables: Record<string, unknown> = {};
         const mismatchedLineIndexes: number[] = [];
+        const unevaluatedLineIndexes: number[] = [];
         let nextShadowSnapshots: Record<number, Record<string, number>> = {};
         let restoreRandomStateFailed = false;
 
@@ -151,6 +152,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                     continue;
                 }
                 if (sourceLines[i] === editableLine) {
+                    unevaluatedLineIndexes.push(i);
                     continue;
                 }
 
@@ -181,8 +183,11 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
             if (revisionChanged()) return 0;
 
-            // Mark mismatched lines with shadow verification marker.
-            nextShadowSnapshots = buildShadowLineSnapshots(mismatchedLineIndexes);
+            // Mark mismatched lines and lines missing computed results.
+            nextShadowSnapshots = {
+                ...buildStaleMarkerSnapshots(mismatchedLineIndexes),
+                ...buildStaleMarkerSnapshots(unevaluatedLineIndexes, UNEVALUATED_STALE_MARKER),
+            };
         } finally {
             if (capturedRandomState !== null) {
                 try {
@@ -194,13 +199,13 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
 
         if (restoreRandomStateFailed) {
-            setLineDependencyVersions(() => ({}));
+            setStaleLineMarkers(() => ({}));
             return 0;
         }
 
         // Shadow verification is the single source of stale markers in shadow-only mode.
-        setLineDependencyVersions(() => nextShadowSnapshots);
-        return mismatchedLineIndexes.length;
+        setStaleLineMarkers(() => nextShadowSnapshots);
+        return mismatchedLineIndexes.length + unevaluatedLineIndexes.length;
     };
 
     const evaluateCurrentLine = async () => {
@@ -512,7 +517,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
             setContent(nextContent);
             setVariableValues(workingVariables);
             // Clear all stale markers after re-evaluation (shadow verifier will detect mismatches)
-            setLineDependencyVersions(() => ({}));
+            setStaleLineMarkers(() => ({}));
             setLastResult(nextLastResult);
             setIsStatusError(failedCount > 0);
             setDevError('');
