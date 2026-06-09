@@ -22,7 +22,7 @@
   <Identity
     Name="VladZaitsev.Run-Calc"
     Publisher="CN=9B7E30DB-5D4F-41F4-9A64-A0FE774F4A33"
-    Version="6.2.0.0"
+    Version="6.2.1.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

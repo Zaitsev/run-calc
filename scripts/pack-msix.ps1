@@ -1,5 +1,5 @@
 # Build and package Run-Calc as an MSIX for local testing or Partner Center upload.
-# Usage: .\scripts\pack-msix.ps1 [-Version 6.2.0.0] [-SelfSign] [-PfxPath .\build\certs\cert.pfx] [-PfxPassword "pass"]
+# Usage: .\scripts\pack-msix.ps1 [-Version 6.2.1.0] [-SelfSign] [-PfxPath .\build\certs\cert.pfx] [-PfxPassword "pass"]
 #
 # Prerequisites:
 #   - wails build -clean must have been run (or pass -SkipBuild)
@@ -9,7 +9,7 @@
 
 [CmdletBinding()]
 param(
-    [string] $Version = "6.2.0.0",
+    [string] $Version = "6.2.1.0",
     [switch] $SkipBuild,
     [switch] $SelfSign,
     [string] $CertSubject,
