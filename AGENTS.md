@@ -1,18 +1,22 @@
 # AGENTS.md — Run-Calc (Wails v2.12.0 + React 19)
 
-## Dev commands
+**Quick reference for agents working on the Run-Calc codebase.**  
+For detailed architecture, workflows, and subsystem guidance, use the specialized `application-*` skills.
+
+## Quick Start
 
 | Action | Command |
 |---|---|
 | Dev server | `wails dev` |
 | Multi-session dev (Windows) | `.\scripts\dev-wails.ps1` |
 | Release build | `wails build` |
-| Windows installer build | `wails build -clean -nsis` |
-| Go tests (all) | `go test ./...` (requires `cd frontend && npm run build` first; see Key constraints) |
+| Windows installer | `wails build -clean -nsis` |
+| Go tests | `go test ./...` (requires `cd frontend && npm run build` first) |
 | Frontend tests | `cd frontend && npm test` |
-| Full CI verify (local) | `.\scripts\ci-verify.ps1` |
+| Site build | `cd site && npm run build` |
+| Full CI verify | `.\scripts\ci-verify.ps1` |
 
-## Repo structure
+## Repository Structure
 
 ```
 ./              Go root package (module "calc"), flat — all .go files are package main
@@ -22,55 +26,47 @@ scripts/        dev/cert/pack helpers (run from repo root)
 build/          Wails build assets (darwin/, windows/installer), bin/ is gitignored
 ```
 
-## Key constraints
+## Critical Constraints
 
 - **LF line endings enforced** via `.gitattributes`. Never introduce CRLF.
-- **Go: tabs** (4-wide), **everything else: 2-space indent** (`.editorconfig`)
-- `frontend/wailsjs/` — auto-generated bindings, do not edit
-- `frontend/dist/` — build output for `go:embed`, must be built before `go test ./...` (frontend build = `cd frontend && npm run build`)
-- `build/bin/` — Wails build output, gitignored
-- Linux CI requires `xvfb-run` for headless Go tests (`xvfb-run -a go test ./...`)
+- **Indentation**: Go uses tabs (4-wide), everything else uses 2-space indent (`.editorconfig`)
+- **Auto-generated files**: `frontend/wailsjs/` (Wails bindings), `frontend/dist/` (go:embed dependency), `build/bin/` (build output)
+- **Go tests require frontend build**: Run `cd frontend && npm run build` before `go test ./...`
+- **Linux CI requires xvfb**: Use `xvfb-run -a go test ./...` for headless testing
+- **Package manager**: Use `npm install --no-fund` (not `npm ci`) in CI to avoid breaking Go security jobs
 
-## Architecture
+## Agent Skills (Specialized Guidance)
 
-- **Go backend** (`expr_eval.go`): expression evaluation via `github.com/expr-lang/expr`, custom math functions
-- **Frontend** (`frontend/src/main.tsx`): deep provider nesting (Theme, Status, DisplaySettings, WorksheetManager, Worksheet, EditorUI, UIState, Window, AI, ThemeStore → App)
-- **State ownership** (`frontend/STATE_OWNERSHIP.md`): each persistence domain has exactly one owner context; `App.tsx` orchestrates only DOM/timing-coupled logic
-- **Site** (`site/`): MPA with multi-step build (`tsc && vite build && vite build --ssr && node scripts/build-static-site.mjs`)
-- **Frontend path alias** `@site/*` maps to `../site/src/*`
+Use these skills for detailed workflows and subsystem-specific rules:
 
-## Design principles
-whenever you need to create and/or change design patterns, follow these principles in `frontend/DESIGN.md`
+- **`application-calculator`** — Architecture overview, core editor behaviors, cross-platform deployment
+- **`application-test`** — Test layers, commands, principles for frontend/backend testing
+- **`application-state-ownership`** — Frontend context ownership boundaries, persistence rules
+- **`application-worksheet-management`** — Worksheet lifecycle, tabs UI, secure file save/load
+- **`application-help-content-sync`** — Help content source of truth, site/app synchronization
+- **`application-version-bump`** — Release version update workflow across canonical files
 
-## Testing quirks
+## Instruction Files (Scoped Rules)
 
-- Go tests in root (`*_test.go`) test the expression evaluator and backend logic
-- Frontend tests (vitest, `environment: 'node'` in vite.config) test pure editor helper functions — no DOM rendering
-- `function_reference_sync_test.go` ensures Go and frontend function reference types stay in sync
-- No pre-existing snapshot or integration test suites
+File-scoped instruction files that auto-trigger during edits:
 
-## AI assistant
+- **`.github/instructions/expr-evaluator.instructions.md`** — Expr function policy (integer coercion, test coverage)
+- **`.github/instructions/frontend-state-ownership.instructions.md`** — Context ownership boundaries enforcement
+- **`.github/instructions/dead-code-prevention.instructions.md`** — Dead code detection rules
+- **`.github/instructions/site-help-sync.instructions.md`** — Help content sync enforcement
+- **`.github/copilot-instructions.md`** — General coding rules (minimal code, LF endings, narrow edits)
 
-- BYOK only (no built-in keys). Supports OpenAI, Gemini, OpenRouter, Custom (Ollama-compatible endpoints)
-- Per-query context modes: Above (default) or Full worksheet
+Reference documentation files:
 
-## Expr function policy (README §Contribution Guidelines)
+- **`frontend/DESIGN.md`** — Visual design system, color tokens, typography
 
-- Numeric intermediate values arrive as `float64` from expr-lang
-- Integer-semantic parameters must coerce with explicit error for non-integral floats
-- New functions require: literal-arg happy path, float-from-chain happy path, boundary cases, type rejection tests, pipeline + direct-call tests
-
-## Existing instruction files
-
-- `.github/copilot-instructions.md` — general coding rules (minimal code, LF endings, narrow edits)
-- When `.github/copilot-instructions.md` conflicts with this file, `AGENTS.md` takes precedence.
-- `frontend/STATE_OWNERSHIP.md` — frontend context ownership boundaries
-- `frontend/TESTING_ARCHITECTURE.md` — frontend test layer definitions
+When `.github/copilot-instructions.md` conflicts with this file or specialized skills, **AGENTS.md and skills take precedence**.
 
 <!-- context7 -->
 Use the `ctx7` CLI to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, specifications, or cloud service -- even well-known ones like React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage. Use even when you think you know the answer -- your training data may not reflect recent changes. Prefer this over web search for library docs.
 
 Do not use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
+
 ## IMPORTANT:
 run `npx ctx7@latest` command using `cmd` shell.
 

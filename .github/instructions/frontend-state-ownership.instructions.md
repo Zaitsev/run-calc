@@ -6,22 +6,29 @@ description: "Use when changing frontend state ownership, persistence, or contex
 # Frontend State Ownership Rules
 
 ## Scope
-- Applies to frontend state ownership, persistence, and context wiring changes in the matched files.
-- Treat file names in this document as current examples of ownership boundaries. If responsibilities move, follow the current owner instead of recreating a second writer.
+- Applies only to the frontend files matched by `applyTo`.
+- For architecture planning and detailed domain mapping, use the `application-state-ownership` skill.
 
-## Ownership model
-- Keep one owner for each shared or persisted state domain.
-- Keep worksheet state and worksheet persistence in the current worksheet owner context.
-- Keep display settings persistence in the current display settings owner context.
-- Keep window and platform behavior persistence in the current window owner context.
-- Keep AI settings and session state in the current AI owner context.
-- Keep status text and error state in the current status owner context.
+## Core Enforcement Rules
 
-## App boundary
-- Keep the top-level app shell as an orchestrator for editor events, DOM refs, timing-sensitive behavior, layout coordination, and platform event wiring.
-- Do not add new persistence effects in the app shell or consumer components for domains already owned by a context.
+### Single Owner Principle
+- Keep **one owner** for each shared or persisted state domain
+- **Owner**: the context that initializes, mutates, and persists that domain
+- **Consumer**: components that read and invoke owner actions
 
-## Change checks
-- Before adding shared state, decide which single context owns initialization, mutation, and persistence.
-- If a change adds persistence, keep that effect in the owner context only.
-- If logic is moved into the app shell, ensure it is UI orchestration or DOM-timing work rather than shared-domain ownership.
+### Current Domain Owners
+- Worksheet state + persistence → **WorksheetContext**
+- Display settings persistence → **DisplaySettingsContext**
+- Window/platform behavior + persistence → **WindowContext**
+- AI settings/session state → **AIContext**
+- Status text + error state → **StatusContext**
+
+### App Component Boundary
+- `App.tsx` is a **smart orchestrator** for editor events, DOM refs, timing-sensitive behavior, layout coordination, and platform event wiring
+- Do **not** add new persistence effects in `App.tsx` or consumer components for domains already owned by a context
+
+## Pre-Edit Checks
+Before editing matched files, verify:
+1. If adding shared state → decide which single context owns it
+2. If adding persistence → keep that effect in the owner context only
+3. If moving logic into `App.tsx` → ensure it is UI orchestration or DOM-timing work, not shared-domain ownership
