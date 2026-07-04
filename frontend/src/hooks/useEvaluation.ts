@@ -331,7 +331,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                 const after = content.slice(lineEnd);
                 const insertionBlock = `\n${insertionLines.join('\n')}`;
                 const nextContent = before + insertionBlock + after + (lineEnd === content.length ? '\n' : '');
-                const nextCaret = before.length + insertionBlock.length;
+                const nextCaret = before.length + insertionBlock.length + 1;
 
                 setContentAndCaret(nextContent, nextCaret);
                 clearLineEvaluationMetadata(lineIndex);
@@ -359,7 +359,9 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
                 const contentForReeval = nextContent;
                 await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => resolve());
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => resolve());
+                    });
                 });
                 await reevaluateAllExpressions(contentForReeval);
             } catch (error) {
