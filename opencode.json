@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+
+ "shell": "pwsh",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    }
+  },
+
+
+
+  "instructions": [
+    "AGENTS.md",
+    ".github/instructions/dead-code-prevention.instructions.md",
+    ".github/instructions/expr-evaluator.instructions.md",
+    ".github/instructions/frontend-state-ownership.instructions.md",
+    ".github/instructions/site-help-sync.instructions.md"
+  ]
+  
+}
