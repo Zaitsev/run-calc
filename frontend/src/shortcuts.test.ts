@@ -53,9 +53,9 @@ function wheelEvent(input: TestWheelEvent) {
 }
 
 describe('getPrimaryShortcutAction', () => {
-    it('matches insert line below shortcut', () => {
-        expect(getPrimaryShortcutAction(event({key: 'Enter', ctrlKey: true}))).toBe('insert-line-below');
-        expect(getPrimaryShortcutAction(event({key: 'Enter', metaKey: true, code: 'NumpadEnter'}))).toBe('insert-line-below');
+    it('matches insert line shortcut', () => {
+        expect(getPrimaryShortcutAction(event({key: 'Enter', ctrlKey: true}))).toBe('insert-line');
+        expect(getPrimaryShortcutAction(event({key: 'Enter', metaKey: true, code: 'NumpadEnter'}))).toBe('insert-line');
     });
 
     it('matches mark toggle shortcut', () => {

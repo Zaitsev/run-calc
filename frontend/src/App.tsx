@@ -647,18 +647,36 @@ function App() {
         setContentAndCaret(nextContent, nextCaret);
     };
 
-    const insertLineBelowCurrent = () => {
+    const insertLineAtCursor = () => {
         const editor = editorRef.current;
         if (!editor) {
             return;
         }
 
-        const {lineEnd} = getLineBounds(content, editor.selectionStart);
-        const insertPos = lineEnd;
-        const nextContent = content.slice(0, insertPos) + '\n' + content.slice(insertPos);
-        const nextCaret = insertPos + 1;
+        const pos = editor.selectionStart;
+        const {lineStart, lineEnd} = getLineBounds(content, pos);
 
-        setContentAndCaret(nextContent, nextCaret);
+        if (pos === lineStart) {
+            const nextContent = content.slice(0, lineStart) + '\n' + content.slice(lineStart);
+            setContentAndCaret(nextContent, lineStart);
+        } else {
+            const nextContent = content.slice(0, lineEnd) + '\n' + content.slice(lineEnd);
+            setContentAndCaret(nextContent, lineEnd + 1);
+        }
+    };
+
+    const insertLineAbove = (lineIndex: number) => {
+        const lines = content.split('\n');
+        const lineStart = lines.slice(0, lineIndex).join('\n').length + (lineIndex > 0 ? 1 : 0);
+        const nextContent = content.slice(0, lineStart) + '\n' + content.slice(lineStart);
+        setContentAndCaret(nextContent, lineStart);
+    };
+
+    const insertLineBelow = (lineIndex: number) => {
+        const lines = content.split('\n');
+        const lineEnd = lines.slice(0, lineIndex + 1).join('\n').length;
+        const nextContent = content.slice(0, lineEnd) + '\n' + content.slice(lineEnd);
+        setContentAndCaret(nextContent, lineEnd + 1);
     };
 
     const updateCaretPosFromEditor = () => {
@@ -1015,15 +1033,15 @@ function App() {
                 return;
             }
 
-            if (shortcutAction === 'insert-line-below' || shortcutAction === 'toggle-mark-line' || event.key === 'Enter' || event.key === 'Tab') {
+            if (shortcutAction === 'insert-line' || shortcutAction === 'toggle-mark-line' || event.key === 'Enter' || event.key === 'Tab') {
                 event.preventDefault();
             }
             return;
         }
 
-        if (shortcutAction === 'insert-line-below') {
+        if (shortcutAction === 'insert-line') {
             event.preventDefault();
-            insertLineBelowCurrent();
+            insertLineAtCursor();
             return;
         }
 
@@ -1601,6 +1619,30 @@ function App() {
                                         <span className="gutter-var">@</span>
                                     )}
                                 </span>
+                                {!isActiveWorksheetLocked && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="gutter-insert-btn gutter-insert-btn--top"
+                                            title="Insert line above"
+                                            aria-label="Insert line above"
+                                            onClick={(e) => { e.stopPropagation(); insertLineAbove(i); }}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            <span aria-hidden="true">+</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="gutter-insert-btn gutter-insert-btn--bottom"
+                                            title="Insert line below"
+                                            aria-label="Insert line below"
+                                            onClick={(e) => { e.stopPropagation(); insertLineBelow(i); }}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            <span aria-hidden="true">+</span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         ))}
                     </div>

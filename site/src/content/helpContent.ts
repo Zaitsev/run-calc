@@ -24,7 +24,7 @@ export const helpContent: HelpContentMap = {
     ],
     shortcuts: [
         'Enter: Evaluate current line, or move to the next line when the current line is empty/comment-only or caret is in trailing comment text. On the last line, Enter creates a new line and moves the caret to it when no evaluation error occurs.',
-        'Ctrl/Cmd + Enter: Always insert a new line below and move the caret to it.',
+        'Ctrl/Cmd + Enter: Insert a new line and move the caret to it. When the cursor is at the start of a line, inserts above; otherwise inserts below.',
         'Ctrl/Cmd + N: New worksheet.',
         'Ctrl/Cmd + L: Create a lock for the current worksheet if needed, then lock it.',
         'New worksheet (Ctrl/Cmd + N or menu) asks for confirmation before clearing content.',
