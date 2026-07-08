@@ -20,6 +20,7 @@ import {
     stripMarkdownCodeFences,
     SHADOW_STALE_MARKER,
     UNEVALUATED_STALE_MARKER,
+    getLastEvaluatedLineInfo,
 } from '../appInteractionLogic';
 import {
     getLineBounds,
@@ -331,7 +332,7 @@ export function buildEvaluationHooks(deps: EvalDeps) {
                 const after = content.slice(lineEnd);
                 const insertionBlock = `\n${insertionLines.join('\n')}`;
                 const nextContent = before + insertionBlock + after + (lineEnd === content.length ? '\n' : '');
-                const nextCaret = before.length + insertionBlock.length;
+                const nextCaret = before.length + insertionBlock.length + 1;
 
                 setContentAndCaret(nextContent, nextCaret);
                 clearLineEvaluationMetadata(lineIndex);
@@ -359,7 +360,9 @@ export function buildEvaluationHooks(deps: EvalDeps) {
 
                 const contentForReeval = nextContent;
                 await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => resolve());
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => resolve());
+                    });
                 });
                 await reevaluateAllExpressions(contentForReeval);
             } catch (error) {
@@ -390,21 +393,16 @@ export function buildEvaluationHooks(deps: EvalDeps) {
         }
 
         const trimmed = editableLine.trim();
-        
-        // Extract previous line content for variable-first inlining feature
-        let previousLineSource = '';
-        if (lineStart > 0) {
-            const prevLineEnd = lineStart - 1;  // Account for the newline
-            const prevBounds = getLineBounds(content, Math.max(0, lineStart - 2));
-            const prevLineStart = prevBounds.lineStart;
-            const prevLineText = content.slice(prevLineStart, prevLineEnd);
-            previousLineSource = getExpressionSource(prevLineText);
-        }
-        
+
+        // Find the nearest evaluated line above the cursor in a single scan, so the
+        // carried-over numeric value and its variable label (if any) always agree.
+        const evaluatedInfo = getLastEvaluatedLineInfo(content, lineStart);
+        const effectiveLastResult = evaluatedInfo?.value ?? lastResult;
+
         const expression = buildEvaluationExpression(
-            editableLine, trimmed, lastResult, decimalDelimiter,
+            editableLine, trimmed, effectiveLastResult, decimalDelimiter,
             (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
-            previousLineSource,
+            evaluatedInfo?.declaredLabel ?? null,
             variableFirstInlining,
         );
 

@@ -1,6 +1,10 @@
 ---
 name: application-calculator
-description: Provides architecture overview and guidance for Run-Calc, a Wails (Go + React + TypeScript) notepad-style expression evaluator with worksheet management, AI assistant integration, and advanced mathematical functions.
+description: Provides architecture overview and guidance for the current target
+  application  "Run-Calc", a Wails (Go + React + TypeScript) notepad-style
+  expression evaluator with worksheet management, AI assistant integration, and
+  advanced mathematical functions.
+targetPath: D:\vlz\calc\.agents\skills\application-calculator\SKILL.md
 ---
 
 # Application Calculator Skill
