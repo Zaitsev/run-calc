@@ -1,6 +1,9 @@
 # Application
 
 Run-Calc (Wails v2.12.0 + React 19)
+# Application
+
+Run-Calc (Wails v2.12.0 + React 19)
 
 Notepad-style expression evaluator with worksheet management, AI integration, and advanced math functions.
 

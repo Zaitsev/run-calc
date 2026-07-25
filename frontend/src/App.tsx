@@ -11,6 +11,7 @@ import {
     buildEvaluationExpression,
     buildStaleLineDetails,
     getCopyableNumericResultText,
+    getLastEvaluatedLineInfo,
     isAITriggerSourceLine,
     parseNumericText,
     reformatComputedLineResult,
@@ -1122,7 +1123,7 @@ function App() {
         }
 
         const editor = editorRef.current;
-        if (!editor || lastResult === null) {
+        if (!editor) {
             return;
         }
 
@@ -1136,22 +1137,21 @@ function App() {
             return;
         }
 
-        event.preventDefault();
-        let previousLineSource = '';
-        if (lineStart > 0) {
-            const prevLineEnd = lineStart - 1;
-            const prevBounds = getLineBounds(content, Math.max(0, lineStart - 2));
-            const prevLineText = content.slice(prevBounds.lineStart, prevLineEnd);
-            previousLineSource = getExpressionSource(prevLineText);
+        const evaluatedInfo = getLastEvaluatedLineInfo(content, lineStart);
+        const effectiveLastResult = evaluatedInfo?.value ?? lastResult;
+        if (effectiveLastResult === null) {
+            return;
         }
+
+        event.preventDefault();
 
         const nextExpression = buildEvaluationExpression(
             event.key,
             event.key,
-            lastResult,
+            effectiveLastResult,
             decimalDelimiter,
             (value, delimiter) => formatNumber(value, delimiter, 'auto', false),
-            previousLineSource,
+            evaluatedInfo?.declaredLabel ?? null,
             variableFirstInlining,
         );
 

@@ -2,9 +2,8 @@ import {describe, expect, it} from 'vitest';
 import {
     buildEvaluationExpression,
     buildStaleLineDetails,
-    SHADOW_STALE_MARKER,
-    UNEVALUATED_STALE_MARKER,
     getCopyableNumericResultText,
+    getLastEvaluatedLineInfo,
     getPreservedCaretOffset,
     getFriendlyEvalErrorMessage,
     parseNumericText,
@@ -14,6 +13,8 @@ import {
     shouldSkipEvaluation,
     shouldAutoReevaluateStaleLines,
     shouldScheduleStaleVerification,
+    SHADOW_STALE_MARKER,
+    UNEVALUATED_STALE_MARKER,
 } from './appInteractionLogic';
 
 describe('app interaction helpers', () => {
@@ -58,19 +59,19 @@ describe('app interaction helpers', () => {
             delimiter === ',' ? String(value).replace('.', ',') : String(value);
 
         // Variable assignment: should use variable name
-        expect(buildEvaluationExpression('+', '+', 5, '.', format, 'a=5', true)).toBe('a+');
-        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', true)).toBe('a+2');
-        expect(buildEvaluationExpression('*3', '*3', 10, '.', format, 'price=100', true)).toBe('price*3');
-        expect(buildEvaluationExpression('-1', '-1', 42, '.', format, '@arr=[1,2,3]', true)).toBe('@arr-1');
-        
-        // Regular expression: should still use result
-        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '2+3 = 5', true)).toBe('5+2');
-        
-        // When disabled: should use result
-        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a=5', false)).toBe('5+2');
-        
-        // Without previous line: should use result
-        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, '', true)).toBe('5+2');
+        expect(buildEvaluationExpression('+', '+', 5, '.', format, 'a', true)).toBe('a+');
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a', true)).toBe('a+2');
+        expect(buildEvaluationExpression('*3', '*3', 10, '.', format, 'price', true)).toBe('price*3');
+        expect(buildEvaluationExpression('-1', '-1', 42, '.', format, '@arr', true)).toBe('@arr-1');
+
+        // Regular expression (no declared label): should still use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, null, true)).toBe('5+2');
+
+        // When disabled: should use result even though a label is available
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, 'a', false)).toBe('5+2');
+
+        // Without a declared label: should use result
+        expect(buildEvaluationExpression('+2', '+2', 5, '.', format, null, true)).toBe('5+2');
     });
 
     it('maps syntax and math failures to user-friendly messages', () => {
@@ -169,5 +170,62 @@ describe('app interaction helpers', () => {
         expect(getCopyableNumericResultText('total = 5', true)).toBeNull();
         expect(getCopyableNumericResultText('label = "ok" = ok', true)).toBeNull();
         expect(getCopyableNumericResultText('status = true', false)).toBeNull();
+    });
+
+    it('scans upward for the closest evaluated result', () => {
+        expect(getLastEvaluatedLineInfo('2+2 = 4\n', 8)?.value).toBe(4);
+        expect(getLastEvaluatedLineInfo('2+2 = 4\n3+3 = 9\n', 16)?.value).toBe(9);
+        expect(getLastEvaluatedLineInfo('1+1 = 2\n\n\n3+3 = 9\n', 20)?.value).toBe(9);
+    });
+
+    it('returns null when no evaluated line exists above', () => {
+        expect(getLastEvaluatedLineInfo('hello world\n', 12)).toBeNull();
+        expect(getLastEvaluatedLineInfo('\n\n', 2)).toBeNull();
+        expect(getLastEvaluatedLineInfo('2+2\n', 4)).toBeNull();
+    });
+
+    it('skips comment-only and AI trigger lines while scanning', () => {
+        const content = '" a comment\n?ask ai\n2+2 = 4\n';
+        expect(getLastEvaluatedLineInfo(content, 29)?.value).toBe(4);
+    });
+
+    it('returns null when only non-numeric results exist above', () => {
+        expect(getLastEvaluatedLineInfo('label = "ok" = ok\n', 18)).toBeNull();
+    });
+
+    it('scans past non-numeric lines to find an evaluated result', () => {
+        const content = 'label = "ok" = ok\n2+2 = 4\n';
+        expect(getLastEvaluatedLineInfo(content, 27)?.value).toBe(4);
+    });
+
+    it('handles European decimal (comma) separator', () => {
+        expect(getLastEvaluatedLineInfo('PI = 3,14\n', 10)?.value).toBe(3.14);
+    });
+
+    it('extracts result from evaluated declaration lines', () => {
+        const content = 'x = 3.14 * 2 = 6.28\n';
+        expect(getLastEvaluatedLineInfo(content, 20)?.value).toBe(6.28);
+    });
+
+    it('skips unevaluated declaration lines', () => {
+        const content = 'x = 3.14 * 2\n';
+        expect(getLastEvaluatedLineInfo(content, 13)).toBeNull();
+    });
+
+    it('reports null declaredLabel for plain (non-declaration) expressions', () => {
+        expect(getLastEvaluatedLineInfo('2+2 = 4\n', 8)?.declaredLabel).toBeNull();
+    });
+
+    it('reports the declared variable label alongside the value, in a single scan', () => {
+        expect(getLastEvaluatedLineInfo('a = 3 = 3\n', 10)).toEqual({value: 3, declaredLabel: 'a'});
+    });
+
+    it('scans past multiple empty lines to find the closest evaluated declaration, matching the label with its own value', () => {
+        const content = 'a = 3 = 3\n\n\n\n';
+        expect(getLastEvaluatedLineInfo(content, 13)).toEqual({value: 3, declaredLabel: 'a'});
+    });
+
+    it('reports the @-prefixed label for list/array declarations', () => {
+        expect(getLastEvaluatedLineInfo('@arr = [1,2,3] = 3\n', 19)?.declaredLabel).toBe('@arr');
     });
 });

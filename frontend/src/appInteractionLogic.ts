@@ -1,4 +1,4 @@
-import { splitLineComment, getExpressionSource } from './lineExpression';
+import { splitLineComment } from './lineExpression';
 import { parseDeclaredVariable } from './utils/worksheetEditing';
 
 type DecimalDelimiter = '.' | ',';
@@ -100,26 +100,69 @@ export function buildEvaluationExpression(
     lastResult: number | null,
     decimalDelimiter: DecimalDelimiter,
     formatNumber: (value: number, decimalDelimiter: DecimalDelimiter) => string,
-    previousLineSource?: string,
+    declaredLabel?: string | null,
     variableFirstInlining?: boolean,
 ): string {
     if (!trimmedLine.match(/^[+\-*/]/) || lastResult === null) {
         return editableLine;
     }
 
-    // If variable-first inlining is enabled and previous line is a variable assignment,
-    // use the variable name instead of the result
-    if (variableFirstInlining && previousLineSource) {
-        const prevLineExpr = getExpressionSource(previousLineSource);
-        const declaredVar = parseDeclaredVariable(prevLineExpr);
-        if (declaredVar) {
-            // Use the variable label (with optional @ prefix)
-            return `${declaredVar.label}${trimmedLine}`;
-        }
+    // If variable-first inlining is enabled and the carried-over value came from
+    // a variable declaration line, use the variable name instead of the result.
+    if (variableFirstInlining && declaredLabel) {
+        return `${declaredLabel}${trimmedLine}`;
     }
 
     // Otherwise, use the original behavior: inject the last result
     return `${formatNumber(lastResult, decimalDelimiter)}${trimmedLine}`;
+}
+
+export interface LastEvaluatedLineInfo {
+    /** The numeric result carried over from the nearest evaluated line above the cursor. */
+    value: number;
+    /** The variable label (e.g. "a" or "@arr") if that line was a declaration, otherwise null. */
+    declaredLabel: string | null;
+}
+
+/**
+ * Scans upward from `currentLineStart` for the nearest line with a finite evaluated
+ * result (an ` = <number>` suffix), skipping empty lines, comment/AI-only lines, and
+ * unevaluated declarations. Returns both the numeric value and — in a single pass —
+ * whether that line was a variable declaration, so callers never have to reconcile
+ * two independently-scanned answers for the same cursor position.
+ */
+export function getLastEvaluatedLineInfo(content: string, currentLineStart: number): LastEvaluatedLineInfo | null {
+    let searchEnd = currentLineStart;
+    let maxIterations = content.length;
+    while (searchEnd > 0 && maxIterations > 0) {
+        maxIterations--;
+        const prevLineEnd = searchEnd - 1;
+        const prevLineStart = prevLineEnd > 0 ? content.lastIndexOf('\n', prevLineEnd - 1) + 1 : 0;
+        const lineText = content.slice(prevLineStart, prevLineEnd);
+        if (lineText.trim().length === 0) {
+            searchEnd = prevLineStart;
+            continue;
+        }
+        const {body} = splitLineComment(lineText);
+        const trimmedBody = body.trimEnd();
+        const decl = parseDeclaredVariable(trimmedBody);
+        if (decl && !decl.expression.includes(' = ') && !parseNumericText(decl.expression)) {
+            searchEnd = prevLineStart;
+            continue;
+        }
+        const equalsIndex = trimmedBody.lastIndexOf(' = ');
+        if (equalsIndex === -1) {
+            searchEnd = prevLineStart;
+            continue;
+        }
+        const resultText = trimmedBody.slice(equalsIndex + 3).trim();
+        const num = Number(resultText.replace(',', '.'));
+        if (isFinite(num)) {
+            return {value: num, declaredLabel: decl ? decl.label : null};
+        }
+        searchEnd = prevLineStart;
+    }
+    return null;
 }
 
 export function reformatComputedLineResult(

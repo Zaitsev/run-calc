@@ -1,8 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-
-
- "shell": "pwsh",
+  "shell": "pwsh",
   "mcp": {
     "playwright": {
       "type": "local",
@@ -17,9 +15,6 @@
       "url": "https://mcp.grep.app"
     }
   },
-
-
-
   "instructions": [
     "AGENTS.md",
     ".github/instructions/dead-code-prevention.instructions.md",
@@ -27,5 +22,4 @@
     ".github/instructions/frontend-state-ownership.instructions.md",
     ".github/instructions/site-help-sync.instructions.md"
   ]
-  
 }

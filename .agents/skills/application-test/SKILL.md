@@ -1,6 +1,6 @@
 ---
 name: application-test
-description: Use when running, writing, or debugging test for frontend or Go-lang backend (Wails files). Covers test layers, commands, principles, and completion criteria for deterministic editor-logic tests in the Run-Calc app.
+description: Use when running, writing, or debugging any tests for application( frontend or Go-lang backend's Wails files). Covers test layers, commands, principles, and completion criteria for deterministic editor-logic tests in the Run-Calc app.
 ---
 
 # Application Test Skill
@@ -36,12 +36,13 @@ Go evaluator tests live in `expr_eval_test.go` — main calculations are validat
    - stale result detection
 
 ## Commands
+CRITICAL: Use only following commands to run tests:
 
-| Action | Command |
-|---|---|
-| Run all frontend tests | `cd frontend && npm test` (alias for `vitest run`) |
-| Run Go tests | `go test ./...` (requires `cd frontend && npm run build` first) |
-| Full CI verify | `.\scripts\ci-verify.ps1` |
+
+-  Run all frontend tests " `cd frontend && npm test` , it accepts the same arguments as vitest, e.g. `npm test -- -t "worksheet lock"` to run a single test by name. |
+- Run Go tests | `go test ./...` (requires `cd frontend && npm run build` first) |
+
+CRITICAL: DO NOT use `npx vitest`, `vitest watch` or `vitest --run` for test runs, as they may not respect the `node` environment and can produce false failures.
 
 ## Test config
 
