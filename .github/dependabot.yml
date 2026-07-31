@@ -16,8 +16,12 @@ updates:
     groups:
       production-dependencies:
         dependency-type: "production"
+        exclude-patterns:
+          - "typescript"
       development-dependencies:
         dependency-type: "development"
+        exclude-patterns:
+          - "typescript"
 
   - package-ecosystem: npm
     directory: "/site"
@@ -28,8 +32,12 @@ updates:
     groups:
       production-dependencies:
         dependency-type: "production"
+        exclude-patterns:
+          - "typescript"
       development-dependencies:
         dependency-type: "development"
+        exclude-patterns:
+          - "typescript"
 
   - package-ecosystem: github-actions
     directory: "/"
