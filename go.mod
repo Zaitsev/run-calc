@@ -7,7 +7,7 @@ require (
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/openai/openai-go v1.12.0
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
-	github.com/wailsapp/wails/v2 v2.12.0
+	github.com/wailsapp/wails/v2 v2.13.0
 	github.com/zalando/go-keyring v0.2.8
 )
 
