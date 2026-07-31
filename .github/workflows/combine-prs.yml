@@ -21,7 +21,7 @@ jobs:
         id: combine-prs
         with:
           # The GitHub token used to create an authenticated client - Provided for you by default!
-          github_token: # default is ${{ github.token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           # The prefix of the branches to combine
           branch_prefix: # default is dependabot
           # The title of the pull request to create
