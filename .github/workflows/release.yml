@@ -83,7 +83,7 @@ jobs:
 
       - name: Set up Node.js
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_verify) }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -143,7 +143,7 @@ jobs:
           cache: ${{ runner.os != 'Windows' }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           # Disable built-in cache on Windows: Git tar.exe fails on paths with spaces (C:\Program Files)
