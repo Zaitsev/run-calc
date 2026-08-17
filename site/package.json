@@ -11,7 +11,7 @@
     "deploy:build": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
-    "lucide-react": "^1.28.0",
+    "lucide-react": "^1.31.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
