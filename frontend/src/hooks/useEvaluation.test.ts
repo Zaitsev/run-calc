@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildEvaluationHooks } from './useEvaluation';
 
-vi.mock('../../wailsjs/go/main/App', () => ({
+vi.mock('../../bindings/calc/app', () => ({
     EvaluateExprProgram: vi.fn(),
     CaptureRandomState: vi.fn(),
     RestoreRandomState: vi.fn(),
     RunAIQuery: vi.fn(),
 }));
 
-import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../wailsjs/go/main/App';
-import type { main } from '../../wailsjs/go/models';
+import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../bindings/calc/app';
+import type { ExprEvalResponse } from '../../bindings/calc';
 
-type EvalResult = main.ExprEvalResponse;
+type EvalResult = ExprEvalResponse;
 
 function evaluateSimpleExpression(expression: string, variables: Record<string, unknown>): number {
     const trimmed = expression.trim();
@@ -253,9 +253,9 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
 
         let resolveEval: ((value: EvalResult) => void) | undefined;
         evaluateExprMock.mockImplementation(
-            () => new Promise<EvalResult>((resolve) => {
+            (() => new Promise<EvalResult>((resolve) => {
                 resolveEval = resolve;
-            }),
+            })) as any,
         );
         captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
         restoreRandomStateMock.mockResolvedValue();
@@ -442,7 +442,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         let staleLineMarkers: Record<number, Record<string, number>> = {};
         captureRandomStateMock.mockResolvedValue({ state: '123', hasSpare: false, spare: 0, seeded: true });
         restoreRandomStateMock.mockResolvedValue();
-        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+        evaluateExprMock.mockImplementation(((async (expression: string, variables: any) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>))) as any);
 
         const hooks = buildEvaluationHooks({
             content: ['a = 1', 'b = a + 1 = 2'].join('\n'),
@@ -499,9 +499,9 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
 
         const evalResolvers: Array<(value: EvalResult) => void> = [];
-        evaluateExprMock.mockImplementation(() => new Promise<EvalResult>((resolve) => {
+        evaluateExprMock.mockImplementation((() => new Promise<EvalResult>((resolve) => {
             evalResolvers.push(resolve as (value: EvalResult) => void);
-        }));
+        })) as any);
 
         let content = ['a = 1 = 1', 'b = a + 1 = 2'].join('\n');
         let variableValues: Record<string, unknown> = { a: 1, b: 2 };
@@ -585,7 +585,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
 
     it('re-evaluates strictly top-to-bottom without refresh passes', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
-        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+        evaluateExprMock.mockImplementation(((async (expression: string, variables: any) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>))) as any);
 
         const editorRef = {
             current: {
@@ -691,7 +691,7 @@ describe('buildEvaluationHooks reevaluateAllExpressions', () => {
 
     it('marks mismatched deterministic lines as stale via shadow verification', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
-        evaluateExprMock.mockImplementation(async (expression, variables) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>));
+        evaluateExprMock.mockImplementation(((async (expression: string, variables: any) => mockedEvaluateExprProgram(expression, variables as Record<string, unknown>))) as any);
 
         let lineDependencyVersions: Record<number, Record<string, number>> = {};
 
@@ -751,9 +751,9 @@ describe('buildEvaluationHooks evaluateCurrentLine', () => {
     it('reevaluates after AI insertion even without code lines', async () => {
         const evaluateExprMock = vi.mocked(EvaluateExprProgram);
         const runAIQueryMock = vi.mocked(RunAIQuery);
-        evaluateExprMock.mockImplementation(async (expression, variables) => {
+        evaluateExprMock.mockImplementation(((async (expression: string, variables: any) => {
             return mockedEvaluateExprProgram(expression, variables as Record<string, unknown>);
-        });
+        })) as any);
         runAIQueryMock.mockResolvedValue({
             ok: true,
             output: {

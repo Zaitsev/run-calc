@@ -21,7 +21,6 @@ import (
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/shared"
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	keyring "github.com/zalando/go-keyring"
 )
 
@@ -684,10 +683,10 @@ func (a *App) RunAIQuery(request AIRunRequest) AIRunResponse {
 }
 
 func (a *App) emitAIProgress(message string) {
-	if a == nil || a.ctx == nil {
+	if a == nil || a.app == nil {
 		return
 	}
-	wruntime.EventsEmit(a.ctx, "ai:progress", AIProgressEvent{Message: message})
+	a.app.Event.Emit("ai:progress", AIProgressEvent{Message: message})
 }
 
 func normalizeAIContextMode(mode string) string {

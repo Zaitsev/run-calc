@@ -10,3 +10,6 @@ calc.exe
 .firebase.json
 .playwright-test-results
 .playwright-mcp
+bin/
+.task/
+*.syso

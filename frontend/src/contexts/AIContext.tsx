@@ -11,7 +11,7 @@ import {
     RunAIQuery,
     SaveAISettings,
     SetAIAPIKey,
-} from '../../wailsjs/go/main/App';
+} from '../../bindings/calc/app';
 
 type AIContextValue = {
     aiSettings: AISettingsState;

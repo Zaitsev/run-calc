@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/tailscale/hujson"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // OpenVSXFiles represents the nested files object from OpenVSX
@@ -597,8 +596,7 @@ func (a *App) InstallTheme(extensionId string, downloadURL string) (*CustomTheme
 
 // OpenThemeStore opens a standalone Wails window for the Theme Store
 func (a *App) OpenThemeStore() {
-    // In Wails v2, spawning native windows from the backend dynamically isn't officially out of the box 
-	// unless using specific hacks. A common approach: just emit an event, and the frontend opens it via React Router
-	// or modal popup taking up screen, or via frontend Window api. Let's emit an event asking to show the Theme Store.
-	runtime.EventsEmit(a.ctx, "theme-store:open")
+	if a.app != nil {
+		a.app.Event.Emit("theme-store:open", nil)
+	}
 }

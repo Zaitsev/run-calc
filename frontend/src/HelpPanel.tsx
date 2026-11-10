@@ -1,4 +1,4 @@
-import { BrowserOpenURL } from '../wailsjs/runtime/runtime';
+import { Browser } from '@wailsio/runtime';
 import { helpContent } from '@site/content/helpContent';
 import type { HelpPage } from './types/app';
 
@@ -38,7 +38,7 @@ export function HelpPanel({ helpSiteUrl, activeHelpPage, onActiveHelpPageChange 
                     <button
                         type="button"
                         className="help-site-link"
-                        onClick={() => BrowserOpenURL(helpSiteUrl)}
+                        onClick={() => Browser.OpenURL(helpSiteUrl)}
                     >
                         Full documentation site
                     </button>
@@ -46,7 +46,7 @@ export function HelpPanel({ helpSiteUrl, activeHelpPage, onActiveHelpPageChange 
                     <button
                         type="button"
                         className="help-site-link"
-                        onClick={() => BrowserOpenURL(APP_DOWNLOAD_URL)}
+                        onClick={() => Browser.OpenURL(APP_DOWNLOAD_URL)}
                     >
                         Download app
                     </button>

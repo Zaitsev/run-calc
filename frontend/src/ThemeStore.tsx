@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SearchThemes, InstallTheme } from '../wailsjs/go/main/App';
+import { SearchThemes, InstallTheme } from '../bindings/calc/app';
 import { useThemeContext, useThemeStore } from './contexts';
 import './ThemeStore.css';
 

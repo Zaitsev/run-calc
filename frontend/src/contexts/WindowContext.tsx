@@ -1,15 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
-    Environment,
-    EventsOn,
-    ScreenGetAll,
-    WindowGetPosition,
-    WindowGetSize,
-    WindowSetPosition,
-    WindowSetSize,
-} from '../../wailsjs/runtime/runtime';
-import { SetMinimiseToTrayOnClose } from '../../wailsjs/go/main/App';
+    Events,
+    Screens,
+    System,
+    Window,
+} from '@wailsio/runtime';
+import { SetMinimiseToTrayOnClose } from '../../bindings/calc/app';
 import {
     WINDOW_STATE_KEY,
     WINDOW_STATE_SAVE_DEBOUNCE_MS,
@@ -18,9 +15,7 @@ import {
     DEFAULT_WINDOW_HEIGHT,
     MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY,
 } from '../constants';
-import { WindowCenter, WindowSetDarkTheme, WindowSetLightTheme, WindowSetSystemDefaultTheme } from '../../wailsjs/runtime/runtime';
 import type { ThemeState } from '../useTheme';
-import { inferCustomThemeMode } from '../utils/colorUtils';
 
 type WindowContextValue = {
     runtimePlatform: string;
@@ -39,7 +34,12 @@ type WindowContextValue = {
 const WindowContext = createContext<WindowContextValue | null>(null);
 
 export function WindowProvider({ children }: { children: ReactNode }) {
-    const [runtimePlatform, setRuntimePlatform] = useState('');
+    const [runtimePlatform, setRuntimePlatform] = useState(() => {
+        if (System.IsWindows()) return 'windows';
+        if (System.IsMac()) return 'darwin';
+        if (System.IsLinux()) return 'linux';
+        return '';
+    });
     const [minimiseToTrayOnClose, setMinimiseToTrayOnCloseState] = useState(() =>
         localStorage.getItem(MINIMISE_TO_TRAY_ON_CLOSE_STORAGE_KEY) !== 'false'
     );
@@ -49,10 +49,10 @@ export function WindowProvider({ children }: { children: ReactNode }) {
     const isWindowHiddenRef = useRef(false);
 
     useEffect(() => {
-        const unsubWindowHidden = EventsOn('window:hidden', () => {
+        const unsubWindowHidden = Events.On('window:hidden', () => {
             isWindowHiddenRef.current = true;
         });
-        const unsubWindowShown = EventsOn('window:shown', () => {
+        const unsubWindowShown = Events.On('window:shown', () => {
             isWindowHiddenRef.current = false;
         });
 
@@ -64,9 +64,14 @@ export function WindowProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         let cancelled = false;
-        Environment()
-            .then((env) => { if (!cancelled) setRuntimePlatform(env.platform || ''); })
-            .catch(() => { if (!cancelled) setRuntimePlatform(''); });
+        System.Environment()
+            .then((env) => {
+                if (!cancelled) {
+                    const os = env.OS?.toLowerCase();
+                    if (os) setRuntimePlatform(os);
+                }
+            })
+            .catch(() => {});
         return () => { cancelled = true; };
     }, []);
 
@@ -99,19 +104,21 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             const stored = readStoredState();
             if (!stored) return;
             try {
-                const screens = await ScreenGetAll();
-                const currentScreen = screens.find((s) => s.isCurrent) ?? screens.find((s) => s.isPrimary) ?? null;
+                const screens = await Screens.GetAll();
+                const currentScreen = screens.find((s) => s.IsPrimary) ?? screens[0] ?? null;
                 if (!currentScreen) {
-                    WindowSetSize(stored.w, stored.h);
-                    WindowSetPosition(stored.x, stored.y);
+                    await Window.SetSize(stored.w, stored.h);
+                    await Window.SetPosition(stored.x, stored.y);
                     return;
                 }
-                const cw = Math.min(stored.w, currentScreen.width);
-                const ch = Math.min(stored.h, currentScreen.height);
-                const maxX = Math.max(0, currentScreen.width - cw);
-                const maxY = Math.max(0, currentScreen.height - ch);
-                WindowSetSize(cw, ch);
-                WindowSetPosition(Math.min(Math.max(stored.x, 0), maxX), Math.min(Math.max(stored.y, 0), maxY));
+                const screenWidth = currentScreen.WorkArea?.Width ?? currentScreen.Size?.Width ?? 1920;
+                const screenHeight = currentScreen.WorkArea?.Height ?? currentScreen.Size?.Height ?? 1080;
+                const cw = Math.min(stored.w, screenWidth);
+                const ch = Math.min(stored.h, screenHeight);
+                const maxX = Math.max(0, screenWidth - cw);
+                const maxY = Math.max(0, screenHeight - ch);
+                await Window.SetSize(cw, ch);
+                await Window.SetPosition(Math.min(Math.max(stored.x, 0), maxX), Math.min(Math.max(stored.y, 0), maxY));
             } catch { /* ignore */ }
         };
 
@@ -122,9 +129,11 @@ export function WindowProvider({ children }: { children: ReactNode }) {
                 return;
             }
             try {
-                const size = await WindowGetSize();
-                const position = await WindowGetPosition();
-                localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify({ w: size.w, h: size.h, x: position.x, y: position.y }));
+                const size = await Window.Size();
+                const position = await Window.Position();
+                const w = size.width ?? (size as any).w;
+                const h = size.height ?? (size as any).h;
+                localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify({ w, h, x: position.x, y: position.y }));
             } catch { /* ignore */ }
         };
 
@@ -153,28 +162,25 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    const syncWindowTheme = (theme: ThemeState) => {
-        if (runtimePlatform !== 'windows') return;
-        if (theme.type === 'system') { WindowSetSystemDefaultTheme(); return; }
-        if (theme.type === 'light') { WindowSetLightTheme(); return; }
-        if (theme.type === 'dark') { WindowSetDarkTheme(); return; }
-        const mode = theme.customThemeBase || inferCustomThemeMode(theme.customColors);
-        if (mode === 'light') WindowSetLightTheme(); else WindowSetDarkTheme();
+    const syncWindowTheme = (_theme: ThemeState) => {
+        // Theme changes on window frame are handled automatically in Wails v3
     };
 
     const resetWindowLayout = (onReset?: () => void) => {
         localStorage.removeItem(WINDOW_STATE_KEY);
-        WindowSetSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
-        WindowCenter();
+        Window.SetSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
+        Window.Center();
         onReset?.();
     };
 
     const expandWindowForThemeStore = async () => {
         try {
-            const current = await WindowGetSize();
-            if (!themeStoreOriginalSizeRef.current) themeStoreOriginalSizeRef.current = { w: current.w, h: current.h };
-            const targetWidth = Math.min(1800, Math.max(1360, current.w + 260));
-            if (targetWidth !== current.w) WindowSetSize(targetWidth, current.h);
+            const current = await Window.Size();
+            const curW = current.width ?? (current as any).w;
+            const curH = current.height ?? (current as any).h;
+            if (!themeStoreOriginalSizeRef.current) themeStoreOriginalSizeRef.current = { w: curW, h: curH };
+            const targetWidth = Math.min(1800, Math.max(1360, curW + 260));
+            if (targetWidth !== curW) await Window.SetSize(targetWidth, curH);
         } catch { /* ignore */ }
     };
 
@@ -182,18 +188,20 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         const original = themeStoreOriginalSizeRef.current;
         if (!original) return;
         themeStoreOriginalSizeRef.current = null;
-        try { WindowSetSize(original.w, original.h); } catch { /* ignore */ }
+        try { await Window.SetSize(original.w, original.h); } catch { /* ignore */ }
     };
 
     const expandWindowForSettingsDrawer = async (drawerWidth: number) => {
         try {
-            const current = await WindowGetSize();
+            const current = await Window.Size();
+            const curW = current.width ?? (current as any).w;
+            const curH = current.height ?? (current as any).h;
             const SETTINGS_DRAWER_MIN_EDITOR_WIDTH = 380;
             const SETTINGS_DRAWER_MIN_WINDOW_WIDTH = 980;
             const requiredWidth = Math.min(1800, Math.max(SETTINGS_DRAWER_MIN_WINDOW_WIDTH, drawerWidth + SETTINGS_DRAWER_MIN_EDITOR_WIDTH));
-            if (current.w >= requiredWidth) return;
-            if (!settingsDrawerOriginalSizeRef.current) settingsDrawerOriginalSizeRef.current = { w: current.w, h: current.h };
-            WindowSetSize(requiredWidth, current.h);
+            if (curW >= requiredWidth) return;
+            if (!settingsDrawerOriginalSizeRef.current) settingsDrawerOriginalSizeRef.current = { w: curW, h: curH };
+            await Window.SetSize(requiredWidth, curH);
         } catch { /* ignore */ }
     };
 
@@ -201,7 +209,7 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         const original = settingsDrawerOriginalSizeRef.current;
         if (!original) return;
         settingsDrawerOriginalSizeRef.current = null;
-        try { WindowSetSize(original.w, original.h); } catch { /* ignore */ }
+        try { await Window.SetSize(original.w, original.h); } catch { /* ignore */ }
     };
 
     const setMinimiseToTrayOnClose = (v: boolean) => setMinimiseToTrayOnCloseState(v);

@@ -1,9 +1,6 @@
 # Application
 
-Run-Calc (Wails v2.12.0 + React 19)
-# Application
-
-Run-Calc (Wails v2.12.0 + React 19)
+Run-Calc (Wails v3.0.0 + React 19)
 
 Notepad-style expression evaluator with worksheet management, AI integration, and advanced math functions.
 
@@ -13,9 +10,10 @@ Notepad-style expression evaluator with worksheet management, AI integration, an
 
 | Action | Command |
 |---|---|
-| Dev server | `wails dev` |
+| Dev server | `wails3 dev` |
+| Generate bindings | `wails3 generate bindings -ts` |
 | Tests | `go test ./...` (build frontend first), `cd frontend && npm test` |
-| Build | `wails build` / `wails build -clean -nsis` |
+| Build | `wails3 task build` / `wails3 task windows:build` |
 
 - Full commands, repo structure, CI: [`docs/build-and-dev.md`](docs/build-and-dev.md)\
 - Library/framework/API/Specifications docs lookups (`context7`,`ctx7`): [`docs/ctx7-workflow.md`](docs/ctx7-workflow.md)\

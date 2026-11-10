@@ -1,4 +1,4 @@
-import { BrowserOpenURL, WindowReload, Quit } from '../../wailsjs/runtime/runtime';
+import { Browser, Window, Application } from '@wailsio/runtime';
 import { APP_VERSION, HELP_SITE_URL } from '../constants';
 
 type Props = {
@@ -27,20 +27,20 @@ export function BurgerMenu({
     return (
         <div className="status-menu-popover" role="menu" aria-label="App menu">
             <button type="button" className="status-menu-item" onClick={onNewWorksheet}>New worksheet</button>
-            <button type="button" className="status-menu-item" onClick={() => { onClose(); WindowReload(); }}>Reload app</button>
+            <button type="button" className="status-menu-item" onClick={() => { onClose(); Window.Reload(); }}>Reload app</button>
             <button type="button" className="status-menu-item" onClick={() => onChangeFontScale(1)}>Increase font size</button>
             <button type="button" className="status-menu-item" onClick={() => onChangeFontScale(-1)}>Decrease font size</button>
             <button type="button" className="status-menu-item" onClick={onResetFontSize}>Reset font size</button>
             <button type="button" className="status-menu-item" onClick={onResetWindowLayout}>Reset window layout</button>
             <button type="button" className="status-menu-item" onClick={onOpenThemeStore}>Open Theme Store</button>
             <button type="button" className="status-menu-item" onClick={onOpenHelp}>Help</button>
-            <button type="button" className="status-menu-item" onClick={() => { onClose(); BrowserOpenURL(HELP_SITE_URL); }}>Open Full Help Site</button>
+            <button type="button" className="status-menu-item" onClick={() => { onClose(); Browser.OpenURL(HELP_SITE_URL); }}>Open Full Help Site</button>
             <button type="button" className="status-menu-item" onClick={onOpenAIDebug}>
                 AI Debug Log{aiDebugLogCount > 0 ? ` (${aiDebugLogCount})` : ''}
             </button>
-            <button type="button" className="status-menu-item" onClick={() => { onClose(); BrowserOpenURL('https://github.com/Zaitsev/run-calc'); }}>GitHub</button>
+            <button type="button" className="status-menu-item" onClick={() => { onClose(); Browser.OpenURL('https://github.com/Zaitsev/run-calc'); }}>GitHub</button>
             <button type="button" className="status-menu-item" onClick={() => { onClose(); alert(`Run-Calc is a fast and light-weight desktop calculator that feels like a notepad, not a form.\nType naturally, press Enter, and get instant inline results.\nEasy use AI to everyday operations.\n\nVersion ${APP_VERSION}`); }}>About</button>
-            <button type="button" className="status-menu-item status-menu-item--danger" onClick={() => { onClose(); Quit(); }}>Quit (your work is saved)</button>
+            <button type="button" className="status-menu-item status-menu-item--danger" onClick={() => { onClose(); Application.Quit(); }}>Quit (your work is saved)</button>
         </div>
     );
 }

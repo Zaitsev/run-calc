@@ -10,7 +10,7 @@ import {
     SelectWorksheetEncryptedSavePath,
     SelectWorksheetPlaintextExportPath,
     SelectWorksheetLoadPath,
-} from '../../wailsjs/go/main/App';
+} from '../../bindings/calc/app';
 
 type WorksheetTabsProps = {
     placement: WorksheetTabPosition;
@@ -259,8 +259,8 @@ export function WorksheetTabs({ placement }: WorksheetTabsProps) {
                 updateWorksheet(worksheetId, {
                     content: result.payload.content,
                     lastResult: result.payload.lastResult,
-                    markedLines: result.payload.markedLines,
-                    variableValues: result.payload.variableValues,
+                    markedLines: result.payload.markedLines ?? undefined,
+                    variableValues: (result.payload.variableValues as Record<string, unknown>) ?? undefined,
                     isLocked: !!result.payload.isLocked,
                     lockPasswordHash: result.payload.lockPasswordHash,
                 });

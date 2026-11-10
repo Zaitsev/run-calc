@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"runtime"
 	"testing"
 )
@@ -14,7 +13,7 @@ func TestBeforeClose_DoesNotMinimizeOutsideWindows(t *testing.T) {
 	app := NewApp()
 	app.minimiseToTrayOnClose.Store(true)
 
-	cancelClose := app.beforeClose(context.Background())
+	cancelClose := app.beforeClose()
 	if cancelClose {
 		t.Fatal("expected close to continue on non-Windows")
 	}
@@ -25,7 +24,7 @@ func TestBeforeClose_AllowsSingleQuitClose(t *testing.T) {
 	app.allowCloseOnce.Store(true)
 	app.minimiseToTrayOnClose.Store(true)
 
-	cancelClose := app.beforeClose(context.Background())
+	cancelClose := app.beforeClose()
 	if cancelClose {
 		t.Fatal("expected close to continue when allowCloseOnce is set")
 	}

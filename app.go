@@ -16,13 +16,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/options"
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx        context.Context
+	app        *application.App
+	mainWindow *application.WebviewWindow
 
 	minimiseToTrayOnClose atomic.Bool
 	allowCloseOnce        atomic.Bool
@@ -39,22 +40,37 @@ func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
-func (a *App) startup(ctx context.Context) {
+func (a *App) init(app *application.App) {
+	a.app = app
+}
+
+// ServiceStartup is called when the service starts
+func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	a.ctx = ctx
 	a.minimiseToTrayOnClose.Store(true)
 	a.startTray()
 	a.startSleepResumeMonitor()
 	a.ShowWindow()
+	return nil
 }
 
-func (a *App) shutdown(ctx context.Context) {
+// ServiceShutdown is called when the application shuts down
+func (a *App) ServiceShutdown() error {
 	a.stopTray()
 	if a.sleepMonitorCancel != nil {
 		a.sleepMonitorCancel()
 		a.sleepMonitorCancel = nil
 	}
+	return nil
+}
+
+// startup is kept for backwards compatibility
+func (a *App) startup(ctx context.Context) {
+	_ = a.ServiceStartup(ctx, application.ServiceOptions{})
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	_ = a.ServiceShutdown()
 }
 
 func (a *App) startSleepResumeMonitor() {
@@ -80,7 +96,9 @@ func (a *App) startSleepResumeMonitor() {
 				return
 			case now := <-ticker.C:
 				if now.Sub(lastTick) > 2*time.Minute {
-					wruntime.EventsEmit(a.ctx, "system:resume")
+					if a.app != nil {
+						a.app.Event.Emit("system:resume", nil)
+					}
 				}
 				lastTick = now
 			}
@@ -94,47 +112,68 @@ func (a *App) Greet(name string) string {
 }
 
 func (a *App) clearWorksheet() {
-	wruntime.EventsEmit(a.ctx, "menu:file:new")
+	if a.app != nil {
+		a.app.Event.Emit("menu:file:new", nil)
+	}
 }
 
 func (a *App) reloadWindow() {
-	wruntime.WindowReload(a.ctx)
+	if a.mainWindow != nil {
+		a.mainWindow.Reload()
+	} else if a.app != nil {
+		if w := a.app.Window.Current(); w != nil {
+			w.Reload()
+		}
+	}
 }
 
 func (a *App) increaseFontSize() {
-	wruntime.EventsEmit(a.ctx, "menu:view:increase-font-size")
+	if a.app != nil {
+		a.app.Event.Emit("menu:view:increase-font-size", nil)
+	}
 }
 
 func (a *App) decreaseFontSize() {
-	wruntime.EventsEmit(a.ctx, "menu:view:decrease-font-size")
+	if a.app != nil {
+		a.app.Event.Emit("menu:view:decrease-font-size", nil)
+	}
 }
 
 func (a *App) resetWindowLayout() {
-	wruntime.EventsEmit(a.ctx, "menu:view:reset-window-layout")
+	if a.app != nil {
+		a.app.Event.Emit("menu:view:reset-window-layout", nil)
+	}
 }
 
 func (a *App) resetFontSize() {
-	wruntime.EventsEmit(a.ctx, "menu:view:reset-font-size")
+	if a.app != nil {
+		a.app.Event.Emit("menu:view:reset-font-size", nil)
+	}
 }
 
 func (a *App) showAbout() {
-	_, _ = wruntime.MessageDialog(a.ctx, wruntime.MessageDialogOptions{
-		Type:    wruntime.InfoDialog,
-		Title:   "About Run-Calc",
-		Message: "Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.",
-	})
+	if a.app != nil {
+		a.app.Dialog.Info().
+			SetTitle("About Run-Calc").
+			SetMessage("Run-Calc is a native Wails desktop calculator with a system menu and standard OS window chrome.").
+			Show()
+	}
 }
 
 func (a *App) openHelp() {
-	wruntime.EventsEmit(a.ctx, "menu:help:open")
+	if a.app != nil {
+		a.app.Event.Emit("menu:help:open", nil)
+	}
 }
 
 func (a *App) quit() {
 	a.allowCloseOnce.Store(true)
-	wruntime.Quit(a.ctx)
+	if a.app != nil {
+		a.app.Quit()
+	}
 }
 
-func (a *App) beforeClose(ctx context.Context) bool {
+func (a *App) beforeClose() bool {
 	if a.allowCloseOnce.Load() {
 		a.allowCloseOnce.Store(false)
 		return false
@@ -148,33 +187,50 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		return false
 	}
 
-	wruntime.EventsEmit(ctx, "window:hidden")
-	wruntime.WindowHide(ctx)
+	if a.app != nil {
+		a.app.Event.Emit("window:hidden", nil)
+	}
+	if a.mainWindow != nil {
+		a.mainWindow.Hide()
+	} else if a.app != nil {
+		if w := a.app.Window.Current(); w != nil {
+			w.Hide()
+		}
+	}
 	setProcessPriorityBackground()
 	return true
 }
 
 func (a *App) ShowWindow() {
-	if a.ctx == nil {
-		return
-	}
-
 	setProcessPriorityNormal()
-	wruntime.WindowShow(a.ctx)
-	wruntime.WindowUnminimise(a.ctx)
-	wruntime.EventsEmit(a.ctx, "window:shown")
+	if a.mainWindow != nil {
+		a.mainWindow.Show()
+		a.mainWindow.UnMinimise()
+	} else if a.app != nil {
+		if w := a.app.Window.Current(); w != nil {
+			w.Show()
+			w.UnMinimise()
+		}
+	}
+	if a.app != nil {
+		a.app.Event.Emit("window:shown", nil)
+	}
 
 	// Toggle always-on-top briefly to reliably bring restored tray windows to front on Windows.
 	if runtime.GOOS == "windows" {
-		wruntime.WindowSetAlwaysOnTop(a.ctx, true)
-		go func(ctx context.Context) {
-			time.Sleep(120 * time.Millisecond)
-			wruntime.WindowSetAlwaysOnTop(ctx, false)
-		}(a.ctx)
+		if a.mainWindow != nil {
+			a.mainWindow.SetAlwaysOnTop(true)
+			go func() {
+				time.Sleep(120 * time.Millisecond)
+				if a.mainWindow != nil {
+					a.mainWindow.SetAlwaysOnTop(false)
+				}
+			}()
+		}
 	}
 }
 
-func (a *App) onSecondInstanceLaunch(_ options.SecondInstanceData) {
+func (a *App) onSecondInstanceLaunch(_ application.SecondInstanceData) {
 	a.ShowWindow()
 }
 
@@ -244,19 +300,23 @@ func (a *App) GetDefaultWorksheetDirectory() string {
 // SelectWorksheetEncryptedSavePath opens native OS save dialog for encrypted worksheet files.
 // Returns empty string if user cancels or dialog fails.
 func (a *App) SelectWorksheetEncryptedSavePath(defaultFileName string) string {
-	if a.ctx == nil {
+	if a.app == nil {
 		return ""
 	}
 
-	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+	dialog := a.app.Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
 		Title:                "Save Worksheet (Encrypted)",
-		DefaultDirectory:     a.GetDefaultWorksheetDirectory(),
-		DefaultFilename:      defaultFileName,
+		Directory:            a.GetDefaultWorksheetDirectory(),
+		Filename:             defaultFileName,
 		CanCreateDirectories: true,
-		Filters: []wruntime.FileFilter{
+		Filters: []application.FileFilter{
 			{DisplayName: "Run-Calc Worksheet (*.rcalc)", Pattern: "*.rcalc"},
 		},
 	})
+	if a.mainWindow != nil {
+		dialog.AttachToWindow(a.mainWindow)
+	}
+	selectedPath, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return ""
 	}
@@ -266,20 +326,24 @@ func (a *App) SelectWorksheetEncryptedSavePath(defaultFileName string) string {
 // SelectWorksheetPlaintextExportPath opens native OS save dialog for plaintext worksheet exports.
 // Returns empty string if user cancels or dialog fails.
 func (a *App) SelectWorksheetPlaintextExportPath(defaultFileName string) string {
-	if a.ctx == nil {
+	if a.app == nil {
 		return ""
 	}
 
-	selectedPath, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+	dialog := a.app.Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
 		Title:                "Export Worksheet (Plain Text)",
-		DefaultDirectory:     a.GetDefaultWorksheetDirectory(),
-		DefaultFilename:      defaultFileName,
+		Directory:            a.GetDefaultWorksheetDirectory(),
+		Filename:             defaultFileName,
 		CanCreateDirectories: true,
-		Filters: []wruntime.FileFilter{
+		Filters: []application.FileFilter{
 			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
 			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
 		},
 	})
+	if a.mainWindow != nil {
+		dialog.AttachToWindow(a.mainWindow)
+	}
+	selectedPath, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return ""
 	}
@@ -289,18 +353,22 @@ func (a *App) SelectWorksheetPlaintextExportPath(defaultFileName string) string 
 // SelectWorksheetLoadPath opens native OS open dialog for encrypted worksheet files.
 // Returns empty string if user cancels or dialog fails.
 func (a *App) SelectWorksheetLoadPath() string {
-	if a.ctx == nil {
+	if a.app == nil {
 		return ""
 	}
 
-	selectedPath, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
-		Title:            "Load Worksheet",
-		DefaultDirectory: a.GetDefaultWorksheetDirectory(),
-		Filters: []wruntime.FileFilter{
+	dialog := a.app.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+		Title:     "Load Worksheet",
+		Directory: a.GetDefaultWorksheetDirectory(),
+		Filters: []application.FileFilter{
 			{DisplayName: "Run-Calc Worksheet (*.rcalc)", Pattern: "*.rcalc"},
 			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
 		},
 	})
+	if a.mainWindow != nil {
+		dialog.AttachToWindow(a.mainWindow)
+	}
+	selectedPath, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return ""
 	}
