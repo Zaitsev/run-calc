@@ -1,12 +1,12 @@
 module calc
 
-go 1.26.5
+go 1.26.10
 
 require (
 	github.com/expr-lang/expr v1.17.8
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/openai/openai-go v1.12.0
-	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
+	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/wailsapp/wails/v2 v2.13.0
 	github.com/zalando/go-keyring v0.2.8
 )
@@ -41,10 +41,10 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.12.0 => C:\Users\vladz\go\pkg\mod
