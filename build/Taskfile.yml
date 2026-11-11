@@ -321,7 +321,7 @@ tasks:
           TAG:
             ref: .TAG
     cmds:
-      - docker run --rm -p {{.PORT | default "8080"}}:8080 {{.TAG | default (printf "%s:latest" .APP_NAME)}}
+      - docker run --rm -p 127.0.0.1:{{.PORT | default "8080"}}:8080 {{.TAG | default (printf "%s:latest" (.APP_NAME | lower))}}
     vars:
       TAG: "{{.TAG}}"
       PORT: "{{.PORT}}"

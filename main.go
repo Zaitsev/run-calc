@@ -66,6 +66,9 @@ func main() {
 	wailsApp := application.New(application.Options{
 		Name:        "Run-Calc",
 		Description: "Run-Calc notepad-style calculator",
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
 		Services: []application.Service{
 			application.NewService(app),
 		},
