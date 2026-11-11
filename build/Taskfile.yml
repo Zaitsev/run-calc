@@ -95,7 +95,7 @@ tasks:
     cmds:
       - task: frontend:run
         vars:
-          SCRIPT: '{{if eq .DEV "true"}}build:dev{{else}}build{{end}}'
+          SCRIPT: "build"
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
 
@@ -297,7 +297,7 @@ tasks:
         --build-arg CGO_ENABLED={{.CGO_ENABLED | default "0"}}
         --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:alpine"}}
         --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}}
-        -t {{.TAG | default (printf "%s:latest" .APP_NAME)}}
+        -t {{.TAG | default (printf "%s:latest" (.APP_NAME | lower))}}
         -f build/docker/Dockerfile.server .
     vars:
       TAG: "{{.TAG}}"
@@ -332,7 +332,7 @@ tasks:
       Builds the Docker image needed for cross-compiling to any platform.
       Run this once to enable cross-platform builds from any OS.
     cmds:
-      - docker build -t wails-cross -f build/docker/Dockerfile.cross build/docker/
+      - docker build {{if .ARCH}}--platform linux/{{.ARCH}} {{end}}-t wails-cross -f build/docker/Dockerfile.cross build/docker/
     preconditions:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker is required. Please install Docker first."

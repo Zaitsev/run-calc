@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     Events,
@@ -6,7 +6,7 @@ import {
     System,
     Window,
 } from '@wailsio/runtime';
-import { SetMinimiseToTrayOnClose } from '../../bindings/calc/app';
+import { SetMinimiseToTrayOnClose, SetWindowTheme } from '../../bindings/calc/app';
 import {
     WINDOW_STATE_KEY,
     WINDOW_STATE_SAVE_DEBOUNCE_MS,
@@ -17,6 +17,9 @@ import {
     SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
     SETTINGS_DRAWER_MIN_WINDOW_WIDTH,
 } from '../constants';
+import { useThemeContext } from './ThemeContext';
+import type { ThemeState } from '../useTheme';
+import { inferCustomThemeMode } from '../utils/colorUtils';
 
 type WindowContextValue = {
     runtimePlatform: string;
@@ -27,11 +30,13 @@ type WindowContextValue = {
     restoreWindowAfterThemeStore: () => Promise<void>;
     expandWindowForSettingsDrawer: (drawerWidth: number) => Promise<void>;
     restoreWindowAfterSettingsDrawer: () => Promise<void>;
+    syncWindowTheme: (theme: ThemeState) => void;
 };
 
 const WindowContext = createContext<WindowContextValue | null>(null);
 
 export function WindowProvider({ children }: { children: ReactNode }) {
+    const { theme } = useThemeContext();
     const [runtimePlatform, setRuntimePlatform] = useState(() => {
         if (System.IsWindows()) return 'windows';
         if (System.IsMac()) return 'darwin';
@@ -102,22 +107,32 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             const stored = readStoredState();
             if (!stored) return;
             try {
-                const activeScreen = await Screens.GetCurrent().catch(() => null);
-                const screens = activeScreen ? [] : await Screens.GetAll().catch(() => []);
-                const currentScreen = activeScreen ?? screens.find((s) => s.IsPrimary) ?? screens[0] ?? null;
+                const screens = await Screens.GetAll().catch(() => []);
+                const getScreenBounds = (s: (typeof screens)[number]) => {
+                    const x = s.WorkArea?.X ?? s.Bounds?.X ?? s.X ?? 0;
+                    const y = s.WorkArea?.Y ?? s.Bounds?.Y ?? s.Y ?? 0;
+                    const w = s.WorkArea?.Width ?? s.Bounds?.Width ?? s.Size?.Width ?? 1920;
+                    const h = s.WorkArea?.Height ?? s.Bounds?.Height ?? s.Size?.Height ?? 1080;
+                    return { x, y, w, h };
+                };
+                const matchingScreen = screens.find((s) => {
+                    const b = getScreenBounds(s);
+                    return stored.x >= b.x && stored.x < b.x + b.w && stored.y >= b.y && stored.y < b.y + b.h;
+                });
+                const activeScreen = matchingScreen ? null : await Screens.GetCurrent().catch(() => null);
+                const currentScreen = matchingScreen ?? activeScreen ?? screens.find((s) => s.IsPrimary) ?? screens[0] ?? null;
                 if (!currentScreen) {
                     await Window.SetSize(stored.w, stored.h);
                     await Window.SetPosition(stored.x, stored.y);
                     return;
                 }
-                const screenWidth = currentScreen.WorkArea?.Width ?? currentScreen.Size?.Width ?? 1920;
-                const screenHeight = currentScreen.WorkArea?.Height ?? currentScreen.Size?.Height ?? 1080;
+                const { x: minX, y: minY, w: screenWidth, h: screenHeight } = getScreenBounds(currentScreen);
                 const cw = Math.min(stored.w, screenWidth);
                 const ch = Math.min(stored.h, screenHeight);
-                const maxX = Math.max(0, screenWidth - cw);
-                const maxY = Math.max(0, screenHeight - ch);
+                const maxX = Math.max(minX, minX + screenWidth - cw);
+                const maxY = Math.max(minY, minY + screenHeight - ch);
                 await Window.SetSize(cw, ch);
-                await Window.SetPosition(Math.min(Math.max(stored.x, 0), maxX), Math.min(Math.max(stored.y, 0), maxY));
+                await Window.SetPosition(Math.min(Math.max(stored.x, minX), maxX), Math.min(Math.max(stored.y, minY), maxY));
             } catch { /* ignore */ }
         };
 
@@ -158,6 +173,26 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             void persistWindowState(true);
         };
     }, []);
+
+    const syncWindowTheme = useCallback((targetTheme: ThemeState) => {
+        if (runtimePlatform !== 'windows') return;
+        let mode: 'system' | 'light' | 'dark' = 'dark';
+        if (targetTheme.type === 'system') {
+            mode = 'system';
+        } else if (targetTheme.type === 'light' || targetTheme.type === 'light-high-contrast') {
+            mode = 'light';
+        } else if (targetTheme.type === 'dark' || targetTheme.type === 'dark-high-contrast') {
+            mode = 'dark';
+        } else {
+            const customBase = targetTheme.customThemeBase || inferCustomThemeMode(targetTheme.customColors);
+            mode = customBase === 'light' ? 'light' : 'dark';
+        }
+        SetWindowTheme(mode).catch(() => {});
+    }, [runtimePlatform]);
+
+    useEffect(() => {
+        syncWindowTheme(theme);
+    }, [syncWindowTheme, theme]);
 
     const resetWindowLayout = (onReset?: () => void) => {
         localStorage.removeItem(WINDOW_STATE_KEY);
@@ -211,6 +246,7 @@ export function WindowProvider({ children }: { children: ReactNode }) {
             resetWindowLayout,
             expandWindowForThemeStore, restoreWindowAfterThemeStore,
             expandWindowForSettingsDrawer, restoreWindowAfterSettingsDrawer,
+            syncWindowTheme,
         }}>
             {children}
         </WindowContext.Provider>

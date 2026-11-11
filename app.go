@@ -231,6 +231,10 @@ func (a *App) SetMinimiseToTrayOnClose(enabled bool) {
 	a.minimiseToTrayOnClose.Store(enabled)
 }
 
+func (a *App) SetWindowTheme(mode string) {
+	a.applyNativeWindowTheme(mode)
+}
+
 
 // ===================== Worksheet File I/O (Secure Persistence) =====================
 

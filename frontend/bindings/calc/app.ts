@@ -139,6 +139,10 @@ export function SetMinimiseToTrayOnClose(enabled: boolean): $CancellablePromise<
     return $Call.ByID(384516174, enabled);
 }
 
+export function SetWindowTheme(mode: string): $CancellablePromise<void> {
+    return $Call.ByID(2182416316, mode);
+}
+
 export function ShowWindow(): $CancellablePromise<void> {
     return $Call.ByID(31117496);
 }
