@@ -176,7 +176,7 @@ export function WindowProvider({ children }: { children: ReactNode }) {
 
     const syncWindowTheme = useCallback((targetTheme: ThemeState) => {
         if (runtimePlatform !== 'windows') return;
-        let mode: 'system' | 'light' | 'dark' = 'dark';
+        let mode: 'system' | 'light' | 'dark';
         if (targetTheme.type === 'system') {
             mode = 'system';
         } else if (targetTheme.type === 'light' || targetTheme.type === 'light-high-contrast') {
