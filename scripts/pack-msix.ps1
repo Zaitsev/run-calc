@@ -2,10 +2,10 @@
 # Usage: .\scripts\pack-msix.ps1 [-Version 6.2.1.0] [-SelfSign] [-PfxPath .\build\certs\cert.pfx] [-PfxPassword "pass"]
 #
 # Prerequisites:
-#   - wails build -clean must have been run (or pass -SkipBuild)
+#   - wails3 task windows:build must have been run (or pass -SkipBuild)
 #   - App Certification Kit installed (makeappx.exe detected automatically)
 #
-# Output: build\bin\Run-Calc-<version>-windows.msix
+# Output: bin\Run-Calc-<version>-windows.msix
 
 [CmdletBinding()]
 param(
@@ -60,17 +60,20 @@ try {
 
     # 2. Optionally build the app
     if (-not $SkipBuild) {
-        Write-Host "`n==> wails build" -ForegroundColor Cyan
-        wails build -clean
+        Write-Host "`n==> wails3 task windows:build" -ForegroundColor Cyan
+        wails3 task windows:build
     }
 
-    $exe = Join-Path $root "build\bin\Run-Calc.exe"
+    $exe = Join-Path $root "bin\Run-Calc.exe"
+    if (-not (Test-Path $exe) -and (Test-Path (Join-Path $root "build\bin\Run-Calc.exe"))) {
+        $exe = Join-Path $root "build\bin\Run-Calc.exe"
+    }
     if (-not (Test-Path $exe)) {
-        throw "Executable not found at $exe. Run wails build first, or omit -SkipBuild."
+        throw "Executable not found at $exe. Run wails3 task windows:build first, or omit -SkipBuild."
     }
 
     # 3. Assemble staging directory
-    $staging = Join-Path $root "build\bin\msix-staging"
+    $staging = Join-Path $root "bin\msix-staging"
     if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
     New-Item $staging -ItemType Directory | Out-Null
 
@@ -111,7 +114,7 @@ try {
     Get-ChildItem $staging -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { Write-Host "    $_" }
 
     # 4. Pack
-    $outMsix = Join-Path $root "build\bin\Run-Calc-$Version-windows.msix"
+    $outMsix = Join-Path $root "bin\Run-Calc-$Version-windows.msix"
     if (Test-Path $outMsix) {
         Remove-Item $outMsix -Force
     }

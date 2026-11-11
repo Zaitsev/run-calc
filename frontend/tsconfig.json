@@ -27,7 +27,7 @@
   },
   "include": [
     "src",
-    "wailsjs",
+    "bindings",
     "../site/src/content/helpContent.ts"
   ],
   "references": [

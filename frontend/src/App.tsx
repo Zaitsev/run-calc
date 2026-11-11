@@ -1,10 +1,8 @@
 import { KeyboardEvent, WheelEvent as ReactWheelEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
-    EventsOn,
-    WindowGetSize,
-    WindowHide,
-    WindowSetSize
-} from '../wailsjs/runtime/runtime';
+    Events,
+    Window,
+} from '@wailsio/runtime';
 import { AIDebugDrawer } from './AIDebugDrawer';
 import './App.css';
 import {
@@ -40,8 +38,6 @@ import {
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
     INTELLIGENCE_HINT_SHOW_DELAY_MS,
     OPERATOR_KEY_RE,
-    SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
-    SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
 import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet, useWorksheetManager } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
@@ -143,9 +139,10 @@ function App() {
     } = useUIState();
     const {
         resetWindowLayout: resetWindowLayoutFromContext,
-        themeStoreOriginalSizeRef,
-        settingsDrawerOriginalSizeRef,
-        syncWindowTheme,
+        expandWindowForThemeStore,
+        restoreWindowAfterThemeStore,
+        expandWindowForSettingsDrawer,
+        restoreWindowAfterSettingsDrawer,
     } = useWindow();
     const {
         pendingThemePreview,
@@ -265,10 +262,6 @@ function App() {
             return changed ? newLines.join('\n') : currentContent;
         });
     }, [precision, scientificNotation, decimalDelimiter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        syncWindowTheme(theme);
-    }, [syncWindowTheme, theme]);
 
     useEffect(() => {
         if (!showClearWorksheetConfirm) {
@@ -484,7 +477,7 @@ function App() {
 
             event.preventDefault();
             lockProtectedWorksheetsIfEnabled();
-            WindowHide();
+            Window.Hide();
         };
 
         document.addEventListener('keydown', onDocumentEscape);
@@ -496,30 +489,30 @@ function App() {
     // --- Menu / keyboard event subscriptions ---
 
     useEffect(() => {
-        const unsubThemeStore = EventsOn('theme-store:open', () => {
+        const unsubThemeStore = Events.On('theme-store:open', () => {
             setShowHelp(false);
             setShowSettings(true);
             setShowThemeStore(true);
             void expandWindowForThemeStore();
         });
-        const unsubWindowHidden = EventsOn('window:hidden', () => {
+        const unsubWindowHidden = Events.On('window:hidden', () => {
             isWindowHiddenRef.current = true;
             lockProtectedWorksheetsIfEnabled();
         });
-        const unsubWindowShown = EventsOn('window:shown', () => {
+        const unsubWindowShown = Events.On('window:shown', () => {
             isWindowHiddenRef.current = false;
             runInactiveWorksheetAutoLockCheck();
         });
-        const unsubSystemResume = EventsOn('system:resume', lockProtectedWorksheetsOnSystemResume);
-        const unsubNew = EventsOn('menu:file:new', () => createWorksheet());
-        const unsubResetWindow = EventsOn('menu:view:reset-window-layout', resetWindowLayout);
-        const unsubIncrease = EventsOn('menu:view:increase-font-size', () => changeFontScale(1));
-        const unsubDecrease = EventsOn('menu:view:decrease-font-size', () => changeFontScale(-1));
-        const unsubResetFont = EventsOn('menu:view:reset-font-size', resetFontSize);
-        const unsubOpenHelp = EventsOn('menu:help:open', () => {
+        const unsubSystemResume = Events.On('system:resume', () => lockProtectedWorksheetsOnSystemResume());
+        const unsubNew = Events.On('menu:file:new', () => createWorksheet());
+        const unsubResetWindow = Events.On('menu:view:reset-window-layout', () => resetWindowLayout());
+        const unsubIncrease = Events.On('menu:view:increase-font-size', () => changeFontScale(1));
+        const unsubDecrease = Events.On('menu:view:decrease-font-size', () => changeFontScale(-1));
+        const unsubResetFont = Events.On('menu:view:reset-font-size', () => resetFontSize());
+        const unsubOpenHelp = Events.On('menu:help:open', () => {
             openHelpPanel();
         });
-        const unsubAIProgress = EventsOn('ai:progress', handleAIProgressEvent);
+        const unsubAIProgress = Events.On('ai:progress', (ev) => handleAIProgressEvent(ev?.data ?? ev));
         return () => {
             unsubThemeStore();
             unsubWindowHidden();
@@ -1449,76 +1442,9 @@ function App() {
         cancelThemePreviewInStore(setTheme);
     };
 
-
-
-    const expandWindowForThemeStore = async () => {
-        try {
-            const current = await WindowGetSize();
-            if (!themeStoreOriginalSizeRef.current) {
-                themeStoreOriginalSizeRef.current = { w: current.w, h: current.h };
-            }
-
-            const targetWidth = Math.min(1800, Math.max(1360, current.w + 260));
-            if (targetWidth !== current.w) {
-                WindowSetSize(targetWidth, current.h);
-            }
-        } catch {
-            // Keep UI functional even if window APIs fail.
-        }
-    };
-
-    const expandWindowForSettingsDrawer = async () => {
-        try {
-            const current = await WindowGetSize();
-            const requiredWidth = Math.min(
-                1800,
-                Math.max(SETTINGS_DRAWER_MIN_WINDOW_WIDTH, settingsDrawerWidth + SETTINGS_DRAWER_MIN_EDITOR_WIDTH),
-            );
-            if (current.w >= requiredWidth) {
-                return;
-            }
-
-            if (!settingsDrawerOriginalSizeRef.current) {
-                settingsDrawerOriginalSizeRef.current = { w: current.w, h: current.h };
-            }
-
-            WindowSetSize(requiredWidth, current.h);
-        } catch {
-            // Keep UI functional even if window APIs fail.
-        }
-    };
-
-    const restoreWindowAfterThemeStore = async () => {
-        const original = themeStoreOriginalSizeRef.current;
-        if (!original) {
-            return;
-        }
-
-        themeStoreOriginalSizeRef.current = null;
-        try {
-            WindowSetSize(original.w, original.h);
-        } catch {
-            // Ignore restore failures.
-        }
-    };
-
-    const restoreWindowAfterSettingsDrawer = async () => {
-        const original = settingsDrawerOriginalSizeRef.current;
-        if (!original) {
-            return;
-        }
-
-        settingsDrawerOriginalSizeRef.current = null;
-        try {
-            WindowSetSize(original.w, original.h);
-        } catch {
-            // Ignore restore failures.
-        }
-    };
-
     useEffect(() => {
         if (showSettings && !showThemeStore) {
-            void expandWindowForSettingsDrawer();
+            void expandWindowForSettingsDrawer(settingsDrawerWidth);
             return;
         }
 

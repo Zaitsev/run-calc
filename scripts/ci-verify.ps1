@@ -9,9 +9,6 @@ $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 
 try {
-    Write-Host "`n==> Go tests" -ForegroundColor Cyan
-    go test ./...
-
     Write-Host "`n==> Frontend: install" -ForegroundColor Cyan
     Push-Location "$root\frontend"
     npm install --no-audit --no-fund
@@ -24,8 +21,11 @@ try {
 
     Pop-Location
 
+    Write-Host "`n==> Go tests" -ForegroundColor Cyan
+    go test ./...
+
     Write-Host "`n==> Wails build (full app)" -ForegroundColor Cyan
-    wails build -clean
+    wails3 task build
 
     Write-Host "`nAll checks passed." -ForegroundColor Green
 }

@@ -14,6 +14,8 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/w32"
 )
 
 //go:embed build/windows/icon.ico
@@ -408,4 +410,26 @@ func applyEfficiencyToSingleProcess(pid uint32, state PROCESS_POWER_THROTTLING_S
 		unsafe.Sizeof(state),
 	)
 	procSetPriorityClass.Call(hProcess, priorityClass)
+}
+
+func (a *App) applyNativeWindowTheme(mode string) {
+	if a.mainWindow == nil {
+		return
+	}
+	hwndPtr := a.mainWindow.NativeWindow()
+	if hwndPtr == nil {
+		return
+	}
+	var isDark bool
+	switch mode {
+	case "dark":
+		isDark = true
+	case "light":
+		isDark = false
+	default:
+		isDark = w32.IsCurrentlyDarkMode()
+	}
+	application.InvokeAsync(func() {
+		w32.SetTheme(uintptr(hwndPtr), isDark)
+	})
 }

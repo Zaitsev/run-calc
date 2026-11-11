@@ -1,15 +1,15 @@
 {
 	"fixed": {
-		"file_version": "{{.Info.ProductVersion}}"
+		"file_version": "6.2.1"
 	},
 	"info": {
-		"0000": {
-			"ProductVersion": "{{.Info.ProductVersion}}",
-			"CompanyName": "{{.Info.CompanyName}}",
-			"FileDescription": "{{.Info.ProductName}}",
-			"LegalCopyright": "{{.Info.Copyright}}",
-			"ProductName": "{{.Info.ProductName}}",
-			"Comments": "{{.Info.Comments}}"
+		"0409": {
+			"ProductVersion": "6.2.1",
+			"CompanyName": "vladzaitsev",
+			"FileDescription": "Run-Calc Calculator Application",
+			"LegalCopyright": "© 2026, vladzaitsev",
+			"ProductName": "Run-Calc",
+			"Comments": "Notepad-style calculator with worksheet management and AI assistant"
 		}
 	}
 }

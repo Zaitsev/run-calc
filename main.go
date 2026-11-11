@@ -4,103 +4,112 @@ import (
 	"embed"
 	goruntime "runtime"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
-func applicationMenu(app *App) *menu.Menu {
-	appMenu := menu.NewMenu()
+func applicationMenu(app *App) *application.Menu {
+	appMenu := application.NewMenu()
 
 	if goruntime.GOOS == "darwin" {
-		appMenu.Append(menu.AppMenu())
+		appMenu.AddRole(application.AppMenu)
 	}
 
 	fileMenu := appMenu.AddSubmenu("File")
-	fileMenu.AddText("New", keys.CmdOrCtrl("n"), func(_ *menu.CallbackData) {
+	fileMenu.Add("New").SetAccelerator("CmdOrCtrl+n").OnClick(func(_ *application.Context) {
 		app.clearWorksheet()
 	})
 	fileMenu.AddSeparator()
-	fileMenu.AddText("Quit (your work is saved)", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+	fileMenu.Add("Quit (your work is saved)").SetAccelerator("CmdOrCtrl+q").OnClick(func(_ *application.Context) {
 		app.quit()
 	})
 
 	viewMenu := appMenu.AddSubmenu("View")
-	viewMenu.AddText("Reload", keys.CmdOrCtrl("r"), func(_ *menu.CallbackData) {
+	viewMenu.Add("Reload").SetAccelerator("CmdOrCtrl+r").OnClick(func(_ *application.Context) {
 		app.reloadWindow()
 	})
-	viewMenu.AddText("Increase Font Size", keys.CmdOrCtrl("="), func(_ *menu.CallbackData) {
+	viewMenu.Add("Increase Font Size").SetAccelerator("CmdOrCtrl+=").OnClick(func(_ *application.Context) {
 		app.increaseFontSize()
 	})
-	viewMenu.AddText("Decrease Font Size", keys.CmdOrCtrl("-"), func(_ *menu.CallbackData) {
+	viewMenu.Add("Decrease Font Size").SetAccelerator("CmdOrCtrl+-").OnClick(func(_ *application.Context) {
 		app.decreaseFontSize()
 	})
-	viewMenu.AddText("Reset Font Size", keys.CmdOrCtrl("0"), func(_ *menu.CallbackData) {
+	viewMenu.Add("Reset Font Size").SetAccelerator("CmdOrCtrl+0").OnClick(func(_ *application.Context) {
 		app.resetFontSize()
 	})
-	viewMenu.AddText("Reset Window Layout", nil, func(_ *menu.CallbackData) {
+	viewMenu.Add("Reset Window Layout").OnClick(func(_ *application.Context) {
 		app.resetWindowLayout()
 	})
 
 	helpMenu := appMenu.AddSubmenu("Help")
-	helpMenu.AddText("Calculator Help", nil, func(_ *menu.CallbackData) {
+	helpMenu.Add("Calculator Help").OnClick(func(_ *application.Context) {
 		app.openHelp()
 	})
 	helpMenu.AddSeparator()
-	helpMenu.AddText("About Run-Calc", nil, func(_ *menu.CallbackData) {
+	helpMenu.Add("About Run-Calc").OnClick(func(_ *application.Context) {
 		app.showAbout()
 	})
 
 	if goruntime.GOOS == "darwin" {
-		appMenu.Append(menu.EditMenu())
+		appMenu.AddRole(application.EditMenu)
 	}
 
 	return appMenu
 }
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
-	var appMenu *menu.Menu
-	if goruntime.GOOS == "darwin" {
-		appMenu = applicationMenu(app)
-	}
 
-	// Create application with options
-	err := wails.Run(&options.App{
-		Title:     "Run-Calc",
-		Width:     1100,
-		Height:    760,
-		MinWidth:  240,
-		MinHeight: 120,
-		Frameless: false,
-		Menu:      appMenu,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	wailsApp := application.New(application.Options{
+		Name:        "Run-Calc",
+		Description: "Run-Calc notepad-style calculator",
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		Windows: &windows.Options{
-			Theme:        windows.SystemDefault,
-			BackdropType: windows.Mica,
+		Services: []application.Service{
+			application.NewService(app),
 		},
-		OnStartup:     app.startup,
-		OnShutdown:    app.shutdown,
-		OnBeforeClose: app.beforeClose,
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId:               "19878879-f3de-4597-8575-567d72f4f74a",
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
+		},
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID:               "19878879-f3de-4597-8575-567d72f4f74a",
 			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
-		},
-		Bind: []interface{}{
-			app,
 		},
 	})
 
+	app.init(wailsApp)
+
+	if goruntime.GOOS == "darwin" {
+		wailsApp.Menu.SetApplicationMenu(applicationMenu(app))
+	}
+
+	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:            "Run-Calc",
+		Width:            1100,
+		Height:           760,
+		MinWidth:         240,
+		MinHeight:        120,
+		Frameless:        false,
+		BackgroundColour: application.NewRGBA(27, 38, 54, 255),
+		Windows: application.WindowsWindow{
+			Theme:        application.SystemDefault,
+			BackdropType: application.Mica,
+		},
+	})
+
+	mainWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if app.beforeClose() {
+			event.Cancel()
+		}
+	})
+
+	app.mainWindow = mainWindow
+
+	err := wailsApp.Run()
 	if err != nil {
 		println("Error:", err.Error())
 	}

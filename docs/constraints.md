@@ -5,9 +5,9 @@
 - **LF line endings only**: Enforced via `.gitattributes` and `.github/copilot-instructions.md`. Never introduce CRLF.
 - **Indentation**: Go uses tabs (4-wide). Everything else uses 2-space indent (via `.editorconfig`).
 - **Auto-generated files** (do not edit directly):
-  - `frontend/wailsjs/` — Wails bindings
+  - `frontend/bindings/` — Wails v3 bindings
   - `frontend/dist/` — go:embed dependency
-  - `build/bin/` — build output (gitignored)
+  - `bin/` — build output (gitignored)
 
 ## File-Scoped Instruction Files
 

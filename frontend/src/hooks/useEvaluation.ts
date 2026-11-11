@@ -3,7 +3,7 @@ import type { AIContextMode, AISettingsState } from '../AISettings';
 import type { AIDebugEntry } from '../AIDebugDrawer';
 import type { AIRunResponse } from '../types/app';
 import type { DecimalDelimiter, PrecisionMode } from '../types/app';
-import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../wailsjs/go/main/App';
+import { CaptureRandomState, EvaluateExprProgram, RestoreRandomState, RunAIQuery } from '../../bindings/calc/app';
 import {
     getExpressionSource,
     isAITriggerLine,

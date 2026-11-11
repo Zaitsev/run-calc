@@ -47,4 +47,4 @@ if ($null -eq $selectedPort) {
 $devServer = "127.0.0.1:$selectedPort"
 Write-Host "Starting Wails dev server on $devServer" -ForegroundColor Cyan
 
-& wails dev -devserver $devServer @WailsArgs
+& wails3 dev -port $selectedPort @WailsArgs

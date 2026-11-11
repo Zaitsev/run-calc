@@ -13,3 +13,6 @@ func setProcessPriorityBackground() {
 
 func setProcessPriorityNormal() {
 }
+
+func (a *App) applyNativeWindowTheme(mode string) {
+}
