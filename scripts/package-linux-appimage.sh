@@ -6,7 +6,10 @@ APP_NAME="${APP_NAME:-Run-Calc}"
 VERSION="${VERSION:-dev}"
 ARCH="${ARCH:-x86_64}"
 
-BIN_PATH="${ROOT_DIR}/build/bin/${APP_NAME}"
+BIN_PATH="${ROOT_DIR}/bin/${APP_NAME}"
+if [[ ! -x "${BIN_PATH}" && -x "${ROOT_DIR}/build/bin/${APP_NAME}" ]]; then
+  BIN_PATH="${ROOT_DIR}/build/bin/${APP_NAME}"
+fi
 ICON_PATH="${ROOT_DIR}/frontend/src/assets/images/icons/hare-calc-256.png"
 APPIMAGE_BUILD_DIR="${ROOT_DIR}/build/appimage"
 APPDIR="${APPIMAGE_BUILD_DIR}/AppDir"

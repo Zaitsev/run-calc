@@ -12,7 +12,7 @@ Runs the same checks as CI locally. Use this before pushing to catch failures ea
 .\scripts\ci-verify.ps1
 ```
 
-Steps performed: Go tests → frontend `npm install` → frontend build → frontend tests → `wails build -clean`.
+Steps performed: frontend `npm install` → frontend build → frontend tests → Go tests → `wails3 task build`.
 
 ---
 
@@ -23,15 +23,15 @@ Starts the Wails dev server on a random free port in a configurable range (avoid
 ```powershell
 .\scripts\dev-wails.ps1
 .\scripts\dev-wails.ps1 -StartPort 34115 -EndPort 35999
-# Pass extra flags through to wails dev:
-.\scripts\dev-wails.ps1 -- -tags dev
+# Pass extra flags through to wails3 dev:
+.\scripts\dev-wails.ps1 -- -config ./build/config.yml
 ```
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `-StartPort` | `34115` | Low end of port search range |
 | `-EndPort` | `35999` | High end of port search range |
-| remaining args | — | Forwarded verbatim to `wails dev` |
+| remaining args | — | Forwarded verbatim to `wails3 dev` |
 
 ---
 
@@ -71,7 +71,7 @@ Builds and packages the app as an MSIX. Optionally signs it with a PFX for local
 # Full build + pack (no signing)
 .\scripts\pack-msix.ps1
 
-# Skip wails build (use existing build\bin\Run-Calc.exe)
+# Skip wails3 build (use existing bin\Run-Calc.exe)
 .\scripts\pack-msix.ps1 -SkipBuild
 
 # Pack + sign for local sideload testing
@@ -84,13 +84,13 @@ Builds and packages the app as an MSIX. Optionally signs it with a PFX for local
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `-Version` | `6.2.1.0` | Four-part version written into `AppxManifest.xml` |
-| `-SkipBuild` | off | Skip `wails build -clean`; use existing executable |
+| `-SkipBuild` | off | Skip `wails3 task windows:build`; use existing executable |
 | `-SelfSign` | off | Sign the MSIX after packing |
 | `-PfxPath` | — | Path to PFX file (create with `New-MsixDevCert.ps1`) |
 | `-PfxPassword` | — | PFX password |
 | `-CertSubject` | read from manifest | Override cert Subject for store lookup (only used when `-PfxPath` is omitted) |
 
-Output: `build\bin\Run-Calc-<Version>-windows.msix`
+Output: `bin\Run-Calc-<Version>-windows.msix`
 
 **Typical local test workflow:**
 ```powershell
@@ -101,7 +101,7 @@ Output: `build\bin\Run-Calc-<Version>-windows.msix`
 .\scripts\pack-msix.ps1 -SelfSign -PfxPath .\build\certs\Run-Calc-Dev.pfx -PfxPassword "MyPass"
 
 # 3. Install
-Add-AppxPackage .\build\bin\Run-Calc-6.2.1.0-windows.msix
+Add-AppxPackage .\bin\Run-Calc-6.2.1.0-windows.msix
 ```
 
 ---

@@ -11,7 +11,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-func applicationMenu(app *App, wailsApp *application.App) *application.Menu {
+func applicationMenu(app *App) *application.Menu {
 	appMenu := application.NewMenu()
 
 	if goruntime.GOOS == "darwin" {
@@ -81,7 +81,7 @@ func main() {
 	app.init(wailsApp)
 
 	if goruntime.GOOS == "darwin" {
-		wailsApp.Menu.SetApplicationMenu(applicationMenu(app, wailsApp))
+		wailsApp.Menu.SetApplicationMenu(applicationMenu(app))
 	}
 
 	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{

@@ -50,7 +50,7 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 	a.minimiseToTrayOnClose.Store(true)
 	a.startTray()
 	a.startSleepResumeMonitor()
-	a.ShowWindow()
+	setProcessPriorityNormal()
 	return nil
 }
 
@@ -62,15 +62,6 @@ func (a *App) ServiceShutdown() error {
 		a.sleepMonitorCancel = nil
 	}
 	return nil
-}
-
-// startup is kept for backwards compatibility
-func (a *App) startup(ctx context.Context) {
-	_ = a.ServiceStartup(ctx, application.ServiceOptions{})
-}
-
-func (a *App) shutdown(ctx context.Context) {
-	_ = a.ServiceShutdown()
 }
 
 func (a *App) startSleepResumeMonitor() {
@@ -206,10 +197,12 @@ func (a *App) ShowWindow() {
 	if a.mainWindow != nil {
 		a.mainWindow.Show()
 		a.mainWindow.UnMinimise()
+		a.mainWindow.Focus()
 	} else if a.app != nil {
 		if w := a.app.Window.Current(); w != nil {
 			w.Show()
 			w.UnMinimise()
+			w.Focus()
 		}
 	}
 	if a.app != nil {

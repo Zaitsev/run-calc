@@ -8,29 +8,27 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="demo"
+        Path="Run-Calc.exe"
         Arguments=""
-        InstallLocation="C:\Program Files\My Company\My Product">
+        InstallLocation="C:\Program Files\vladzaitsev\Run-Calc">
     </Installer>
     <PackageInformation
-        PackageName="My Product"
-        PackageDisplayName="My Product"
-        PublisherName="CN=My Company"
-        PublisherDisplayName="My Company"
-        Version="0.1.0.0"
-        PackageDescription="A demo application">
+        PackageName="Run-Calc"
+        PackageDisplayName="Run-Calc"
+        PublisherName="CN=9B7E30DB-5D4F-41F4-9A64-A0FE774F4A33"
+        PublisherDisplayName="Vlad Zaitsev"
+        Version="6.2.1.0"
+        PackageDescription="Run-Calc Calculator Application">
         <Capabilities>
             <Capability Name="runFullTrust" />
-            
         </Capabilities>
         <Applications>
             <Application
-                Id="com.example.demo"
-                Description="A demo application"
-                DisplayName="My Product"
-                ExecutableName="demo"
+                Id="RunCalc"
+                Description="Run-Calc Calculator Application"
+                DisplayName="Run-Calc"
+                ExecutableName="Run-Calc.exe"
                 EntryPoint="Windows.FullTrustApplication">
-                
             </Application>
         </Applications>
         <Resources>
@@ -41,13 +39,13 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>My Product</DisplayName>
-            <PublisherDisplayName>My Company</PublisherDisplayName>
-            <Description>A demo application</Description>
+            <DisplayName>Run-Calc</DisplayName>
+            <PublisherDisplayName>Vlad Zaitsev</PublisherDisplayName>
+            <Description>Run-Calc Calculator Application</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="demo.msix" />
+    <SaveLocation PackagePath="Run-Calc.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

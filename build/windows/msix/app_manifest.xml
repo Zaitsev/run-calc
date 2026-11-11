@@ -7,16 +7,16 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap3">
   
-  <Identity 
-    Name="com.example.demo"
-    Publisher="CN=My Company"
-    Version="0.1.0.0" 
+  <Identity
+    Name="VladZaitsev.Run-Calc"
+    Publisher="CN=9B7E30DB-5D4F-41F4-9A64-A0FE774F4A33"
+    Version="6.2.1.0"
     ProcessorArchitecture="x64" />
   
   <Properties>
-    <DisplayName>My Product</DisplayName>
-    <PublisherDisplayName>My Company</PublisherDisplayName>
-    <Description>A demo application</Description>
+    <DisplayName>Run-Calc</DisplayName>
+    <PublisherDisplayName>Vlad Zaitsev</PublisherDisplayName>
+    <Description>Run-Calc Calculator Application</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   
@@ -29,10 +29,10 @@
   </Resources>
   
   <Applications>
-    <Application Id="com.example.demo" Executable="demo" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="RunCalc" Executable="Run-Calc.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="My Product"
-        Description="A demo application"
+        DisplayName="Run-Calc"
+        Description="Run-Calc Calculator Application"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -41,9 +41,7 @@
       </uap:VisualElements>
       
       <Extensions>
-        <desktop:Extension Category="windows.fullTrustProcess" Executable="demo" />
-        
-        
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="Run-Calc.exe" />
       </Extensions>
     </Application>
   </Applications>

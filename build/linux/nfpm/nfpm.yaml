@@ -3,26 +3,26 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "demo"
+name: "Run-Calc"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+version: "6.2.1"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A demo application"
-vendor: "My Company"
+description: "Run-Calc Calculator Application"
+vendor: "vladzaitsev"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/demo"
-    dst: "/usr/local/bin/demo"
+  - src: "./bin/Run-Calc"
+    dst: "/usr/local/bin/Run-Calc"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/demo.png"
-  - src: "./build/linux/demo.desktop"
-    dst: "/usr/share/applications/demo.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/Run-Calc.png"
+  - src: "./build/linux/desktop"
+    dst: "/usr/share/applications/Run-Calc.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

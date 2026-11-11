@@ -38,8 +38,6 @@ import {
     INTELLIGENCE_HINT_HIDE_IDLE_MS,
     INTELLIGENCE_HINT_SHOW_DELAY_MS,
     OPERATOR_KEY_RE,
-    SETTINGS_DRAWER_MIN_EDITOR_WIDTH,
-    SETTINGS_DRAWER_MIN_WINDOW_WIDTH
 } from './constants';
 import { useAI, useDisplaySettings, useEditorUI, useStatus, useThemeContext, useThemeStore, useUIState, useWindow, useWorksheet, useWorksheetManager } from './contexts';
 import { buildEvaluationHooks } from './hooks/useEvaluation';
@@ -141,9 +139,10 @@ function App() {
     } = useUIState();
     const {
         resetWindowLayout: resetWindowLayoutFromContext,
-        themeStoreOriginalSizeRef,
-        settingsDrawerOriginalSizeRef,
-        syncWindowTheme,
+        expandWindowForThemeStore,
+        restoreWindowAfterThemeStore,
+        expandWindowForSettingsDrawer,
+        restoreWindowAfterSettingsDrawer,
     } = useWindow();
     const {
         pendingThemePreview,
@@ -263,10 +262,6 @@ function App() {
             return changed ? newLines.join('\n') : currentContent;
         });
     }, [precision, scientificNotation, decimalDelimiter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        syncWindowTheme(theme);
-    }, [syncWindowTheme, theme]);
 
     useEffect(() => {
         if (!showClearWorksheetConfirm) {
@@ -1447,80 +1442,9 @@ function App() {
         cancelThemePreviewInStore(setTheme);
     };
 
-
-
-    const expandWindowForThemeStore = async () => {
-        try {
-            const current = await Window.Size();
-            const curW = current.width ?? (current as any).w;
-            const curH = current.height ?? (current as any).h;
-            if (!themeStoreOriginalSizeRef.current) {
-                themeStoreOriginalSizeRef.current = { w: curW, h: curH };
-            }
-
-            const targetWidth = Math.min(1800, Math.max(1360, curW + 260));
-            if (targetWidth !== curW) {
-                await Window.SetSize(targetWidth, curH);
-            }
-        } catch {
-            // Keep UI functional even if window APIs fail.
-        }
-    };
-
-    const expandWindowForSettingsDrawer = async () => {
-        try {
-            const current = await Window.Size();
-            const curW = current.width ?? (current as any).w;
-            const curH = current.height ?? (current as any).h;
-            const requiredWidth = Math.min(
-                1800,
-                Math.max(SETTINGS_DRAWER_MIN_WINDOW_WIDTH, settingsDrawerWidth + SETTINGS_DRAWER_MIN_EDITOR_WIDTH),
-            );
-            if (curW >= requiredWidth) {
-                return;
-            }
-
-            if (!settingsDrawerOriginalSizeRef.current) {
-                settingsDrawerOriginalSizeRef.current = { w: curW, h: curH };
-            }
-
-            await Window.SetSize(requiredWidth, curH);
-        } catch {
-            // Keep UI functional even if window APIs fail.
-        }
-    };
-
-    const restoreWindowAfterThemeStore = async () => {
-        const original = themeStoreOriginalSizeRef.current;
-        if (!original) {
-            return;
-        }
-
-        themeStoreOriginalSizeRef.current = null;
-        try {
-            await Window.SetSize(original.w, original.h);
-        } catch {
-            // Ignore restore failures.
-        }
-    };
-
-    const restoreWindowAfterSettingsDrawer = async () => {
-        const original = settingsDrawerOriginalSizeRef.current;
-        if (!original) {
-            return;
-        }
-
-        settingsDrawerOriginalSizeRef.current = null;
-        try {
-            await Window.SetSize(original.w, original.h);
-        } catch {
-            // Ignore restore failures.
-        }
-    };
-
     useEffect(() => {
         if (showSettings && !showThemeStore) {
-            void expandWindowForSettingsDrawer();
+            void expandWindowForSettingsDrawer(settingsDrawerWidth);
             return;
         }
 

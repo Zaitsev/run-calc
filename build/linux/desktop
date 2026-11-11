@@ -1,13 +1,11 @@
 [Desktop Entry]
 Version=1.0
-Name=My Product
-Comment=A demo application
+Name=Run-Calc
+Comment=Run-Calc Calculator Application
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/demo %u
+Exec=/usr/local/bin/Run-Calc %u
 Terminal=false
 Type=Application
-Icon=demo
+Icon=Run-Calc
 Categories=Utility;
-StartupWMClass=demo
-
- 
+StartupWMClass=Run-Calc
