@@ -11,7 +11,7 @@ info:
   description: "Run-Calc notepad-style calculator" # The application description
   copyright: "(c) 2026, vladzaitsev" # Copyright text
   comments: "Notepad-style expression evaluator" # Comments
-  version: "6.2.1" # The application version
+  version: "7.0.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

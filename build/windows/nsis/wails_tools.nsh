@@ -14,10 +14,10 @@
     !define INFO_PRODUCTNAME "Run-Calc"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "6.2.1"
+    !define INFO_PRODUCTVERSION "7.0.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "© 2026, vladzaitsev"
+    !define INFO_COPYRIGHT "(c) 2026, vladzaitsev"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"

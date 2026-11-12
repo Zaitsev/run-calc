@@ -1,15 +1,15 @@
 {
 	"fixed": {
-		"file_version": "6.2.1"
+		"file_version": "7.0.0"
 	},
 	"info": {
 		"0409": {
-			"ProductVersion": "6.2.1",
+			"ProductVersion": "7.0.0",
 			"CompanyName": "vladzaitsev",
-			"FileDescription": "Run-Calc Calculator Application",
-			"LegalCopyright": "© 2026, vladzaitsev",
+			"FileDescription": "Run-Calc notepad-style calculator",
+			"LegalCopyright": "(c) 2026, vladzaitsev",
 			"ProductName": "Run-Calc",
-			"Comments": "Notepad-style calculator with worksheet management and AI assistant"
+			"Comments": "Notepad-style expression evaluator"
 		}
 	}
 }

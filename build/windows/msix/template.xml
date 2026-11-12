@@ -17,7 +17,7 @@
         PackageDisplayName="Run-Calc"
         PublisherName="CN=9B7E30DB-5D4F-41F4-9A64-A0FE774F4A33"
         PublisherDisplayName="Vlad Zaitsev"
-        Version="6.2.1.0"
+        Version="7.0.0.0"
         PackageDescription="Run-Calc Calculator Application">
         <Capabilities>
             <Capability Name="runFullTrust" />
