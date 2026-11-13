@@ -674,7 +674,7 @@ export function SettingsPanel({
                         </div>
                     </div>
 
-                    {windowContext.runtimePlatform === 'windows' && (
+                    {(windowContext.runtimePlatform === 'windows' || windowContext.runtimePlatform === 'darwin') && (
                         <div className="settings-card">
                             <div className="settings-row">
                                 <div className="settings-row-info">

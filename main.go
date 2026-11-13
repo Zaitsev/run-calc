@@ -67,7 +67,7 @@ func main() {
 		Name:        "Run-Calc",
 		Description: "Run-Calc notepad-style calculator",
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		Services: []application.Service{
 			application.NewService(app),
@@ -85,6 +85,9 @@ func main() {
 
 	if goruntime.GOOS == "darwin" {
 		wailsApp.Menu.SetApplicationMenu(applicationMenu(app))
+		wailsApp.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
+			app.ShowWindow()
+		})
 	}
 
 	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{

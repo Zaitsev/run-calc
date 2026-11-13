@@ -170,7 +170,7 @@ func (a *App) beforeClose() bool {
 		return false
 	}
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		return false
 	}
 
