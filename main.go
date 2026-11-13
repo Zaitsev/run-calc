@@ -67,7 +67,7 @@ func main() {
 		Name:        "Run-Calc",
 		Description: "Run-Calc notepad-style calculator",
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: false,
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 		Services: []application.Service{
 			application.NewService(app),
