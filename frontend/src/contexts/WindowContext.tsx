@@ -70,7 +70,8 @@ export function WindowProvider({ children }: { children: ReactNode }) {
         System.Environment()
             .then((env) => {
                 if (!cancelled) {
-                    const os = env.OS?.toLowerCase();
+                    const rawOs = env.OS?.toLowerCase();
+                    const os = rawOs === 'macos' ? 'darwin' : rawOs;
                     if (os) setRuntimePlatform(os);
                 }
             })

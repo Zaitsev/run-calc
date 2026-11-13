@@ -85,6 +85,9 @@ func main() {
 
 	if goruntime.GOOS == "darwin" {
 		wailsApp.Menu.SetApplicationMenu(applicationMenu(app))
+		wailsApp.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
+			app.ShowWindow()
+		})
 	}
 
 	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
